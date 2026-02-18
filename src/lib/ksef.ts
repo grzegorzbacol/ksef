@@ -8,6 +8,13 @@ import { getKsefSettings } from "./settings";
 
 const DEFAULT_API_URL = "https://api.ksef.mf.gov.pl";
 
+/** Sprawdza, czy token nadaje się do nagłówka HTTP (tylko ASCII). Zwraca token, jeśli OK, lub null przy znakach spoza ASCII. */
+function tokenSafeForHeader(token: string): string | null {
+  if (!token) return null;
+  if (/[^\x00-\x7F]/.test(token)) return null;
+  return token;
+}
+
 export type KsefSendResult = { success: boolean; ksefId?: string; error?: string };
 
 export type KsefInvoiceRaw = {
@@ -136,6 +143,14 @@ export async function fetchInvoicesFromKsef(
     };
   }
 
+  const tokenForHeader = tokenSafeForHeader(token);
+  if (!tokenForHeader) {
+    return {
+      success: false,
+      error: "Token KSEF zawiera niedozwolone znaki (np. polskie litery przy wklejaniu). Użyj tokenu tylko ze znakami ASCII – skopiuj ponownie z portalu KSEF.",
+    };
+  }
+
   const from = dateFrom.slice(0, 10);
   const to = dateTo.slice(0, 10);
 
@@ -152,7 +167,7 @@ export async function fetchInvoicesFromKsef(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${tokenForHeader}`,
       },
       body: JSON.stringify(body),
     });
@@ -205,13 +220,21 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
     };
   }
 
+  const tokenForHeader = tokenSafeForHeader(token);
+  if (!tokenForHeader) {
+    return {
+      success: false,
+      error: "Token KSEF zawiera niedozwolone znaki (np. polskie litery przy wklejaniu). Użyj tokenu tylko ze znakami ASCII – skopiuj ponownie z portalu KSEF.",
+    };
+  }
+
   try {
     const url = `${apiUrl}${sendPath}`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${tokenForHeader}`,
       },
       body: JSON.stringify(invoice),
     });
