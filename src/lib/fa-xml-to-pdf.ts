@@ -128,38 +128,104 @@ function getNested(obj: unknown, key: string): unknown {
   return v;
 }
 
+/** Wyciąga dane z Podmiot1 (sprzedawca) i Podmiot2 (nabywca) – NIP, Nazwa z DaneIdentyfikacyjne. */
 function collectPartyData(parsed: unknown): {
+  sellerNip?: string;
+  sellerName?: string;
   sellerAddress?: string;
   sellerContact?: string;
+  buyerNip?: string;
+  buyerName?: string;
   buyerAddress?: string;
   buyerContact?: string;
 } {
-  const out: { sellerAddress?: string; sellerContact?: string; buyerAddress?: string; buyerContact?: string } = {};
-  function walk(n: unknown, depth: number, path: string[]): void {
+  const out: {
+    sellerNip?: string;
+    sellerName?: string;
+    sellerAddress?: string;
+    sellerContact?: string;
+    buyerNip?: string;
+    buyerName?: string;
+    buyerAddress?: string;
+    buyerContact?: string;
+  } = {};
+  function extractDaneId(dane: unknown): { nip?: string; nazwa?: string } {
+    if (dane == null || typeof dane !== "object") return {};
+    const o = dane as Record<string, unknown>;
+    let nip = getFirstText(o.NIP ?? o.nip);
+    if (!nip) {
+      const ident = getNested(dane, "Identyfikator") ?? getNested(dane, "Identifier");
+      if (ident && typeof ident === "object") {
+        nip = getFirstText((ident as Record<string, unknown>).NrID ?? (ident as Record<string, unknown>).nrId);
+      }
+    }
+    const nazwa = getFirstText(o.Nazwa ?? o.nazwa);
+    return { nip: nip || undefined, nazwa: nazwa || undefined };
+  }
+  function walk(n: unknown, depth: number): void {
     if (n == null || typeof n !== "object" || depth > 15) return;
     const o = n as Record<string, unknown>;
     for (const [tag, val] of Object.entries(o)) {
       const clean = stripNs(tag);
-      if (clean === "Podmiot1" && !out.sellerAddress) {
+      if (clean === "Podmiot1" && val && typeof val === "object") {
+        const v = val as Record<string, unknown>;
+        const dane = getNested(val, "DaneIdentyfikacyjne") ?? getNested(val, "daneIdentyfikacyjne");
+        const id = extractDaneId(dane);
+        if (id.nip) out.sellerNip = id.nip;
+        if (id.nazwa) out.sellerName = id.nazwa;
         const adres = getNested(val, "Adres");
         if (adres && typeof adres === "object") out.sellerAddress = formatAddress(adres as Record<string, unknown>);
         const kontakt = getFirstText(getNested(val, "DaneKontaktowe") ?? getNested(val, "Email") ?? getNested(val, "Telefon"));
         if (kontakt) out.sellerContact = kontakt;
       }
-      if (clean === "Podmiot2" && !out.buyerAddress) {
+      if (clean === "Podmiot2" && val && typeof val === "object") {
+        const dane = getNested(val, "DaneIdentyfikacyjne") ?? getNested(val, "daneIdentyfikacyjne");
+        const id = extractDaneId(dane);
+        if (id.nip) out.buyerNip = id.nip;
+        if (id.nazwa) out.buyerName = id.nazwa;
         const adres = getNested(val, "Adres");
         if (adres && typeof adres === "object") out.buyerAddress = formatAddress(adres as Record<string, unknown>);
         const kontakt = getFirstText(getNested(val, "DaneKontaktowe") ?? getNested(val, "Email") ?? getNested(val, "Telefon"));
         if (kontakt) out.buyerContact = kontakt;
       }
       if (val && typeof val === "object") {
-        if (Array.isArray(val)) val.forEach((item) => walk(item, depth + 1, [...path, tag]));
-        else walk(val, depth + 1, [...path, tag]);
+        if (Array.isArray(val)) val.forEach((item) => walk(item, depth + 1));
+        else walk(val, depth + 1);
       }
     }
   }
-  walk(parsed, 0, []);
+  walk(parsed, 0);
   return out;
+}
+
+/** Wyciąga z sekcji Fa: P_1 (data), P_2 (numer), P_13_1 (netto), P_14_1 (VAT), P_15 (brutto). */
+function extractFaAmounts(parsed: unknown): {
+  number?: string;
+  issueDate?: string;
+  saleDate?: string;
+  netAmount?: number;
+  vatAmount?: number;
+  grossAmount?: number;
+  currency?: string;
+} {
+  const fa = getNested(parsed, "Fa") ?? getNested(parsed, "fa");
+  if (fa == null || typeof fa !== "object") return {};
+  const o = fa as Record<string, unknown>;
+  const p1 = getFirstText(o.P_1);
+  const p2 = getFirstText(o.P_2);
+  const p6 = getFirstText(o.P_6);
+  const p13_1 = getFirstNum(o.P_13_1);
+  const p14_1 = getFirstNum(o.P_14_1);
+  const p15 = getFirstNum(o.P_15);
+  const waluta = getFirstText(o.KodWaluty);
+  return {
+    number: p2 || undefined,
+    issueDate: p1 || p6 || undefined,
+    netAmount: p13_1 || 0,
+    vatAmount: p14_1 || 0,
+    grossAmount: p15 || 0,
+    currency: waluta || "PLN",
+  };
 }
 
 function collectLines(node: unknown): FaInvoiceData["items"] {
@@ -200,16 +266,14 @@ function collectLines(node: unknown): FaInvoiceData["items"] {
   return items;
 }
 
+// Uwaga: W FA(3) P_13_1, P_14_1, P_15 w sekcji Fa to KWOTY (netto, VAT, brutto), nie dane podmiotów!
 const TEXT_KEYS = [
-  "P_1", "P_2_1", "P_3_1", "P_4_1", "P_4_2",
-  "P_13_1", "P_14_1", "P_15_1", "P_16_1",
+  "P_1", "P_2", "P_2_1", "P_3_1", "P_4_1", "P_4_2",
   "Numer", "DataWystawienia", "DataSprzedazy", "Waluta",
-  "NIP", "Nazwa", "KodKraju", "AdresL1", "NazwaUlicy", "NrDomu", "NrLokalu", "KodPocztowy", "Miejscowosc", "NazwaMiejscowosci",
-  "Email", "Telefon", "NumerKlienta", "NumerUmowy",
   "FormaPlatnosci", "TerminPlatnosci", "NumerRachunku", "SWIFT", "NazwaBanku",
+  "NumerKlienta", "NumerUmowy",
   "KRS", "REGON", "NumerKSeF", "LinkWeryfikacyjny", "StopkaFaktury",
 ];
-const NUM_KEYS = ["P_13_2", "P_14_2", "P_15_2", "KwotaNetto", "KwotaVAT", "KwotaBrutto"];
 
 export function parseFaXmlToInvoiceData(xmlString: string): FaInvoiceData | null {
   const parser = new XMLParser({
@@ -226,24 +290,26 @@ export function parseFaXmlToInvoiceData(xmlString: string): FaInvoiceData | null
   }
   const text: Record<string, string> = {};
   const num: Record<string, number> = {};
-  collect(parsed, text, num, TEXT_KEYS, NUM_KEYS);
+  collect(parsed, text, num, TEXT_KEYS, []);
 
-  const number = text.P_1 || text.Numer || "";
-  const issueDate = text.P_2_1 || text.DataWystawienia || new Date().toISOString().slice(0, 10);
+  const fa = extractFaAmounts(parsed);
+  const party = collectPartyData(parsed);
+
+  const number = fa.number || text.P_2 || text.P_2_1 || text.Numer || "";
+  const issueDate = (fa.issueDate || text.P_2_1 || text.DataWystawienia || text.P_1 || "").slice(0, 10) || new Date().toISOString().slice(0, 10);
   const saleDate = text.P_3_1 || text.DataSprzedazy || undefined;
   const dateFrom = text.P_4_1 || undefined;
   const dateTo = text.P_4_2 || undefined;
-  const sellerNip = text.P_13_1 || text.NIP || "—";
-  const sellerName = text.P_14_1 || text.Nazwa || "—";
-  const buyerNip = text.P_15_1 || "—";
-  const buyerName = text.P_16_1 || "—";
-  const netAmount = num.P_13_2 || num.KwotaNetto || 0;
-  const vatAmount = num.P_14_2 || num.KwotaVAT || 0;
-  const grossAmount = num.P_15_2 || num.KwotaBrutto || netAmount + vatAmount;
-  const currency = text.Waluta || "PLN";
+  const sellerNip = party.sellerNip || "—";
+  const sellerName = party.sellerName || "—";
+  const buyerNip = party.buyerNip || "—";
+  const buyerName = party.buyerName || "—";
+  const netAmount = fa.netAmount ?? 0;
+  const vatAmount = fa.vatAmount ?? 0;
+  const grossAmount = fa.grossAmount ?? (netAmount + vatAmount);
+  const currency = fa.currency || text.Waluta || "PLN";
 
   const items = collectLines(parsed);
-  const party = collectPartyData(parsed);
   if (!number && !sellerNip && !buyerNip) return null;
 
   const data: FaInvoiceData = {
