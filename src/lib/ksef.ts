@@ -4,7 +4,7 @@
  * Dokumentacja: https://ksef.mf.gov.pl, API 2.0
  */
 
-import { getKsefSettings } from "./settings";
+import { getKsefSettings, setSetting } from "./settings";
 
 const DEFAULT_API_URL = "https://api.ksef.mf.gov.pl";
 
@@ -155,6 +155,44 @@ export async function isKsefConfigured(): Promise<boolean> {
 }
 
 /**
+ * Odświeża token dostępu KSEF za pomocą refresh tokena (KSEF 2.0: POST /v2/auth/token/refresh).
+ * Zapisuje nowy access token (i ewentualnie nowy refresh token) w ustawieniach.
+ * Zwraca nowy access token lub null przy braku refresh tokena / błędzie.
+ */
+export async function refreshKsefAccessToken(): Promise<string | null> {
+  const s = await getKsefSettings();
+  const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+  const refreshToken = (s.refreshToken || "").trim();
+  if (!refreshToken) return null;
+  const refreshForHeader = tokenSafeForHeader(refreshToken);
+  if (!refreshForHeader) return null;
+  try {
+    const url = `${apiUrl}/v2/auth/token/refresh`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${refreshForHeader}`,
+      },
+    });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const data = JSON.parse(text) as {
+      accessToken?: { token?: string; validUntil?: string };
+      refreshToken?: { token?: string; validUntil?: string };
+    };
+    const newAccess = data.accessToken?.token;
+    const newRefresh = data.refreshToken?.token;
+    if (!newAccess) return null;
+    await setSetting("ksef_token", newAccess);
+    if (newRefresh) await setSetting("ksef_refresh_token", newRefresh);
+    return newAccess;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Pobiera faktury z KSEF z podanego zakresu dat.
  * Endpoint zgodny z API KSeF 2.0 (zapytanie o faktury po zakresie dat).
  */
@@ -164,7 +202,7 @@ export async function fetchInvoicesFromKsef(
 ): Promise<KsefFetchResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/v2/invoices/query/metadata";
 
   if (!token) {
@@ -174,7 +212,7 @@ export async function fetchInvoicesFromKsef(
     };
   }
 
-  const tokenForHeader = tokenSafeForHeader(token);
+  let tokenForHeader = tokenSafeForHeader(token);
   if (!tokenForHeader) {
     return {
       success: false,
@@ -184,14 +222,16 @@ export async function fetchInvoicesFromKsef(
 
   const from = dateFrom.slice(0, 10);
   const to = dateTo.slice(0, 10);
+  const queryParams = new URLSearchParams({
+    sortOrder: "Asc",
+    pageOffset: "0",
+    pageSize: "100",
+  });
+  const url = `${apiUrl}${queryPath}?${queryParams}`;
 
-  try {
-    const queryParams = new URLSearchParams({
-      sortOrder: "Asc",
-      pageOffset: "0",
-      pageSize: "100",
-    });
-    const url = `${apiUrl}${queryPath}?${queryParams}`;
+  const runWithToken = async (authToken: string): Promise<KsefInvoiceNormalized[]> => {
+    const forHeader = tokenSafeForHeader(authToken);
+    if (!forHeader) throw new Error("Token zawiera niedozwolone znaki.");
 
     const fetchForSubject = async (subjectType: "Subject1" | "Subject2"): Promise<KsefInvoiceRaw[]> => {
       const body = {
@@ -202,16 +242,14 @@ export async function fetchInvoicesFromKsef(
           to: `${to}T23:59:59`,
         },
       };
-
       const res = await fetch(url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenForHeader}`,
+          Authorization: `Bearer ${forHeader}`,
         },
         body: JSON.stringify(body),
       });
-
       if (!res.ok) {
         const text = await res.text();
         let errMsg = `KSEF API ${res.status}: ${res.statusText}`;
@@ -227,7 +265,6 @@ export async function fetchInvoicesFromKsef(
         }
         throw new Error(errMsg);
       }
-
       const data = await res.json().catch(() => ({}));
       let rawList = parseKsefResponse(data);
       rawList = rawList.map((r) => {
@@ -237,12 +274,10 @@ export async function fetchInvoicesFromKsef(
       return rawList;
     };
 
-    // KSEF może zwracać dane zależnie od kontekstu podmiotu; pobieramy oba i łączymy.
     const [list1, list2] = await Promise.all([
       fetchForSubject("Subject1"),
       fetchForSubject("Subject2"),
     ]);
-
     const seen = new Set<string>();
     const invoices: KsefInvoiceNormalized[] = [];
     for (const raw of [...list1, ...list2]) {
@@ -253,13 +288,29 @@ export async function fetchInvoicesFromKsef(
       seen.add(key);
       invoices.push(normalized);
     }
+    return invoices;
+  };
 
+  try {
+    let invoices = await runWithToken(token);
     return { success: true, invoices, count: invoices.length };
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    if (errMsg.includes("401") && (await refreshKsefAccessToken())) {
+      const s2 = await getKsefSettings();
+      const newToken = (s2.token || "").trim();
+      if (newToken) {
+        try {
+          const invoices = await runWithToken(newToken);
+          return { success: true, invoices, count: invoices.length };
+        } catch {
+          // fall through to original error
+        }
+      }
+    }
     return {
       success: false,
-      error: `Połączenie z KSEF nie powiodło się: ${message}`,
+      error: `Połączenie z KSEF nie powiodło się: ${errMsg}`,
     };
   }
 }
@@ -271,7 +322,7 @@ export async function fetchInvoicesFromKsef(
 export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const sendPath = s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "/api/online/Invoice/Send";
 
   if (!token) {
@@ -289,17 +340,18 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
     };
   }
 
-  try {
+  const doSend = async (authToken: string): Promise<KsefSendResult> => {
+    const forHeader = tokenSafeForHeader(authToken);
+    if (!forHeader) return { success: false, error: "Token zawiera niedozwolone znaki." };
     const url = `${apiUrl}${sendPath}`;
     const res = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${tokenForHeader}`,
+        Authorization: `Bearer ${forHeader}`,
       },
       body: JSON.stringify(invoice),
     });
-
     if (!res.ok) {
       const text = await res.text();
       let errMsg = `KSEF API ${res.status}`;
@@ -311,15 +363,23 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
       }
       return { success: false, error: errMsg };
     }
-
     const data = await res.json().catch(() => ({}));
     const ksefId =
       (data as Record<string, unknown>)?.referenceNumber ??
       (data as Record<string, unknown>)?.ksefId ??
       (data as Record<string, unknown>)?.id ??
       `KSEF-${Date.now()}`;
-
     return { success: true, ksefId: String(ksefId) };
+  };
+
+  try {
+    let result = await doSend(token);
+    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken())) {
+      const s2 = await getKsefSettings();
+      const newToken = (s2.token || "").trim();
+      if (newToken) result = await doSend(newToken);
+    }
+    return result;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { success: false, error: `Wysyłka do KSEF: ${message}` };
@@ -341,7 +401,7 @@ export type KsefInvoicePdfResult =
 export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoicePdfResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const pathTemplate =
     s.invoicePdfPath || process.env.KSEF_INVOICE_PDF_PATH?.trim() || DEFAULT_INVOICE_PDF_PATH;
   const path = pathTemplate.replace(/\{referenceNumber\}/g, encodeURIComponent(ksefId));
@@ -355,16 +415,17 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
     return { success: false, error: "Token KSEF zawiera niedozwolone znaki." };
   }
 
-  try {
+  const doFetch = async (authToken: string): Promise<KsefInvoicePdfResult> => {
+    const forHeader = tokenSafeForHeader(authToken);
+    if (!forHeader) return { success: false, error: "Token zawiera niedozwolone znaki." };
     const url = `${apiUrl}${path}`;
     const res = await fetch(url, {
       method: "GET",
       headers: {
         Accept: "application/pdf",
-        Authorization: `Bearer ${tokenForHeader}`,
+        Authorization: `Bearer ${forHeader}`,
       },
     });
-
     if (!res.ok) {
       const text = await res.text();
       let errMsg = `KSEF API ${res.status}`;
@@ -376,7 +437,6 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
       }
       return { success: false, error: errMsg };
     }
-
     const contentType = res.headers.get("Content-Type") || "";
     if (!contentType.includes("pdf")) {
       return {
@@ -391,6 +451,16 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
     }
 
     return { success: true, pdf };
+  };
+
+  try {
+    let result = await doFetch(token);
+    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken())) {
+      const s2 = await getKsefSettings();
+      const newToken = (s2.token || "").trim();
+      if (newToken) result = await doFetch(newToken);
+    }
+    return result;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { success: false, error: `Pobieranie PDF z KSEF: ${message}` };

@@ -10,6 +10,7 @@ export async function GET() {
   return NextResponse.json({
     apiUrl: s.apiUrl,
     token: s.token ? "********" : "",
+    refreshToken: s.refreshToken ? "********" : "",
     queryPath: s.queryPath,
     sendPath: s.sendPath,
     nip: s.nip,
@@ -22,10 +23,11 @@ export async function PUT(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const keys = ["ksef_api_url", "ksef_token", "ksef_query_path", "ksef_send_path", "ksef_nip", "ksef_invoice_pdf_path"];
+  const keys = ["ksef_api_url", "ksef_token", "ksef_refresh_token", "ksef_query_path", "ksef_send_path", "ksef_nip", "ksef_invoice_pdf_path"];
   const map: Record<string, string> = {
     ksef_api_url: "apiUrl",
     ksef_token: "token",
+    ksef_refresh_token: "refreshToken",
     ksef_query_path: "queryPath",
     ksef_send_path: "sendPath",
     ksef_nip: "nip",
@@ -36,7 +38,7 @@ export async function PUT(req: NextRequest) {
     const bodyKey = map[key];
     if (bodyKey && body[bodyKey] !== undefined) {
       const val = body[bodyKey];
-      if (key === "ksef_token" && (val === "" || val === "********")) continue;
+      if ((key === "ksef_token" || key === "ksef_refresh_token") && (val === "" || val === "********")) continue;
       await setSetting(key, String(val ?? ""));
     }
   }

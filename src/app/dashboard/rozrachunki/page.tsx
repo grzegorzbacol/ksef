@@ -81,7 +81,7 @@ export default function RozrachunkiPage() {
             {invoices.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-6 text-center text-muted">
-                  Brak faktur. Dodaj faktury w module Faktury.
+                  Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
                 </td>
               </tr>
             ) : (

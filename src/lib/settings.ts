@@ -22,14 +22,16 @@ export async function setSetting(key: string, value: string): Promise<void> {
 export async function getKsefSettings(): Promise<{
   apiUrl: string;
   token: string;
+  refreshToken: string;
   queryPath: string;
   sendPath: string;
   nip: string;
   invoicePdfPath: string;
 }> {
-  const [apiUrl, token, queryPath, sendPath, nip, invoicePdfPath] = await Promise.all([
+  const [apiUrl, token, refreshToken, queryPath, sendPath, nip, invoicePdfPath] = await Promise.all([
     getSetting("ksef_api_url"),
     getSetting("ksef_token"),
+    getSetting("ksef_refresh_token"),
     getSetting("ksef_query_path"),
     getSetting("ksef_send_path"),
     getSetting("ksef_nip"),
@@ -38,6 +40,7 @@ export async function getKsefSettings(): Promise<{
   return {
     apiUrl: apiUrl?.trim() || "",
     token: token?.trim() || "",
+    refreshToken: refreshToken?.trim() || "",
     queryPath: queryPath?.trim() || "",
     sendPath: sendPath?.trim() || "",
     nip: nip?.trim() || "",

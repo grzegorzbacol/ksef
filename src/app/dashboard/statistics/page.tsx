@@ -347,7 +347,7 @@ export default function StatisticsPage() {
       </section>
 
       <StatsCards title="Faktury sprzedaży" s={stats.sales} type="sales" />
-      <StatsCards title="Faktury zakupu (kosztowe)" s={stats.cost} type="cost" />
+      <StatsCards title="Faktury zakupu" s={stats.cost} type="cost" />
 
       <div className="mb-6">
         <p className="text-sm text-muted mb-2">Grupowanie</p>

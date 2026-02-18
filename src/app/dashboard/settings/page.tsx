@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 type KsefSettings = {
   apiUrl: string;
   token: string;
+  refreshToken: string;
   queryPath: string;
   sendPath: string;
   nip: string;
@@ -22,6 +23,7 @@ type CompanySettings = {
 const emptyKsef: KsefSettings = {
   apiUrl: "",
   token: "",
+  refreshToken: "",
   queryPath: "",
   sendPath: "",
   nip: "",
@@ -60,6 +62,7 @@ export default function SettingsPage() {
         setKsef({
           apiUrl: ksefData.apiUrl ?? "",
           token: ksefData.token === "********" ? "" : (ksefData.token ?? ""),
+          refreshToken: ksefData.refreshToken === "********" ? "" : (ksefData.refreshToken ?? ""),
           queryPath: ksefData.queryPath ?? "",
           sendPath: ksefData.sendPath ?? "",
           nip: ksefData.nip ?? "",
@@ -88,6 +91,7 @@ export default function SettingsPage() {
         body: JSON.stringify({
           apiUrl: ksef.apiUrl,
           token: ksef.token,
+          refreshToken: ksef.refreshToken,
           queryPath: ksef.queryPath,
           sendPath: ksef.sendPath,
           nip: ksef.nip,
@@ -218,6 +222,7 @@ export default function SettingsPage() {
         </p>
         <p className="text-muted text-xs mb-4">
           Przy 401: upewnij się, że najpierw wykonałeś krok 3 (Zaloguj tokenem KSeF). W polu musi być JWT, nie surowy token z MCU.
+          Po zapisaniu ustawień aplikacja zapisuje też refresh token – gdy access token wygaśnie, połączenie zostanie automatycznie odświeżone (bez ponownego logowania w portalu).
         </p>
 
         <div className="space-y-4">
@@ -322,7 +327,11 @@ export default function SettingsPage() {
                 });
                 const data = await res.json().catch(() => ({}));
                 if (data.ok === true && data.accessToken) {
-                  setKsef((s) => ({ ...s, token: data.accessToken }));
+                  setKsef((s) => ({
+                    ...s,
+                    token: data.accessToken,
+                    ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}),
+                  }));
                   setLoginResult({ ok: true });
                 } else {
                   setLoginResult({
@@ -389,7 +398,11 @@ export default function SettingsPage() {
                 });
                 const data = await res.json().catch(() => ({}));
                 if (data.ok === true && data.accessToken) {
-                  setKsef((s) => ({ ...s, token: data.accessToken }));
+                  setKsef((s) => ({
+                    ...s,
+                    token: data.accessToken,
+                    ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}),
+                  }));
                   setRedeemResult({ ok: true });
                 } else {
                   setRedeemResult({
@@ -424,7 +437,7 @@ export default function SettingsPage() {
         {redeemResult && (
           <div className={`mt-3 p-3 rounded-lg text-sm ${redeemResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
             {redeemResult.ok ? (
-              <p>Otrzymano token dostępu. Kliknij „Zapisz ustawienia KSEF”, aby go zapisać.</p>
+              <p>Otrzymano token dostępu. Kliknij „Zapisz ustawienia KSEF”, aby zapisać token i refresh token (automatyczne odświeżanie przy 401).</p>
             ) : (
               <>
                 <p>{redeemResult.error ?? "Wymiana tokena nie powiodła się."}</p>
@@ -436,7 +449,7 @@ export default function SettingsPage() {
         {loginResult && (
           <div className={`mt-3 p-3 rounded-lg text-sm ${loginResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
             {loginResult.ok ? (
-              <p>Zalogowano. Token dostępu wpisany w pole powyżej. Kliknij „Zapisz ustawienia KSEF”.</p>
+              <p>Zalogowano. Token dostępu wpisany w pole powyżej. Kliknij „Zapisz ustawienia KSEF”, aby zapisać też refresh token (automatyczne odświeżanie przy wygaśnięciu).</p>
             ) : (
               <>
                 <p>{loginResult.error ?? "Logowanie nie powiodło się."}</p>
