@@ -126,7 +126,7 @@ export async function fetchInvoicesFromKsef(
 ): Promise<KsefFetchResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  const token = (s.token || process.env.KSEF_TOKEN ?? "").trim();
+  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/api/online/Query/Invoice/Sync";
 
   if (!token) {
@@ -195,7 +195,7 @@ export async function fetchInvoicesFromKsef(
 export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  const token = (s.token || process.env.KSEF_TOKEN ?? "").trim();
+  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const sendPath = s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "/api/online/Invoice/Send";
 
   if (!token) {
