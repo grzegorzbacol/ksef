@@ -146,8 +146,7 @@ export default function InvoiceDetailPage() {
   const [savingNumber, setSavingNumber] = useState(false);
   const [togglingPaid, setTogglingPaid] = useState(false);
   const [editNet, setEditNet] = useState("");
-  const [editVat, setEditVat] = useState("");
-  const [editGross, setEditGross] = useState("");
+  const [editVatRate, setEditVatRate] = useState<0 | 12 | 23>(23);
   const [editNumber, setEditNumber] = useState("");
   const [editSellerName, setEditSellerName] = useState("");
   const [editSellerNip, setEditSellerNip] = useState("");
@@ -175,8 +174,16 @@ export default function InvoiceDetailPage() {
         setInvoice(inv);
         if (inv) {
           setEditNet(String(inv.netAmount ?? 0));
-          setEditVat(String(inv.vatAmount ?? 0));
-          setEditGross(String(inv.grossAmount ?? 0));
+          const net = Number(inv.netAmount) || 0;
+          const vat = Number(inv.vatAmount) || 0;
+          const derivedRate = net > 0 ? (vat / net) * 100 : 0;
+          const snap = (r: number) =>
+            Math.abs(r - 0) <= Math.abs(r - 12) && Math.abs(r - 0) <= Math.abs(r - 23)
+              ? 0
+              : Math.abs(r - 12) <= Math.abs(r - 23)
+                ? 12
+                : 23;
+          setEditVatRate(snap(derivedRate) as 0 | 12 | 23);
           setEditNumber(inv.number ?? "");
           setEditSellerName(inv.sellerName ?? "");
           setEditSellerNip(inv.sellerNip ?? "");
@@ -519,7 +526,7 @@ export default function InvoiceDetailPage() {
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Uzupełnij kwotę (rozrachunek cykliczny)</h2>
             <p className="text-muted text-sm mb-3">
-              Uzupełnij kwotę netto, VAT i brutto oraz zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
+              Wpisz kwotę netto, wybierz stawkę VAT (0%, 12% lub 23%) i zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
             </p>
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -535,37 +542,38 @@ export default function InvoiceDetailPage() {
               </div>
               <div>
                 <label className="block text-xs text-muted mb-1">VAT</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editVat}
-                  onChange={(e) => setEditVat(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-28"
-                />
+                <select
+                  value={editVatRate}
+                  onChange={(e) => setEditVatRate(Number(e.target.value) as 0 | 12 | 23)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                >
+                  <option value={0}>0%</option>
+                  <option value={12}>12%</option>
+                  <option value={23}>23%</option>
+                </select>
               </div>
               <div>
-                <label className="block text-xs text-muted mb-1">Brutto</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={editGross}
-                  onChange={(e) => setEditGross(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-28"
-                />
+                <label className="block text-xs text-muted mb-1">Brutto (obliczone)</label>
+                <div className="rounded border border-border bg-bg/50 px-3 py-2 w-28 text-sm">
+                  {(() => {
+                    const net = parseFloat(editNet);
+                    if (Number.isNaN(net) || net < 0) return "—";
+                    const vat = net * (editVatRate / 100);
+                    return (net + vat).toFixed(2);
+                  })()}
+                </div>
               </div>
               <button
                 type="button"
                 disabled={savingAmount}
                 onClick={async () => {
                   const net = parseFloat(editNet);
-                  const vat = parseFloat(editVat);
-                  const gross = parseFloat(editGross);
-                  if (Number.isNaN(net) || Number.isNaN(vat) || Number.isNaN(gross) || net < 0 || vat < 0 || gross < 0) {
-                    alert("Wpisz poprawne kwoty (liczby ≥ 0).");
+                  if (Number.isNaN(net) || net < 0) {
+                    alert("Wpisz poprawną kwotę netto (liczba ≥ 0).");
                     return;
                   }
+                  const vat = Math.round(net * (editVatRate / 100) * 100) / 100;
+                  const gross = Math.round((net + vat) * 100) / 100;
                   setSavingAmount(true);
                   try {
                     const res = await fetch(`/api/invoices/${id}`, {
