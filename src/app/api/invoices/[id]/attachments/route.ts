@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import path from "path";
 import fs from "fs/promises";
-
-const UPLOAD_BASE = path.join(process.cwd(), "uploads", "invoice-mail");
+import { getSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { UPLOAD_BASE, safeFilename } from "@/lib/upload-paths";
 
 export async function POST(
   req: NextRequest,
@@ -29,7 +28,7 @@ export async function POST(
     return NextResponse.json({ error: "Wybierz plik do załączenia" }, { status: 400 });
   }
 
-  const safeName = (file.name || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
+  const safeName = safeFilename(file.name || "file");
   if (!safeName) {
     return NextResponse.json({ error: "Nieprawidłowa nazwa pliku" }, { status: 400 });
   }

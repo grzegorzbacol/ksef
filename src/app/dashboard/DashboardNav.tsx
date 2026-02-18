@@ -19,18 +19,25 @@ const navItems = [
 export function DashboardNav() {
   const pathname = usePathname();
 
+  function isActive(item: (typeof navItems)[number]) {
+    if (pathname === item.href) return true;
+    if (item.href === "/dashboard") return false;
+    const prefix = item.href + "/";
+    if (!pathname.startsWith(prefix)) return false;
+    if (item.href === "/dashboard/invoices" && pathname.startsWith("/dashboard/invoices-sales")) return false;
+    return true;
+  }
+
   return (
     <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
       {navItems.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+        const active = isActive(item);
         return (
           <Link
             key={item.href}
             href={item.href}
             className={`block rounded-lg px-3 py-2.5 text-sm transition-colors ${
-              isActive
+              active
                 ? "bg-accent-muted text-accent font-medium"
                 : "text-[var(--text-secondary)] hover:bg-card hover:text-text"
             }`}

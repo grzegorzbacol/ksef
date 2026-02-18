@@ -9,9 +9,8 @@ import path from "path";
 import fs from "fs/promises";
 import { getMailSettings, getCompanySettings } from "./settings";
 import { parseFaXmlToInvoiceData } from "./fa-xml-to-pdf";
+import { UPLOAD_BASE, safeFilename } from "./upload-paths";
 import type { PrismaClient } from "@prisma/client";
-
-const UPLOAD_BASE = path.join(process.cwd(), "uploads", "invoice-mail");
 
 export type MailInvoiceItem = {
   name: string;
@@ -402,6 +401,10 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
               where: { emailMessageId: parsed.emailMessageId },
             });
             if (existing) continue;
+            const wasDeleted = await prisma.deletedMailInvoiceMessageId.findUnique({
+              where: { emailMessageId: parsed.emailMessageId },
+            });
+            if (wasDeleted) continue;
           }
 
           const issueDate = new Date(parsed.invoice.issueDate);
@@ -489,7 +492,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
 
           await fs.mkdir(path.join(UPLOAD_BASE, created.id), { recursive: true });
           for (const att of parsed.attachments) {
-            const safeName = (att.filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
+            const safeName = safeFilename(att.filename || "file");
             const storedPath = path.join(UPLOAD_BASE, created.id, safeName);
             await fs.writeFile(storedPath, att.content);
             await prisma.invoiceEmailAttachment.create({

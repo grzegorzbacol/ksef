@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import fs from "fs/promises";
+import { readAttachmentFile } from "@/lib/upload-paths";
 
 export async function GET(
   _req: NextRequest,
@@ -22,14 +22,25 @@ export async function GET(
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
-    const content = await fs.readFile(attachment.storedPath);
+    const content = await readAttachmentFile(
+      attachment.storedPath,
+      id,
+      attachment.filename
+    );
     return new NextResponse(content, {
       headers: {
         "Content-Type": attachment.contentType || "application/octet-stream",
         "Content-Disposition": `attachment; filename="${attachment.filename.replace(/"/g, '\\"')}"`,
       },
     });
-  } catch {
-    return NextResponse.json({ error: "File not found" }, { status: 404 });
+  } catch (err) {
+    console.error(
+      "[attachments] Nie można odczytać pliku:",
+      { storedPath: attachment.storedPath, invoiceId: id, err }
+    );
+    return NextResponse.json(
+      { error: "Plik załącznika niedostępny." },
+      { status: 404 }
+    );
   }
 }

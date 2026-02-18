@@ -192,7 +192,7 @@ export default function TaxBenefitsPage() {
                     </td>
                     <td className="p-3">
                       <Link
-                        href={`/dashboard/invoices/${inv.id}`}
+                        href={`/dashboard/invoices-sales/${inv.id}`}
                         className="text-accent hover:underline"
                       >
                         Szczegóły

@@ -9,20 +9,24 @@ function DownloadPdfButton({
   invoiceId,
   invoiceNumber,
   ksefId,
+  hasMailAttachments,
 }: {
   invoiceId: string;
   invoiceNumber: string;
   ksefId: string | null;
+  hasMailAttachments?: boolean;
 }) {
   const [loading, setLoading] = useState(false);
   const hasKsefId = !!ksefId?.trim();
+  const canDownload = hasKsefId || (hasMailAttachments ?? false);
   async function handleDownload() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { credentials: "include" });
+      const endpoint = hasKsefId ? `/api/invoices/${invoiceId}/pdf` : `/api/invoices/${invoiceId}/download`;
+      const res = await fetch(endpoint, { credentials: "include" });
       if (!res.ok) {
         const text = await res.text();
-        let msg = "Nie udało się pobrać PDF z KSEF.";
+        let msg = "Nie udało się pobrać PDF.";
         try {
           const data = JSON.parse(text);
           if (data?.error) msg = data.error;
@@ -33,14 +37,20 @@ function DownloadPdfButton({
         return;
       }
       const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      let filename = `Faktura_${invoiceNumber.replace(/\//g, "-")}.pdf`;
+      if (disposition) {
+        const match = /filename="?([^";\n]+)"?/.exec(disposition);
+        if (match?.[1]) filename = match[1].trim();
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Faktura_${invoiceNumber.replace(/\//g, "-")}.pdf`;
+      a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Nie udało się pobrać PDF z KSEF.");
+      alert("Nie udało się pobrać pliku.");
     } finally {
       setLoading(false);
     }
@@ -49,11 +59,15 @@ function DownloadPdfButton({
     <button
       type="button"
       onClick={handleDownload}
-      disabled={loading || !hasKsefId}
-      title={!hasKsefId ? "PDF tylko z KSEF. Pobierz tę fakturę z KSEF (lista faktur → Pobierz z KSEF), aby mieć numer KSEF." : undefined}
+      disabled={loading || !canDownload}
+      title={
+        !canDownload
+          ? "Pobierz PDF z KSEF (gdy masz numer KSEF) lub z załącznika maila (gdy faktura przyszła mailem)."
+          : undefined
+      }
       className="rounded bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
     >
-      {loading ? "Pobieranie…" : "Pobierz PDF z KSEF"}
+      {loading ? "Pobieranie…" : hasKsefId ? "Pobierz PDF z KSEF" : "Pobierz PDF"}
     </button>
   );
 }
@@ -239,7 +253,7 @@ export default function InvoiceDetailPage() {
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
 
   const isCost = invoice.type === "cost";
-  const listHref = isCost ? "/dashboard/rozrachunki" : "/dashboard/invoices";
+  const listHref = isCost ? "/dashboard/invoices-sales" : "/dashboard/invoices";
   const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
 
   const saveSellerInline = async () => {
@@ -272,7 +286,7 @@ export default function InvoiceDetailPage() {
   return (
     <div>
       <div className="mb-4">
-        <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Rozrachunki" : "Lista faktur sprzedaży"}</Link>
+        <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Lista faktur zakupu" : "Lista faktur sprzedaży"}</Link>
       </div>
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h1 className="text-xl font-semibold flex flex-wrap items-center gap-2">
@@ -883,14 +897,19 @@ export default function InvoiceDetailPage() {
         )}
 
         <div className="flex flex-wrap gap-3 pt-2">
-          <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} ksefId={invoice.ksefId} />
+          <DownloadPdfButton
+            invoiceId={id}
+            invoiceNumber={invoice.number}
+            ksefId={invoice.ksefId}
+            hasMailAttachments={(invoice.emailAttachments?.length ?? 0) > 0}
+          />
           {isCost && (
             <Link href="/dashboard/tax-benefits" className="rounded border border-border px-4 py-2 hover:border-accent">
               Korzyści podatkowe
             </Link>
           )}
           <Link href={listHref} className="rounded border border-border px-4 py-2 hover:border-accent">
-            {isCost ? "Rozrachunki" : "Lista faktur"}
+            {isCost ? "Lista faktur zakupu" : "Lista faktur"}
           </Link>
         </div>
       </div>

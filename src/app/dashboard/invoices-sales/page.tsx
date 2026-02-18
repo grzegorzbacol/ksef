@@ -1222,7 +1222,7 @@ function InvoiceNumberCell({
                     </label>
                   </td>
                   <td className="p-3 flex gap-2">
-                    <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
+                    <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
                       Szczegóły
                     </Link>
                     <button
