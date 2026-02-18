@@ -27,7 +27,7 @@ export async function GET(
       id,
       attachment.filename
     );
-    return new NextResponse(content, {
+    return new NextResponse(new Uint8Array(content), {
       headers: {
         "Content-Type": attachment.contentType || "application/octet-stream",
         "Content-Disposition": `attachment; filename="${attachment.filename.replace(/"/g, '\\"')}"`,

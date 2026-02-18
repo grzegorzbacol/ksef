@@ -65,7 +65,7 @@ export async function GET(
         chosenAttachment.filename
       );
       const filename = chosenAttachment.filename || `${baseFilename}.pdf`;
-      return new NextResponse(content, {
+      return new NextResponse(new Uint8Array(content), {
         headers: {
           "Content-Type": chosenAttachment.contentType || "application/octet-stream",
           "Content-Disposition": `attachment; filename="${filename.replace(/"/g, '\\"')}"`,
