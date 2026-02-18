@@ -16,6 +16,7 @@ export default function RozrachunkiPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -48,6 +49,18 @@ export default function RozrachunkiPage() {
     }
   }
 
+  async function handleDelete(invoiceId: string, number: string) {
+    if (!confirm(`Usunąć fakturę ${number} z rozrachunków?`)) return;
+    setDeletingId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, { method: "DELETE" });
+      if (!res.ok) alert("Błąd usuwania");
+      else load();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (loading) return <p className="text-muted">Ładowanie…</p>;
 
   const paidCount = invoices.filter((i) => i.payment).length;
@@ -75,12 +88,13 @@ export default function RozrachunkiPage() {
               <th className="p-3 text-left">Wystawca</th>
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Data rozliczenia</th>
+              <th className="p-3 w-16"></th>
             </tr>
           </thead>
           <tbody>
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-muted">
+                <td colSpan={7} className="p-6 text-center text-muted">
                   Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
                 </td>
               </tr>
@@ -104,6 +118,16 @@ export default function RozrachunkiPage() {
                     {inv.payment
                       ? new Date(inv.payment.paidAt).toLocaleString("pl-PL")
                       : "–"}
+                  </td>
+                  <td className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(inv.id, inv.number)}
+                      disabled={deletingId === inv.id}
+                      className="text-red-400 hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
                   </td>
                 </tr>
               ))

@@ -73,6 +73,7 @@ export default function InvoicesSalesPage() {
   });
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const invoiceType = "cost" as const;
 
@@ -203,6 +204,18 @@ export default function InvoicesSalesPage() {
     else {
       alert(`Zaimportowano: ${data.imported ?? 0} faktur.`);
       loadInvoices();
+    }
+  }
+
+  async function handleDelete(inv: Invoice) {
+    if (!confirm(`Usunąć fakturę ${inv.number}?`)) return;
+    setDeletingId(inv.id);
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}`, { method: "DELETE" });
+      if (!res.ok) alert("Błąd usuwania");
+      else loadInvoices();
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -472,7 +485,7 @@ export default function InvoicesSalesPage() {
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3">KSEF</th>
                 <th className="p-3">Rozliczono</th>
-                <th className="p-3"></th>
+                <th className="p-3 w-20"></th>
               </tr>
             </thead>
             <tbody>
@@ -500,10 +513,18 @@ export default function InvoicesSalesPage() {
                       </Link>
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 flex gap-2">
                     <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
                       Szczegóły
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(inv)}
+                      disabled={deletingId === inv.id}
+                      className="text-red-400 hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
                   </td>
                 </tr>
               ))}
