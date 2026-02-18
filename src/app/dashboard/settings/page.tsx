@@ -42,6 +42,8 @@ export default function SettingsPage() {
   const [savingCompany, setSavingCompany] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [companyMessage, setCompanyMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message?: string; error?: string; detail?: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -198,8 +200,13 @@ export default function SettingsPage() {
 
       <form onSubmit={handleKsefSubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <h2 className="font-medium mb-4">Integracja KSEF</h2>
-        <p className="text-muted text-sm mb-4">
+        <p className="text-muted text-sm mb-2">
           Uzupełnij dane, aby aplikacja mogła łączyć się z KSEF. Wymagane minimum: URL API i token.
+        </p>
+        <p className="text-muted text-xs mb-4">
+          Token (JWT) uzyskasz w portalu KSEF: zaloguj się na{" "}
+          <a href="https://ksef.mf.gov.pl" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ksef.mf.gov.pl</a>
+          {" "}→ Moduł certyfikatów i uprawnień (MCU) → wygeneruj token. URL i token muszą być z tego samego środowiska (produkcja: api.ksef.mf.gov.pl, demo: api-demo.ksef.mf.gov.pl). Token wygasa – przy 401 wygeneruj nowy, wklej tutaj i użyj „Sprawdź połączenie”.
         </p>
 
         <div className="space-y-4">
@@ -223,7 +230,7 @@ export default function SettingsPage() {
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
               autoComplete="off"
             />
-            <p className="text-xs text-muted mt-1">Pozostaw puste, aby nie zmieniać zapisanego tokenu.</p>
+            <p className="text-xs text-muted mt-1">Pozostaw puste, aby nie zmieniać zapisanego tokenu. Po wklejeniu nowego tokenu użyj „Sprawdź połączenie”.</p>
           </div>
           <div>
             <label className="block text-sm text-muted mb-1">Ścieżka zapytania o faktury (opcjonalnie)</label>
@@ -262,13 +269,56 @@ export default function SettingsPage() {
             {message.text}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={saving}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
-        >
-          {saving ? "Zapisywanie…" : "Zapisz ustawienia KSEF"}
-        </button>
+        <div className="mt-4 flex flex-wrap gap-3 items-center">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? "Zapisywanie…" : "Zapisz ustawienia KSEF"}
+          </button>
+          <button
+            type="button"
+            disabled={testing || !ksef.token.trim()}
+            onClick={async () => {
+              setTestResult(null);
+              setTesting(true);
+              try {
+                const res = await fetch("/api/ksef/test-connection", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ apiUrl: ksef.apiUrl || "https://api.ksef.mf.gov.pl", token: ksef.token }),
+                });
+                const data = await res.json().catch(() => ({}));
+                setTestResult({
+                  ok: data.ok === true,
+                  message: data.message,
+                  error: data.error,
+                  detail: data.detail,
+                });
+              } catch {
+                setTestResult({ ok: false, error: "Błąd połączenia z serwerem." });
+              } finally {
+                setTesting(false);
+              }
+            }}
+            className="rounded-lg border border-border bg-bg px-4 py-2 text-text hover:bg-border disabled:opacity-50"
+          >
+            {testing ? "Sprawdzanie…" : "Sprawdź połączenie"}
+          </button>
+        </div>
+        {testResult && (
+          <div className={`mt-3 p-3 rounded-lg text-sm ${testResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
+            {testResult.ok ? (
+              <p>{testResult.message ?? "Połączenie z KSEF poprawne."}</p>
+            ) : (
+              <>
+                <p>{testResult.error ?? "Błąd połączenia."}</p>
+                {testResult.detail && <p className="mt-1 text-xs opacity-90">{testResult.detail}</p>}
+              </>
+            )}
+          </div>
+        )}
       </form>
     </div>
   );
