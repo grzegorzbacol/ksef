@@ -21,7 +21,9 @@ export function DashboardNav() {
   return (
     <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
       {navItems.map((item) => {
-        const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+        const isActive =
+          pathname === item.href ||
+          (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
         return (
           <Link
             key={item.href}
