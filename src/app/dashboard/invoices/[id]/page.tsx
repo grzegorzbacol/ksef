@@ -538,9 +538,9 @@ export default function InvoiceDetailPage() {
         )}
         {isCost && (
           <div className="mt-6 pt-6 border-t border-border">
-            <h2 className="font-medium mb-3">Uzupełnij kwotę (rozrachunek cykliczny)</h2>
+            <h2 className="font-medium mb-3">Uzupełnij kwotę</h2>
             <p className="text-muted text-sm mb-3">
-              Wpisz kwotę netto, wybierz stawkę VAT (0%, 12% lub 23%) i zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
+              Wpisz kwotę netto, wybierz stawkę VAT (0%, 12% lub 23%) i zapisz – dla faktur, które nie mają kwot z KSeF.
             </p>
             <div className="flex flex-wrap items-end gap-4">
               <div>
