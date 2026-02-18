@@ -32,9 +32,9 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
 
   const now = new Date();
   const currentYear = now.getFullYear();
-  // Lata od 2026 do aktualnego
+  // Lata od 2026 do aktualnego (min. 2026 jeśli jesteśmy wcześniej)
   const years = Array.from(
-    { length: Math.max(0, currentYear - START_YEAR + 1) },
+    { length: Math.max(1, currentYear - START_YEAR + 1) },
     (_, i) => START_YEAR + i
   ).reverse();
 
