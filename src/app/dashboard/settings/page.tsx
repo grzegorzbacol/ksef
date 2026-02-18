@@ -235,7 +235,7 @@ export default function SettingsPage() {
               autoComplete="off"
             />
             <p className="text-xs text-muted mt-1">
-              Wklej tutaj token z MCU, podaj NIP poniżej i użyj „Zaloguj tokenem KSeF”. Pozostaw puste, aby nie zmieniać zapisanego tokenu.
+              Wklej cały token z MCU (np. „referencja | nip-XXX | secret”) – aplikacja użyje właściwej części do szyfrowania. Podaj NIP i kliknij „Zaloguj tokenem KSeF”.
             </p>
           </div>
           <div>

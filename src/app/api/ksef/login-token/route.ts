@@ -79,8 +79,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Odpowiedź challenge nie zawiera challenge lub timestamp." });
     }
 
+    // Token z portalu MCU bywa w formacie "referencja | nip-XXX | secret" – do szyfrowania używamy tylko ostatniego segmentu (secret)
+    const tokenToEncrypt = token.includes(" | ") ? token.split(" | ").pop()?.trim() ?? token : token;
+    if (!tokenToEncrypt) {
+      return NextResponse.json({ ok: false, error: "Nie udało się odczytać tokenu (format: referencja | nip-XXX | secret)." });
+    }
+
     // 3. Zaszyfruj token|timestampMs (RSA-OAEP SHA-256) kluczem publicznym z certyfikatu KSEF
-    const payload = `${token}|${timestampMs}`;
+    const payload = `${tokenToEncrypt}|${timestampMs}`;
     const payloadBuf = Buffer.from(payload, "utf8");
     const certBuf = Buffer.from(certB64, "base64");
     let encryptedBuf: Buffer;
