@@ -140,12 +140,39 @@ export async function POST(req: NextRequest) {
       referenceNumber?: string;
     };
     const authToken = ksefTokenData.authenticationToken?.token;
+    const referenceNumber = ksefTokenData.referenceNumber;
     if (!authToken) {
       return NextResponse.json({
         ok: false,
         error: "Odpowiedź KSEF nie zawiera authenticationToken.",
         detail: ksefTokenText?.slice(0, 200),
       });
+    }
+
+    // 4b. Odpytywanie statusu uwierzytelniania (proces asynchroniczny) – czekaj na 200 lub błąd 4xx
+    if (referenceNumber) {
+      const maxAttempts = 20;
+      const delayMs = 1500;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, attempt === 0 ? 500 : delayMs));
+        const statusRes = await fetch(`${base}/auth/${encodeURIComponent(referenceNumber)}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!statusRes.ok) break;
+        const statusData = (await statusRes.json()) as { status?: { code?: number; description?: string; details?: string[] } };
+        const code = statusData.status?.code;
+        if (code === 200) break;
+        if (code === 450 || code === 415 || code === 425 || code === 460 || (code && code >= 400)) {
+          const details = statusData.status?.details?.join("; ") ?? statusData.status?.description ?? "";
+          return NextResponse.json({
+            ok: false,
+            error: code === 450
+              ? "Token KSeF odrzucony (450). Sprawdź: czy token z MCU jest aktualny i nie użyty wcześniej, czy NIP jest zgodny z kontekstem tokenu, czy URL to to samo środowisko (produkcja/demo) co portal, z którego skopiowano token."
+              : `Uwierzytelnianie nie powiodło się (${code}).`,
+            detail: details || JSON.stringify(statusData).slice(0, 200),
+          });
+        }
+      }
     }
 
     // 5. Wymiana na access token
@@ -156,15 +183,21 @@ export async function POST(req: NextRequest) {
     const redeemText = await redeemRes.text();
     if (!redeemRes.ok) {
       let detail: string | undefined;
+      let hint = "";
       try {
-        const j = JSON.parse(redeemText);
-        detail = j.details ?? j.message ?? redeemText?.slice(0, 300);
+        const j = JSON.parse(redeemText) as { exception?: { exceptionDetailList?: Array<{ exceptionCode?: number; details?: string[] }> } };
+        const first = j.exception?.exceptionDetailList?.[0];
+        detail = first?.details?.join("; ") ?? redeemText?.slice(0, 300);
+        if (first?.exceptionCode === 21301 && detail?.includes("450")) {
+          hint =
+            " Status 450 = błędny token (nieprawidłowy, wygasły, unieważniony lub zły NIP/środowisko). Wygeneruj nowy token w MCU, upewnij się, że NIP i URL (produkcja/demo) są poprawne.";
+        }
       } catch {
         detail = redeemText?.slice(0, 300);
       }
       return NextResponse.json({
         ok: false,
-        error: "Wymiana na token dostępu nie powiodła się.",
+        error: "Wymiana na token dostępu nie powiodła się." + hint,
         detail,
       });
     }
