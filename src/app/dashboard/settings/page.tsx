@@ -19,6 +19,9 @@ type CompanySettings = {
   address: string;
   postalCode: string;
   city: string;
+  pitRate: number;
+  healthRate: number;
+  isVatPayer: boolean;
 };
 
 type PaymentReminderSettings = {
@@ -61,11 +64,26 @@ const emptyCompany: CompanySettings = {
   address: "",
   postalCode: "",
   city: "",
+  pitRate: 0.12,
+  healthRate: 0.09,
+  isVatPayer: true,
+};
+
+type Car = {
+  id: string;
+  name: string;
+  value: number;
+  limit100k: number;
+  limit150k: number;
+  limit200k: number;
+  vatDeductionPercent: number;
+  sortOrder: number;
 };
 
 export default function SettingsPage() {
   const [ksef, setKsef] = useState<KsefSettings>(emptyKsef);
   const [company, setCompany] = useState<CompanySettings>(emptyCompany);
+  const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
@@ -81,12 +99,24 @@ export default function SettingsPage() {
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [showSmtp, setShowSmtp] = useState(false);
+  const [carForm, setCarForm] = useState({
+    name: "",
+    value: "150000",
+    limit100k: "100000",
+    limit150k: "150000",
+    limit200k: "200000",
+    vatDeductionPercent: "0.5" as "0.5" | "1",
+  });
+  const [savingCar, setSavingCar] = useState(false);
+  const [editingCarId, setEditingCarId] = useState<string | null>(null);
+  const [deletingCarId, setDeletingCarId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/settings/ksef").then((r) => r.json()),
       fetch("/api/settings/company").then((r) => r.json()),
       fetch("/api/settings/payment-reminders").then((r) => r.json()),
+      fetch("/api/cars").then((r) => r.json()).then((data) => setCars(Array.isArray(data) ? data : [])).catch(() => setCars([])),
     ])
       .then(([ksefData, companyData, reminderData]) => {
         setKsef({
@@ -104,6 +134,9 @@ export default function SettingsPage() {
           address: companyData.address ?? "",
           postalCode: companyData.postalCode ?? "",
           city: companyData.city ?? "",
+          pitRate: companyData.pitRate != null ? Number(companyData.pitRate) : 0.12,
+          healthRate: companyData.healthRate != null ? Number(companyData.healthRate) : 0.09,
+          isVatPayer: companyData.isVatPayer !== false && companyData.isVatPayer !== "false",
         });
         if (reminderData.paymentReminderEmail != null || reminderData.smtp) {
           setPaymentReminder({
@@ -414,6 +447,52 @@ export default function SettingsPage() {
               />
             </div>
           </div>
+          <div className="border-t border-border pt-4 mt-4">
+            <h3 className="font-medium mb-2">Korzyści podatkowe (faktury zakupu)</h3>
+            <p className="text-muted text-sm mb-3">
+              Stawki używane w module „Korzyści podatkowe” do obliczania VAT do odzyskania, oszczędności PIT i składki zdrowotnej oraz realnego kosztu faktury.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-muted mb-1">Stawka PIT (skala podatkowa)</label>
+                <select
+                  value={company.pitRate === 0.32 ? "0.32" : "0.12"}
+                  onChange={(e) =>
+                    setCompany((s) => ({ ...s, pitRate: e.target.value === "0.32" ? 0.32 : 0.12 }))
+                  }
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                >
+                  <option value="0.12">12%</option>
+                  <option value="0.32">32%</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-muted mb-1">Stawka składki zdrowotnej</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  value={company.healthRate}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!Number.isNaN(v)) setCompany((s) => ({ ...s, healthRate: Math.max(0, Math.min(1, v)) }));
+                  }}
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text max-w-[120px]"
+                />
+                <span className="text-muted text-sm ml-2">np. 0.09 = 9%</span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={company.isVatPayer}
+                  onChange={(e) => setCompany((s) => ({ ...s, isVatPayer: e.target.checked }))}
+                  className="rounded border-border"
+                />
+                <span className="text-sm">Jestem płatnikiem VAT (VAT do odzyskania z faktur zakupu)</span>
+              </label>
+            </div>
+          </div>
         </div>
         {companyMessage && (
           <p className={`mt-4 text-sm ${companyMessage.type === "ok" ? "text-success" : "text-red-400"}`}>
@@ -428,6 +507,231 @@ export default function SettingsPage() {
           {savingCompany ? "Zapisywanie…" : "Zapisz dane firmy"}
         </button>
       </form>
+
+      <div className="rounded-xl border border-border bg-card p-6 max-w-3xl mb-8">
+        <h2 className="font-medium mb-2">Samochody (wydatki na pojazd)</h2>
+        <p className="text-muted text-sm mb-4">
+          Definicje samochodów do oznaczania faktur zakupu. Wartość pojazdu i limity odliczenia (progi 100 / 150 / 200 tys. PLN) oraz % odliczenia VAT (50% lub 100%). Przepisy się zmieniają – limity można edytować.
+        </p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const name = carForm.name.trim();
+            if (!name) {
+              alert("Podaj nazwę samochodu.");
+              return;
+            }
+            const value = parseFloat(carForm.value);
+            if (Number.isNaN(value) || value < 0) {
+              alert("Podaj poprawną wartość (PLN).");
+              return;
+            }
+            setSavingCar(true);
+            const payload = {
+              name,
+              value,
+              limit100k: parseFloat(carForm.limit100k) || 100000,
+              limit150k: parseFloat(carForm.limit150k) || 150000,
+              limit200k: parseFloat(carForm.limit200k) || 200000,
+              vatDeductionPercent: carForm.vatDeductionPercent === "1" ? 1 : 0.5,
+            };
+            try {
+              if (editingCarId) {
+                const res = await fetch(`/api/cars/${editingCarId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const updated = await res.json();
+                setCars((prev) => prev.map((c) => (c.id === editingCarId ? updated : c)));
+              } else {
+                const res = await fetch("/api/cars", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payload),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const created = await res.json();
+                setCars((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+              }
+              setEditingCarId(null);
+              setCarForm({
+                name: "",
+                value: "150000",
+                limit100k: "100000",
+                limit150k: "150000",
+                limit200k: "200000",
+                vatDeductionPercent: "0.5",
+              });
+            } finally {
+              setSavingCar(false);
+            }
+          }}
+          className="space-y-3 mb-6"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Nazwa (np. Skoda Octavia)</label>
+              <input
+                type="text"
+                value={carForm.name}
+                onChange={(e) => setCarForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Nazwa samochodu"
+                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Wartość (PLN)</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={carForm.value}
+                onChange={(e) => setCarForm((f) => ({ ...f, value: e.target.value }))}
+                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Limit do 100 tys. (PLN)</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={carForm.limit100k}
+                onChange={(e) => setCarForm((f) => ({ ...f, limit100k: e.target.value }))}
+                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Limit 100–150 tys. (PLN)</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={carForm.limit150k}
+                onChange={(e) => setCarForm((f) => ({ ...f, limit150k: e.target.value }))}
+                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Limit pow. 150 tys. (PLN)</label>
+              <input
+                type="number"
+                min="0"
+                step="1000"
+                value={carForm.limit200k}
+                onChange={(e) => setCarForm((f) => ({ ...f, limit200k: e.target.value }))}
+                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <div>
+              <label className="block text-xs text-muted mb-1">Odliczenie VAT</label>
+              <select
+                value={carForm.vatDeductionPercent}
+                onChange={(e) => setCarForm((f) => ({ ...f, vatDeductionPercent: e.target.value as "0.5" | "1" }))}
+                className="rounded border border-border bg-bg px-3 py-2 text-sm"
+              >
+                <option value="0.5">50%</option>
+                <option value="1">100%</option>
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={savingCar || !carForm.name.trim()}
+              className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 text-sm mt-6"
+            >
+              {savingCar ? "Zapisywanie…" : editingCarId ? "Zapisz zmiany" : "Dodaj samochód"}
+            </button>
+            {editingCarId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingCarId(null);
+                  setCarForm({
+                    name: "",
+                    value: "150000",
+                    limit100k: "100000",
+                    limit150k: "150000",
+                    limit200k: "200000",
+                    vatDeductionPercent: "0.5",
+                  });
+                }}
+                className="rounded border border-border px-4 py-2 text-sm mt-6"
+              >
+                Anuluj
+              </button>
+            )}
+          </div>
+        </form>
+        {cars.length > 0 && (
+          <div className="border-t border-border pt-4">
+            <h3 className="font-medium mb-2">Lista samochodów</h3>
+            <ul className="space-y-2">
+              {cars.map((car) => (
+                <li
+                  key={car.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-bg/50 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium">{car.name}</span>
+                  <span className="text-muted">
+                    wartość: {car.value.toLocaleString("pl-PL")} PLN, limit: {car.value <= 100000 ? car.limit100k : car.value <= 150000 ? car.limit150k : car.limit200k} PLN, VAT {(car.vatDeductionPercent * 100).toFixed(0)}%
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCarId(car.id);
+                        setCarForm({
+                          name: car.name,
+                          value: String(car.value),
+                          limit100k: String(car.limit100k),
+                          limit150k: String(car.limit150k),
+                          limit200k: String(car.limit200k),
+                          vatDeductionPercent: car.vatDeductionPercent === 1 ? "1" : "0.5",
+                        });
+                      }}
+                      className="text-accent hover:underline"
+                    >
+                      Edytuj
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingCarId === car.id}
+                      onClick={async () => {
+                        if (!confirm(`Usunąć samochód „${car.name}"?`)) return;
+                        setDeletingCarId(car.id);
+                        try {
+                          const res = await fetch(`/api/cars/${car.id}`, { method: "DELETE" });
+                          if (res.ok) setCars((prev) => prev.filter((c) => c.id !== car.id));
+                          else alert("Błąd usuwania");
+                        } finally {
+                          setDeletingCarId(null);
+                        }
+                      }}
+                      className="text-red-400 hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       <form onSubmit={handleKsefSubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <h2 className="font-medium mb-4">Integracja KSEF</h2>

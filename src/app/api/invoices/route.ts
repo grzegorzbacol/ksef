@@ -26,6 +26,8 @@ const createSchema = z.object({
   grossAmount: z.number(),
   currency: z.string().default("PLN"),
   items: z.array(itemSchema).optional(),
+  expenseType: z.enum(["standard", "car"]).optional(),
+  carId: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -40,7 +42,10 @@ export async function GET(req: NextRequest) {
   const invoices = await prisma.invoice.findMany({
     where: typeFilter === "cost" || typeFilter === "sales" ? { type: typeFilter } : undefined,
     orderBy: { issueDate: "desc" },
-    include: includePayment ? { payment: true } : undefined,
+    include: {
+      ...(includePayment ? { payment: true } : {}),
+      car: true,
+    },
   });
 
   if (groupBy === "month") {
@@ -117,6 +122,11 @@ export async function POST(req: NextRequest) {
       number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
     }
 
+    const expenseType = invoiceType === "cost" && data.expenseType === "car" && data.carId
+      ? "car"
+      : "standard";
+    const carId = expenseType === "car" ? data.carId : null;
+
     return tx.invoice.create({
       data: {
         type: invoiceType,
@@ -131,6 +141,8 @@ export async function POST(req: NextRequest) {
         vatAmount,
         grossAmount,
         currency: data.currency,
+        expenseType,
+        carId,
       },
     });
   });

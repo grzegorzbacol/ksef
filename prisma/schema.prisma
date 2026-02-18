@@ -58,11 +58,30 @@ model Invoice {
   emailFrom        String?       // nadawca
   emailReceivedAt  DateTime?     // data otrzymania
   emailMessageId   String?       // Message-ID do deduplikacji
+  vatDeductionPercent  Float?    // udział VAT do odliczenia (1.0 = 100%, 0.5 = 50%) – moduł korzyści podatkowych
+  costDeductionPercent Float?    // udział kosztu do odliczenia (1.0 = 100%, 0.75 = 75%)
+  expenseType         String    @default("standard") // "standard" | "car" – typ wydatku (faktury zakupu)
+  carId               String?   // powiązany samochód gdy expenseType = "car"
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   payment          Payment?
+  car               Car?         @relation(fields: [carId], references: [id], onDelete: SetNull)
   items            InvoiceItem[]
   emailAttachments InvoiceEmailAttachment[]
+}
+
+model Car {
+  id                  String    @id @default(cuid())
+  name                String    // np. "Skoda Octavia"
+  value               Float     // wartość w PLN (do ustalenia progu limitu)
+  limit100k           Float     @default(100000)  // limit odliczenia przy wartości do 100 tys. PLN
+  limit150k           Float     @default(150000)  // limit przy 100–150 tys.
+  limit200k           Float     @default(200000) // limit przy pow. 150 tys.
+  vatDeductionPercent Float     @default(0.5)     // 0.5 = 50%, 1 = 100% VAT do odliczenia
+  sortOrder           Int       @default(0)      // kolejność na liście
+  createdAt           DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  invoices           Invoice[]
 }
 
 model RecurringSettlement {

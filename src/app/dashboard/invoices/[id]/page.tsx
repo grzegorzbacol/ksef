@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
 
 function DownloadPdfButton({
   invoiceId,
@@ -102,6 +103,8 @@ type Invoice = {
   payment?: { paidAt: string } | null;
   items?: InvoiceItem[];
   emailAttachments?: EmailAttachment[];
+  vatDeductionPercent?: number | null;
+  costDeductionPercent?: number | null;
 };
 
 type Contractor = {
@@ -118,10 +121,25 @@ export default function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [savingAmount, setSavingAmount] = useState(false);
   const [savingContractor, setSavingContractor] = useState(false);
+  const [savingNumber, setSavingNumber] = useState(false);
   const [togglingPaid, setTogglingPaid] = useState(false);
   const [editNet, setEditNet] = useState("");
   const [editVat, setEditVat] = useState("");
   const [editGross, setEditGross] = useState("");
+  const [editNumber, setEditNumber] = useState("");
+  const [editSellerName, setEditSellerName] = useState("");
+  const [editSellerNip, setEditSellerNip] = useState("");
+  const [savingSeller, setSavingSeller] = useState(false);
+  const [editingNumberInline, setEditingNumberInline] = useState(false);
+  const [editingSellerInline, setEditingSellerInline] = useState(false);
+  const [companyTax, setCompanyTax] = useState<{
+    pitRate: number;
+    healthRate: number;
+    isVatPayer: boolean;
+  } | null>(null);
+  const [savingDeduction, setSavingDeduction] = useState(false);
+  const [editVatDeduction, setEditVatDeduction] = useState("");
+  const [editCostDeduction, setEditCostDeduction] = useState("");
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -132,6 +150,15 @@ export default function InvoiceDetailPage() {
           setEditNet(String(inv.netAmount ?? 0));
           setEditVat(String(inv.vatAmount ?? 0));
           setEditGross(String(inv.grossAmount ?? 0));
+          setEditNumber(inv.number ?? "");
+          setEditSellerName(inv.sellerName ?? "");
+          setEditSellerNip(inv.sellerNip ?? "");
+          setEditVatDeduction(
+            inv.vatDeductionPercent != null ? String(inv.vatDeductionPercent) : "1"
+          );
+          setEditCostDeduction(
+            inv.costDeductionPercent != null ? String(inv.costDeductionPercent) : "1"
+          );
         }
       });
   }
@@ -146,8 +173,27 @@ export default function InvoiceDetailPage() {
         .then((r) => r.json())
         .then((data) => setContractors(Array.isArray(data) ? data : []))
         .catch(() => setContractors([]));
+      fetch("/api/settings/company")
+        .then((r) => r.json())
+        .then((data: { pitRate?: number; healthRate?: number; isVatPayer?: boolean }) => {
+          setCompanyTax({
+            pitRate: data?.pitRate != null ? Number(data.pitRate) : 0.12,
+            healthRate: data?.healthRate != null ? Number(data.healthRate) : 0.09,
+            isVatPayer: data?.isVatPayer !== false && data?.isVatPayer !== "false",
+          });
+        })
+        .catch(() => {});
     }
   }, [invoice?.type]);
+
+  useEffect(() => {
+    if (invoice?.number) setEditNumber(invoice.number);
+  }, [invoice?.number]);
+
+  useEffect(() => {
+    if (invoice?.sellerName != null) setEditSellerName(invoice.sellerName);
+    if (invoice?.sellerNip != null) setEditSellerNip(invoice.sellerNip);
+  }, [invoice?.sellerName, invoice?.sellerNip]);
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
@@ -156,20 +202,153 @@ export default function InvoiceDetailPage() {
   const listHref = isCost ? "/dashboard/rozrachunki" : "/dashboard/invoices";
   const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
 
+  async function saveSellerInline() {
+    if (
+      editSellerName.trim() === invoice.sellerName &&
+      editSellerNip.trim().replace(/\s/g, "") === (invoice.sellerNip ?? "")
+    ) {
+      setEditingSellerInline(false);
+      return;
+    }
+    setSavingSeller(true);
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sellerName: editSellerName.trim(),
+          sellerNip: editSellerNip.trim().replace(/\s/g, ""),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setInvoice(data);
+      else alert(data.error || "Błąd zapisu");
+    } finally {
+      setSavingSeller(false);
+      setEditingSellerInline(false);
+    }
+  }
+
+
   return (
     <div>
       <div className="mb-4">
         <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Rozrachunki" : "Lista faktur sprzedaży"}</Link>
       </div>
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h1 className="text-xl font-semibold">{typeLabel} {invoice.number}</h1>
+        <h1 className="text-xl font-semibold flex flex-wrap items-center gap-2">
+          {typeLabel}{" "}
+          {invoice.source === "mail" && editingNumberInline ? (
+            <input
+              type="text"
+              value={editNumber}
+              onChange={(e) => setEditNumber(e.target.value)}
+              onBlur={async () => {
+                const num = editNumber.trim();
+                if (num && num !== invoice.number) {
+                  setSavingNumber(true);
+                  try {
+                    const res = await fetch(`/api/invoices/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ number: num }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok) setInvoice(data);
+                    else alert(data.error || "Błąd zapisu");
+                  } finally {
+                    setSavingNumber(false);
+                  }
+                }
+                setEditingNumberInline(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setEditNumber(invoice.number);
+                  setEditingNumberInline(false);
+                }
+              }}
+              disabled={savingNumber}
+              autoFocus
+              className="rounded border border-border bg-bg px-2 py-1 text-lg font-semibold min-w-[140px]"
+            />
+          ) : invoice.source === "mail" ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditNumber(invoice.number);
+                setEditingNumberInline(true);
+              }}
+              title="Kliknij, aby edytować numer faktury"
+              className="rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {invoice.number}
+            </button>
+          ) : (
+            invoice.number
+          )}
+        </h1>
         <dl className="grid gap-2 sm:grid-cols-2">
           <dt className="text-muted">Data wystawienia</dt>
           <dd>{new Date(invoice.issueDate).toLocaleDateString("pl-PL")}</dd>
           <dt className="text-muted">Data sprzedaży</dt>
           <dd>{invoice.saleDate ? new Date(invoice.saleDate).toLocaleDateString("pl-PL") : "–"}</dd>
           <dt className="text-muted">Sprzedawca</dt>
-          <dd>{invoice.sellerName} (NIP: {invoice.sellerNip})</dd>
+          <dd>
+            {invoice.source !== "ksef" && editingSellerInline ? (
+              <div className="flex flex-wrap gap-2 items-center">
+                <input
+                  type="text"
+                  value={editSellerName}
+                  onChange={(e) => setEditSellerName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveSellerInline();
+                    if (e.key === "Escape") {
+                      setEditSellerName(invoice.sellerName);
+                      setEditSellerNip(invoice.sellerNip ?? "");
+                      setEditingSellerInline(false);
+                    }
+                  }}
+                  placeholder="Nazwa"
+                  disabled={savingSeller}
+                  autoFocus
+                  className="rounded border border-border bg-bg px-2 py-1 text-sm min-w-[160px]"
+                />
+                <input
+                  type="text"
+                  value={editSellerNip}
+                  onChange={(e) => setEditSellerNip(e.target.value)}
+                  onBlur={() => saveSellerInline()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveSellerInline();
+                    if (e.key === "Escape") {
+                      setEditSellerNip(invoice.sellerNip ?? "");
+                      setEditingSellerInline(false);
+                    }
+                  }}
+                  placeholder="NIP"
+                  disabled={savingSeller}
+                  className="rounded border border-border bg-bg px-2 py-1 text-sm w-28"
+                />
+              </div>
+            ) : invoice.source !== "ksef" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditSellerName(invoice.sellerName);
+                  setEditSellerNip(invoice.sellerNip ?? "");
+                  setEditingSellerInline(true);
+                }}
+                title="Kliknij, aby edytować dostawcę"
+                className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {invoice.sellerName} (NIP: {invoice.sellerNip})
+              </button>
+            ) : (
+              <>{invoice.sellerName} (NIP: {invoice.sellerNip})</>
+            )}
+          </dd>
           <dt className="text-muted">Nabywca</dt>
           <dd>{invoice.buyerName} (NIP: {invoice.buyerNip})</dd>
           <dt className="text-muted">Netto / VAT / Brutto</dt>
@@ -380,6 +559,111 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         )}
+        {isCost && (() => {
+          const taxConfig = companyTax ?? { pitRate: 0.12, healthRate: 0.09, isVatPayer: true };
+          const vatDed = parseFloat(editVatDeduction);
+          const costDed = parseFloat(editCostDeduction);
+          const taxResult = computePurchaseInvoiceTaxBenefit(
+            {
+              grossAmount: invoice.grossAmount,
+              netAmount: invoice.netAmount,
+              vatAmount: invoice.vatAmount,
+              vatDeductionPercent: Number.isNaN(vatDed) ? 1 : Math.max(0, Math.min(1, vatDed)),
+              costDeductionPercent: Number.isNaN(costDed) ? 1 : Math.max(0, Math.min(1, costDed)),
+            },
+            taxConfig
+          );
+          return (
+          <div className="mt-6 pt-6 border-t border-border">
+            <h2 className="font-medium mb-3">Korzyści podatkowe</h2>
+            <p className="text-muted text-sm mb-3">
+              Obliczenia dla tej faktury zakupowej na podstawie ustawień firmy (
+              <Link href="/dashboard/settings" className="text-accent hover:underline">Ustawienia → Dane firmy</Link>
+              ).
+            </p>
+            <dl className="grid gap-2 sm:grid-cols-2 mb-4">
+              <dt className="text-muted">VAT odzyskany</dt>
+              <dd className="text-success">{taxResult.vatRecovered.toFixed(2)} {invoice.currency}</dd>
+              <dt className="text-muted">Oszczędność PIT</dt>
+              <dd className="text-success">{taxResult.incomeTaxSaving.toFixed(2)} {invoice.currency}</dd>
+              <dt className="text-muted">Oszczędność zdrowotna</dt>
+              <dd className="text-success">{taxResult.healthSaving.toFixed(2)} {invoice.currency}</dd>
+              <dt className="text-muted">Łączna korzyść podatkowa</dt>
+              <dd className="font-medium text-success">{taxResult.totalTaxBenefit.toFixed(2)} {invoice.currency}</dd>
+              <dt className="text-muted">Realny koszt</dt>
+              <dd className="font-medium">{taxResult.realCost.toFixed(2)} {invoice.currency}</dd>
+            </dl>
+            <p className="text-muted text-xs mb-3">
+              Założone stawki: PIT {(taxConfig.pitRate * 100).toFixed(0)}%, zdrowotna {(taxConfig.healthRate * 100).toFixed(0)}%,
+              płatnik VAT: {taxConfig.isVatPayer ? "tak" : "nie"}.
+            </p>
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-xs text-muted mb-1">Udział VAT do odliczenia (0–1)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  value={editVatDeduction}
+                  onChange={(e) => setEditVatDeduction(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Udział kosztu do odliczenia (0–1)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  value={editCostDeduction}
+                  onChange={(e) => setEditCostDeduction(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={savingDeduction}
+                onClick={async () => {
+                  const v = parseFloat(editVatDeduction);
+                  const c = parseFloat(editCostDeduction);
+                  if (Number.isNaN(v) || Number.isNaN(c) || v < 0 || v > 1 || c < 0 || c > 1) {
+                    alert("Wpisz wartości od 0 do 1.");
+                    return;
+                  }
+                  setSavingDeduction(true);
+                  try {
+                    const res = await fetch(`/api/invoices/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        vatDeductionPercent: v,
+                        costDeductionPercent: c,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}));
+                      alert(d.error || "Błąd zapisu");
+                      return;
+                    }
+                    const updated = await res.json();
+                    setInvoice(updated);
+                  } finally {
+                    setSavingDeduction(false);
+                  }
+                }}
+                className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {savingDeduction ? "Zapisywanie…" : "Zapisz udziały"}
+              </button>
+            </div>
+            <p className="text-muted text-xs mt-2">
+              Np. 1 = 100%, 0.5 = 50% VAT do odliczenia, 0.75 = 75% kosztu do odliczenia.
+            </p>
+          </div>
+          );
+        })()}
         {invoice.source === "mail" && (invoice.emailSubject || invoice.emailBody || (invoice.emailAttachments && invoice.emailAttachments.length > 0)) && (
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Treść maila</h2>
@@ -429,10 +713,15 @@ export default function InvoiceDetailPage() {
           </div>
         )}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-wrap gap-3 pt-2">
           <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} ksefId={invoice.ksefId} />
-          <Link href="/dashboard/rozrachunki" className="rounded border border-border px-4 py-2 hover:border-accent">
-            Moduł rozrachunków
+          {isCost && (
+            <Link href="/dashboard/tax-benefits" className="rounded border border-border px-4 py-2 hover:border-accent">
+              Korzyści podatkowe
+            </Link>
+          )}
+          <Link href={listHref} className="rounded border border-border px-4 py-2 hover:border-accent">
+            {isCost ? "Rozrachunki" : "Lista faktur"}
           </Link>
         </div>
       </div>

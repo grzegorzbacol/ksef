@@ -54,17 +54,46 @@ export type CompanySettings = {
   address: string;
   postalCode: string;
   city: string;
+  /** Stawka PIT – skala (0.12 lub 0.32) */
+  pitRate: number;
+  /** Stawka składki zdrowotnej (domyślnie 0.09) */
+  healthRate: number;
+  /** Czy firma jest płatnikiem VAT */
+  isVatPayer: boolean;
 };
 
-const COMPANY_KEYS = ["company_name", "company_nip", "company_address", "company_postal_code", "company_city"] as const;
+const COMPANY_KEYS = [
+  "company_name",
+  "company_nip",
+  "company_address",
+  "company_postal_code",
+  "company_city",
+  "company_pit_rate",
+  "company_health_rate",
+  "company_is_vat_payer",
+] as const;
+
+function parseCompanyNum(val: string | null, defaultVal: number): number {
+  if (val == null || val.trim() === "") return defaultVal;
+  const n = parseFloat(val.replace(",", "."));
+  return Number.isNaN(n) ? defaultVal : n;
+}
+
+function parseCompanyBool(val: string | null, defaultVal: boolean): boolean {
+  if (val == null || val.trim() === "") return defaultVal;
+  return val !== "false" && val !== "0";
+}
 
 export async function getCompanySettings(): Promise<CompanySettings> {
-  const [name, nip, address, postalCode, city] = await Promise.all([
+  const [name, nip, address, postalCode, city, pitRate, healthRate, isVatPayer] = await Promise.all([
     getSetting("company_name"),
     getSetting("company_nip"),
     getSetting("company_address"),
     getSetting("company_postal_code"),
     getSetting("company_city"),
+    getSetting("company_pit_rate"),
+    getSetting("company_health_rate"),
+    getSetting("company_is_vat_payer"),
   ]);
   return {
     name: name?.trim() || "",
@@ -72,14 +101,25 @@ export async function getCompanySettings(): Promise<CompanySettings> {
     address: address?.trim() || "",
     postalCode: postalCode?.trim() || "",
     city: city?.trim() || "",
+    pitRate: parseCompanyNum(pitRate ?? null, 0.12),
+    healthRate: parseCompanyNum(healthRate ?? null, 0.09),
+    isVatPayer: parseCompanyBool(isVatPayer ?? null, true),
   };
 }
 
 export async function setCompanySettings(data: CompanySettings): Promise<void> {
-  const keys = COMPANY_KEYS;
-  const values = [data.name, data.nip, data.address, data.postalCode, data.city];
-  for (let i = 0; i < keys.length; i++) {
-    await setSetting(keys[i], values[i] ?? "");
+  const values = [
+    data.name ?? "",
+    data.nip ?? "",
+    data.address ?? "",
+    data.postalCode ?? "",
+    data.city ?? "",
+    String(data.pitRate ?? 0.12),
+    String(data.healthRate ?? 0.09),
+    data.isVatPayer !== false ? "true" : "false",
+  ];
+  for (let i = 0; i < COMPANY_KEYS.length; i++) {
+    await setSetting(COMPANY_KEYS[i], values[i] ?? "");
   }
 }
 

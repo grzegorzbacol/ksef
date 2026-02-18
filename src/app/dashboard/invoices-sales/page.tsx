@@ -2,6 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
+
+type Car = {
+  id: string;
+  name: string;
+  value: number;
+  limit100k: number;
+  limit150k: number;
+  limit200k: number;
+  vatDeductionPercent: number;
+};
 
 type Invoice = {
   id: string;
@@ -21,6 +32,11 @@ type Invoice = {
   ksefStatus: string | null;
   source: string;
   payment?: { paidAt: string } | null;
+  vatDeductionPercent?: number | null;
+  costDeductionPercent?: number | null;
+  expenseType?: string;
+  carId?: string | null;
+  car?: Car | null;
 };
 
 type Product = {
@@ -81,8 +97,24 @@ export default function InvoicesSalesPage() {
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
   const [editingAmountValue, setEditingAmountValue] = useState("");
   const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
+  const [editingNumberId, setEditingNumberId] = useState<string | null>(null);
+  const [editingNumberValue, setEditingNumberValue] = useState("");
+  const [savingNumberId, setSavingNumberId] = useState<string | null>(null);
+  const [editingSellerId, setEditingSellerId] = useState<string | null>(null);
+  const [editingSellerName, setEditingSellerName] = useState("");
+  const [editingSellerNip, setEditingSellerNip] = useState("");
+  const [savingSellerId, setSavingSellerId] = useState<string | null>(null);
+  const [companyTax, setCompanyTax] = useState<{
+    pitRate: number;
+    healthRate: number;
+    isVatPayer: boolean;
+  } | null>(null);
+  const [cars, setCars] = useState<Car[]>([]);
+  const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
+  const [expenseCarId, setExpenseCarId] = useState("");
 
   const invoiceType = "cost" as const;
+  const taxConfig = companyTax ?? { pitRate: 0.12, healthRate: 0.09, isVatPayer: true };
 
 function sourceLabel(source: string): string {
   switch (source) {
@@ -101,10 +133,13 @@ function InvoiceNumberCell({
   invoiceId,
   invoiceNumber,
   onError,
+  label,
 }: {
   invoiceId: string;
   invoiceNumber: string;
   onError: (msg: string) => void;
+  /** Gdy podane, przycisk wyświetla tę etykietę zamiast numeru (np. "Pobierz") */
+  label?: string;
 }) {
   const [loading, setLoading] = useState(false);
   async function handleDownload(e: React.MouseEvent) {
@@ -143,15 +178,16 @@ function InvoiceNumberCell({
       setLoading(false);
     }
   }
+  const displayText = label ?? invoiceNumber;
   return (
     <button
       type="button"
       onClick={handleDownload}
       disabled={loading}
       className="font-medium text-left text-accent hover:underline disabled:opacity-70"
-      title="Pobierz plik faktury"
+      title={label ? "Pobierz plik faktury" : undefined}
     >
-      {loading ? "Pobieranie…" : invoiceNumber}
+      {loading ? "Pobieranie…" : displayText}
     </button>
   );
 }
@@ -166,6 +202,26 @@ function InvoiceNumberCell({
 
   useEffect(() => {
     loadInvoices();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings/company")
+      .then((r) => r.json())
+      .then((data: { pitRate?: number; healthRate?: number; isVatPayer?: boolean }) => {
+        setCompanyTax({
+          pitRate: data?.pitRate != null ? Number(data.pitRate) : 0.12,
+          healthRate: data?.healthRate != null ? Number(data.healthRate) : 0.09,
+          isVatPayer: data?.isVatPayer !== false && data?.isVatPayer !== "false",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/cars")
+      .then((r) => r.json())
+      .then((data) => setCars(Array.isArray(data) ? data : []))
+      .catch(() => setCars([]));
   }, []);
 
   useEffect(() => {
@@ -281,6 +337,8 @@ function InvoiceNumberCell({
       vatAmount: lines.length > 0 ? totalsFromLines.vat : vat,
       grossAmount: lines.length > 0 ? totalsFromLines.gross : gross,
       currency: form.currency,
+      expenseType: expenseType === "car" && expenseCarId ? "car" : "standard",
+      carId: expenseType === "car" && expenseCarId ? expenseCarId : null,
     };
     if (lines.length > 0) payload.items = lines;
     const res = await fetch("/api/invoices", {
@@ -322,6 +380,8 @@ function InvoiceNumberCell({
       grossAmount: "",
       currency: "PLN",
     });
+    setExpenseType("standard");
+    setExpenseCarId("");
     loadInvoices();
   }
 
@@ -390,6 +450,53 @@ function InvoiceNumberCell({
     } finally {
       setSavingAmountId(null);
       setEditingAmountId(null);
+    }
+  }
+
+  async function saveNumber(invoiceId: string, valueStr: string) {
+    const num = valueStr.trim();
+    if (!num) {
+      setEditingNumberId(null);
+      return;
+    }
+    setSavingNumberId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: num }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd zapisu numeru");
+        return;
+      }
+      loadInvoices();
+    } finally {
+      setSavingNumberId(null);
+      setEditingNumberId(null);
+    }
+  }
+
+  async function saveSeller(invoiceId: string, name: string, nip: string) {
+    const trimmedName = name.trim();
+    const trimmedNip = nip.trim().replace(/\s/g, "");
+    setSavingSellerId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sellerName: trimmedName, sellerNip: trimmedNip }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd zapisu dostawcy");
+        return;
+      }
+      loadInvoices();
+    } finally {
+      setSavingSellerId(null);
+      setEditingSellerId(null);
     }
   }
 
@@ -535,6 +642,48 @@ function InvoiceNumberCell({
                 required
               />
             </div>
+          </div>
+          <div className="border-t border-border pt-4 mt-4">
+            <h3 className="font-medium mb-2">Typ wydatku</h3>
+            <p className="text-muted text-sm mb-2">Oznacz, czy to wydatek standardowy, czy związany z samochodem (korzyści podatkowe będą liczone według limitów i VAT dla pojazdu).</p>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="expenseType"
+                  checked={expenseType === "standard"}
+                  onChange={() => { setExpenseType("standard"); setExpenseCarId(""); }}
+                  className="rounded border-border"
+                />
+                <span>Standardowy</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="expenseType"
+                  checked={expenseType === "car"}
+                  onChange={() => setExpenseType("car")}
+                  className="rounded border-border"
+                />
+                <span>Samochód:</span>
+              </label>
+              <select
+                value={expenseCarId}
+                onChange={(e) => setExpenseCarId(e.target.value)}
+                disabled={expenseType !== "car"}
+                className="rounded border border-border bg-bg px-3 py-2 min-w-[180px] disabled:opacity-50"
+              >
+                <option value="">— wybierz samochód —</option>
+                {cars.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            {cars.length === 0 && expenseType === "car" && (
+              <p className="text-muted text-xs mt-1">
+                <Link href="/dashboard/settings" className="text-accent hover:underline">Dodaj samochody w Ustawieniach</Link>.
+              </p>
+            )}
           </div>
           <div className="border-t border-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
@@ -796,44 +945,161 @@ function InvoiceNumberCell({
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
                 <th className="p-3 text-right">Brutto</th>
+                <th className="p-3 text-right">Korzyść podatkowa</th>
+                <th className="p-3 text-right">Realny koszt</th>
                 <th className="p-3">Źródło</th>
                 <th className="p-3">Rozliczono</th>
                 <th className="p-3 w-20"></th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((inv) => (
+              {invoices.map((inv) => {
+                const taxResult = computePurchaseInvoiceTaxBenefit(
+                  {
+                    grossAmount: inv.grossAmount,
+                    netAmount: inv.netAmount,
+                    vatAmount: inv.vatAmount,
+                    vatDeductionPercent: inv.vatDeductionPercent ?? 1,
+                    costDeductionPercent: inv.costDeductionPercent ?? 1,
+                    car: inv.expenseType === "car" && inv.car
+                      ? {
+                          value: inv.car.value,
+                          limit100k: inv.car.limit100k,
+                          limit150k: inv.car.limit150k,
+                          limit200k: inv.car.limit200k,
+                          vatDeductionPercent: inv.car.vatDeductionPercent,
+                        }
+                      : undefined,
+                  },
+                  taxConfig
+                );
+                return (
                 <tr key={inv.id} className="border-b border-border">
                   <td className="p-3">
-                    <InvoiceNumberCell
-                      invoiceId={inv.id}
-                      invoiceNumber={inv.number}
-                      onError={(msg) => alert(msg)}
-                    />
+                    {inv.source === "mail" ? (
+                      editingNumberId === inv.id ? (
+                        <input
+                          type="text"
+                          value={editingNumberValue}
+                          onChange={(e) => setEditingNumberValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingNumberId === inv.id) saveNumber(inv.id, editingNumberValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                            if (e.key === "Escape") {
+                              setEditingNumberId(null);
+                              setEditingNumberValue("");
+                            }
+                          }}
+                          disabled={savingNumberId === inv.id}
+                          autoFocus
+                          className="w-full max-w-[140px] rounded border border-border bg-bg px-2 py-1 text-sm font-medium"
+                        />
+                      ) : (
+                        <span className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingNumberId(inv.id);
+                              setEditingNumberValue(inv.number);
+                            }}
+                            title="Kliknij, aby edytować numer faktury"
+                            className="font-medium text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+                          >
+                            {inv.number}
+                          </button>
+                          <InvoiceNumberCell
+                            invoiceId={inv.id}
+                            invoiceNumber={inv.number}
+                            onError={(msg) => alert(msg)}
+                            label="Pobierz"
+                          />
+                        </span>
+                      )
+                    ) : (
+                      <InvoiceNumberCell
+                        invoiceId={inv.id}
+                        invoiceNumber={inv.number}
+                        onError={(msg) => alert(msg)}
+                      />
+                    )}
                   </td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
                   <td className="p-3">
                     <div className="space-y-1">
-                      <span>{inv.sellerName}</span>
-                      {inv.source === "mail" && contractors.length > 0 && (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            if (v) assignContractor(inv, v);
-                            e.target.value = "";
-                          }}
-                          disabled={assigningContractorId === inv.id}
-                          className="block w-full max-w-[200px] rounded border border-border bg-bg px-2 py-1 text-xs text-muted disabled:opacity-50"
-                          title="Przypisz kontrahenta (dla faktur z maila)"
-                        >
-                          <option value="">— przypisz kontrahenta —</option>
-                          {contractors.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name} ({c.nip})
-                            </option>
-                          ))}
-                        </select>
+                      {inv.source !== "ksef" && editingSellerId === inv.id ? (
+                        <div className="space-y-1 max-w-[220px]">
+                          <input
+                            type="text"
+                            value={editingSellerName}
+                            onChange={(e) => setEditingSellerName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                saveSeller(inv.id, editingSellerName, editingSellerNip);
+                              }
+                              if (e.key === "Escape") {
+                                setEditingSellerId(null);
+                              }
+                            }}
+                            placeholder="Nazwa dostawcy"
+                            disabled={savingSellerId === inv.id}
+                            autoFocus
+                            className="block w-full rounded border border-border bg-bg px-2 py-1 text-xs"
+                          />
+                          <input
+                            type="text"
+                            value={editingSellerNip}
+                            onChange={(e) => setEditingSellerNip(e.target.value)}
+                            onBlur={() => saveSeller(inv.id, editingSellerName, editingSellerNip)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveSeller(inv.id, editingSellerName, editingSellerNip);
+                              if (e.key === "Escape") setEditingSellerId(null);
+                            }}
+                            placeholder="NIP"
+                            disabled={savingSellerId === inv.id}
+                            className="block w-full rounded border border-border bg-bg px-2 py-1 text-xs"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          {inv.source !== "ksef" ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSellerId(inv.id);
+                                setEditingSellerName(inv.sellerName);
+                                setEditingSellerNip(inv.sellerNip ?? "");
+                              }}
+                              title="Kliknij, aby edytować dostawcę"
+                              className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent block"
+                            >
+                              {inv.sellerName}
+                            </button>
+                          ) : (
+                            <span>{inv.sellerName}</span>
+                          )}
+                          {inv.source !== "ksef" && contractors.length > 0 && (
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                if (v) assignContractor(inv, v);
+                                e.target.value = "";
+                              }}
+                              disabled={assigningContractorId === inv.id}
+                              className="block w-full max-w-[200px] rounded border border-border bg-bg px-2 py-1 text-xs text-muted disabled:opacity-50"
+                              title="Przypisz kontrahenta z bazy"
+                            >
+                              <option value="">— przypisz kontrahenta —</option>
+                              {contractors.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name} ({c.nip})
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </>
                       )}
                     </div>
                   </td>
@@ -875,6 +1141,12 @@ function InvoiceNumberCell({
                       </button>
                     )}
                   </td>
+                  <td className="p-3 text-right text-success">
+                    {taxResult.totalTaxBenefit.toFixed(2)} {inv.currency}
+                  </td>
+                  <td className="p-3 text-right">
+                    {taxResult.realCost.toFixed(2)} {inv.currency}
+                  </td>
                   <td className="p-3">{sourceLabel(inv.source)}</td>
                   <td className="p-3">
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -909,7 +1181,8 @@ function InvoiceNumberCell({
                     </button>
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
