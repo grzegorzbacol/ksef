@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
           currency: inv.currency ?? "PLN",
           source: "ksef",
           ksefStatus: "received",
+          ksefId: inv.referenceNumber ?? null,
         },
         update: {
           type,
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
           vatAmount: inv.vatAmount ?? 0,
           grossAmount: inv.grossAmount ?? 0,
           ksefStatus: "received",
+          ...(inv.referenceNumber ? { ksefId: inv.referenceNumber } : {}),
         },
       });
     } catch {

@@ -42,6 +42,8 @@ export type KsefInvoiceRaw = {
 
 export type KsefInvoiceNormalized = {
   number: string;
+  /** Numer referencyjny KSEF – używany do pobrania PDF (getInvoicePdfFromKsef). */
+  referenceNumber?: string;
   issueDate: string;
   saleDate?: string;
   sellerName: string;
@@ -87,8 +89,10 @@ function normalizeKsefInvoice(raw: KsefInvoiceRaw): KsefInvoiceNormalized | null
   const grossAmount = Number(raw.grossAmount) || netAmount + vatAmount;
   const currency = String(raw.currency ?? "PLN").trim() || "PLN";
 
+  const refNum = raw.referenceNumber ? String(raw.referenceNumber).trim() : undefined;
   return {
     number: String(number).trim(),
+    referenceNumber: refNum || undefined,
     issueDate: String(issueDate).slice(0, 10),
     saleDate: raw.saleDate ? String(raw.saleDate).slice(0, 10) : undefined,
     sellerName: sellerName || "—",
