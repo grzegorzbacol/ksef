@@ -209,7 +209,7 @@ export default function InvoicesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Faktury kosztowe</h1>
+        <h1 className="text-2xl font-semibold">Faktury zakupu</h1>
         <div className="flex flex-wrap gap-3">
           <div className="flex gap-2 items-center text-sm">
             <input
@@ -238,15 +238,15 @@ export default function InvoicesPage() {
             onClick={() => setShowForm((v) => !v)}
             className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
           >
-            {showForm ? "Anuluj" : "Nowa faktura kosztowa"}
+            {showForm ? "Anuluj" : "Nowa faktura zakupu"}
           </button>
         </div>
       </div>
 
       {showForm && (
         <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
-          <h2 className="font-medium">Nowa faktura kosztowa</h2>
-          <p className="text-muted text-sm">Faktura kosztowa – my jesteśmy nabywcą. Numer (FK/rok/numer) nadawany automatycznie.</p>
+          <h2 className="font-medium">Nowa faktura zakupu</h2>
+          <p className="text-muted text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-muted mb-1">Data wystawienia</label>
@@ -452,7 +452,7 @@ export default function InvoicesPage() {
             </div>
           </div>
           <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90">
-            Zapisz fakturę kosztową
+            Zapisz fakturę zakupu
           </button>
         </form>
       )}
@@ -460,7 +460,7 @@ export default function InvoicesPage() {
       {loading ? (
         <p className="text-muted">Ładowanie…</p>
       ) : invoices.length === 0 ? (
-        <p className="text-muted">Brak faktur kosztowych. Dodaj pierwszą lub pobierz z KSEF.</p>
+        <p className="text-muted">Brak faktur zakupu. Pobierz z KSEF lub dodaj ręcznie.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-sm">

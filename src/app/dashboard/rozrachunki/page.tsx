@@ -6,7 +6,7 @@ type Invoice = {
   id: string;
   number: string;
   issueDate: string;
-  buyerName: string;
+  sellerName: string;
   grossAmount: number;
   currency: string;
   payment?: { paidAt: string } | null;
@@ -19,7 +19,7 @@ export default function RozrachunkiPage() {
 
   function load() {
     setLoading(true);
-    fetch("/api/invoices?payment=true")
+    fetch("/api/invoices?type=cost&payment=true")
       .then((r) => r.json())
       .then((data) => setInvoices(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
@@ -72,7 +72,7 @@ export default function RozrachunkiPage() {
               <th className="p-3 text-left w-12">Rozliczono</th>
               <th className="p-3 text-left">Numer</th>
               <th className="p-3 text-left">Data</th>
-              <th className="p-3 text-left">Nabywca</th>
+              <th className="p-3 text-left">Wystawca</th>
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Data rozliczenia</th>
             </tr>
@@ -98,7 +98,7 @@ export default function RozrachunkiPage() {
                   </td>
                   <td className="p-3 font-medium">{inv.number}</td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.buyerName}</td>
+                  <td className="p-3">{inv.sellerName}</td>
                   <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
                   <td className="p-3 text-muted">
                     {inv.payment

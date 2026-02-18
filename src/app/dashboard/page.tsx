@@ -3,13 +3,13 @@ import Link from "next/link";
 const cards = [
   {
     href: "/dashboard/invoices",
-    title: "Faktury kosztowe",
-    description: "Wystawianie, wysyłka do KSEF, pobieranie z KSEF",
+    title: "Faktury zakupu",
+    description: "Faktury od kontrahentów (za które płacisz) – pobieranie z KSEF, rozliczenia",
   },
   {
     href: "/dashboard/invoices-sales",
     title: "Faktury sprzedaży",
-    description: "Faktury sprzedaży i zarządzanie nimi",
+    description: "Faktury wystawiane przez Ciebie – zarządzanie i lista",
   },
   {
     href: "/dashboard/statistics",
