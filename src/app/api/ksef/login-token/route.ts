@@ -7,7 +7,7 @@ import { X509Certificate, createPublicKey, publicEncrypt } from "crypto";
  *
  * Specyfikacja:
  * - Payload do szyfrowania: ciąg "token|timestamp" (timestamp w milisekundach Unix z challenge).
- * - Dla tokena z portalu MCU (format: ref|nip-XXX|secret) do szyfrowania używamy TYLKO ostatniego segmentu (secret).
+ * - Dla tokena z portalu MCU (format: ref|nip-XXX|secret) szyfrujemy CAŁY token (tak zwracany przez MCU).
  * - Algorytm: RSA-OAEP z SHA-256 (MGF1).
  * - Certyfikat: z GET /v2/security/public-key-certificates, usage = KsefTokenEncryption.
  */
@@ -49,12 +49,17 @@ export async function POST(req: NextRequest) {
     const certRow = (list as CertRow[]).find(
       (c) => (Array.isArray(c.usage) ? c.usage.includes("KsefTokenEncryption") : c.usage === "KsefTokenEncryption")
     ) ?? (list as CertRow[])[0];
-    const certB64 = certRow?.certificate?.replace(/\s/g, "");
+    let certB64 = certRow?.certificate?.replace(/\s/g, "");
     if (!certB64) {
       return NextResponse.json({
         ok: false,
         error: "Brak certyfikatu KsefTokenEncryption w odpowiedzi KSEF.",
       });
+    }
+    // Certyfikat może być w formacie PEM (-----BEGIN CERTIFICATE-----...-----END CERTIFICATE-----) lub raw Base64 (DER)
+    if (certB64.includes("BEGIN")) {
+      const match = /-----BEGINCERTIFICATE-----([A-Za-z0-9+/=]+)-----ENDCERTIFICATE-----/.exec(certB64);
+      certB64 = match ? match[1]! : certB64.replace(/-----BEGINCERTIFICATE-----|-----ENDCERTIFICATE-----/g, "");
     }
 
     // —— 2. Pobierz challenge (challenge + timestamp w ms) ——
@@ -80,16 +85,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Nieprawidłowa odpowiedź challenge." });
     }
 
-    // —— 3. Wyciągnij secret (dla MCU: ref|nip-XXX|secret → tylko ostatni segment) ——
-    const segments = rawToken.split("|").map((s) => s.trim());
-    const secret = segments.length >= 3 ? segments[segments.length - 1]! : rawToken;
-    if (!secret) {
-      return NextResponse.json({ ok: false, error: "Nie udało się odczytać tokenu (oczekiwany format: ref|nip-XXX|secret)." });
-    }
-
-    // —— 4. Zaszyfruj payload: "secret|timestampMs" (RSA-OAEP SHA-256) ——
-    const payload = `${secret}|${timestampMs}`;
-    const payloadBytes = Buffer.from(payload, "utf8");
     const certDer = Buffer.from(certB64, "base64");
     let publicKey: ReturnType<typeof createPublicKey>;
     try {
@@ -98,79 +93,121 @@ export async function POST(req: NextRequest) {
     } catch {
       publicKey = createPublicKey({ key: certDer, format: "der", type: "spki" });
     }
-    const encrypted = publicEncrypt(
-      { key: publicKey, padding: 1, oaepHash: "sha256" },
-      payloadBytes
-    );
-    const encryptedTokenB64 = encrypted.toString("base64");
+    const doEncrypt = (payloadStr: string) =>
+      publicEncrypt(
+        { key: publicKey, padding: 1, oaepHash: "sha256" },
+        Buffer.from(payloadStr, "utf8")
+      ).toString("base64");
 
-    // —— 5. POST /auth/ksef-token ——
-    const initRes = await fetch(`${base}/auth/ksef-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        challenge,
-        contextIdentifier: { type: "Nip", value: nip },
-        encryptedToken: encryptedTokenB64,
-      }),
-    });
-    const initText = await initRes.text();
-    if (!initRes.ok) {
-      let detail: string | undefined;
-      try {
-        const j = JSON.parse(initText) as { message?: string; details?: string; exceptionDescription?: string };
-        detail = j.details ?? j.message ?? j.exceptionDescription ?? initText.slice(0, 400);
-      } catch {
-        detail = initText.slice(0, 400);
-      }
-      return NextResponse.json({
-        ok: false,
-        error: initRes.status === 401 ? "KSEF odrzucił token (401)." : `KSEF zwrócił ${initRes.status}.`,
-        detail,
-      });
-    }
-    const initData = JSON.parse(initText) as { authenticationToken?: { token?: string }; referenceNumber?: string };
-    const authToken = initData.authenticationToken?.token;
-    const referenceNumber = initData.referenceNumber;
-    if (!authToken) {
-      return NextResponse.json({
-        ok: false,
-        error: "Odpowiedź KSEF nie zawiera authenticationToken.",
-        detail: initText.slice(0, 300),
-      });
-    }
+    const segments = rawToken.split("|").map((s) => s.trim());
+    const secretOnly = segments.length >= 3 ? segments[segments.length - 1]! : rawToken;
+    const variants: { tokenPart: string }[] = [{ tokenPart: rawToken }, { tokenPart: secretOnly }];
+    if (secretOnly === rawToken) variants.pop();
 
-    // —— 6. Polling statusu (GET /auth/{referenceNumber}) do 200 lub błąd ——
-    const maxPollAttempts = 25;
-    const pollDelayMs = 1500;
-    let pollOk = false;
-    for (let i = 0; i < maxPollAttempts; i++) {
-      await new Promise((r) => setTimeout(r, i === 0 ? 600 : pollDelayMs));
-      const statusRes = await fetch(`${base}/auth/${encodeURIComponent(referenceNumber ?? "")}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      if (!statusRes.ok) break;
-      const statusJson = (await statusRes.json()) as { status?: { code?: number; description?: string; details?: string[] } };
-      const code = statusJson.status?.code ?? 0;
-      const details = statusJson.status?.details?.join("; ") ?? statusJson.status?.description ?? "";
-      if (code === 200) {
-        pollOk = true;
-        break;
+    let authToken: string | undefined;
+    let referenceNumber: string | undefined;
+    let lastError: { detail: string } | null = null;
+    let pollSucceeded = false;
+
+    for (let attempt = 0; attempt < variants.length; attempt++) {
+      let curChallenge = challenge;
+      let curTimestampMs = timestampMs;
+      if (attempt > 0) {
+        const chRes = await fetch(`${base}/auth/challenge`, { method: "POST", headers: { "Content-Type": "application/json" } });
+        if (!chRes.ok) break;
+        const ch2 = (await chRes.json()) as { challenge?: string; timestamp?: string; timestampMs?: number | string };
+        const nextCh = ch2.challenge;
+        const nextTs = ch2.timestampMs != null
+          ? (typeof ch2.timestampMs === "string" ? parseInt(ch2.timestampMs, 10) : ch2.timestampMs)
+          : (ch2.timestamp ? new Date(ch2.timestamp).getTime() : 0);
+        if (!nextCh || Number.isNaN(nextTs)) break;
+        curChallenge = nextCh;
+        curTimestampMs = nextTs;
       }
-      if (code === 450 || code === 415 || code === 425 || code === 460 || code >= 400) {
+
+      const payload = `${variants[attempt]!.tokenPart}|${curTimestampMs}`;
+      const encryptedTokenB64 = doEncrypt(payload);
+
+      const initRes = await fetch(`${base}/auth/ksef-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          challenge: curChallenge,
+          contextIdentifier: { type: "Nip", value: nip },
+          encryptedToken: encryptedTokenB64,
+        }),
+      });
+      const initText = await initRes.text();
+      if (!initRes.ok) {
+        const detailLower = initText.toLowerCase();
+        const is450Invalid = (initRes.status === 450 || initRes.status === 401) && detailLower.includes("invalid") && detailLower.includes("encryption");
+        if (is450Invalid && attempt < variants.length - 1) {
+          lastError = { detail: initText.slice(0, 400) };
+          continue;
+        }
+        let detail: string | undefined;
+        try {
+          const j = JSON.parse(initText) as { message?: string; details?: string; exceptionDescription?: string };
+          detail = j.details ?? j.message ?? j.exceptionDescription ?? initText.slice(0, 400);
+        } catch {
+          detail = initText.slice(0, 400);
+        }
         return NextResponse.json({
           ok: false,
-          error: code === 450
-            ? "Token KSeF odrzucony (450). Sprawdź: token aktualny i nieużyty, NIP zgodny z tokenem, URL to to samo środowisko (produkcja/demo) co portal MCU."
-            : `Uwierzytelnianie nie powiodło się (${code}).`,
-          detail: details || JSON.stringify(statusJson).slice(0, 300),
+          error: initRes.status === 401 ? "KSEF odrzucił token (401)." : `KSEF zwrócił ${initRes.status}.`,
+          detail,
         });
       }
+      const initData = JSON.parse(initText) as { authenticationToken?: { token?: string }; referenceNumber?: string };
+      authToken = initData.authenticationToken?.token;
+      referenceNumber = initData.referenceNumber;
+      if (!authToken) {
+        return NextResponse.json({
+          ok: false,
+          error: "Odpowiedź KSEF nie zawiera authenticationToken.",
+          detail: initText.slice(0, 300),
+        });
+      }
+
+      lastError = null;
+      const maxPollAttempts = 25;
+      const pollDelayMs = 1500;
+      let pollOk = false;
+      for (let i = 0; i < maxPollAttempts; i++) {
+        await new Promise((r) => setTimeout(r, i === 0 ? 600 : pollDelayMs));
+        const statusRes = await fetch(`${base}/auth/${encodeURIComponent(referenceNumber ?? "")}`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!statusRes.ok) break;
+        const statusJson = (await statusRes.json()) as { status?: { code?: number; description?: string; details?: string[] } };
+        const code = statusJson.status?.code ?? 0;
+        const details = statusJson.status?.details?.join("; ") ?? statusJson.status?.description ?? "";
+        if (code === 200) {
+          pollOk = true;
+          pollSucceeded = true;
+          break;
+        }
+        if (code === 450 || code === 415 || code === 425 || code === 460 || code >= 400) {
+          lastError = { detail: details || JSON.stringify(statusJson).slice(0, 300) };
+          const is450Invalid = code === 450 && details.toLowerCase().includes("invalid") && details.toLowerCase().includes("encryption");
+          if (is450Invalid && attempt < variants.length - 1) break;
+          return NextResponse.json({
+            ok: false,
+            error: code === 450
+              ? "Token KSeF odrzucony (450). Sprawdź: token aktualny i nieużyty, NIP zgodny z tokenem, URL to to samo środowisko (produkcja/demo) co portal MCU."
+              : `Uwierzytelnianie nie powiodło się (${code}).`,
+            detail: lastError.detail,
+          });
+        }
+      }
+      if (pollOk) break;
     }
-    if (!pollOk) {
+
+    if (!authToken || !referenceNumber || !pollSucceeded) {
       return NextResponse.json({
         ok: false,
-        error: "Przekroczono czas oczekiwania na potwierdzenie uwierzytelnienia.",
+        error: "Token KSeF odrzucony (450). Sprawdź: token aktualny i nieużyty, NIP zgodny z tokenem, URL to to samo środowisko (produkcja/demo) co portal MCU.",
+        detail: lastError?.detail ?? "Uwierzytelnianie nie zakończyło się sukcesem.",
       });
     }
 
