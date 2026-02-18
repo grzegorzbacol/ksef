@@ -44,6 +44,8 @@ export default function SettingsPage() {
   const [companyMessage, setCompanyMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message?: string; error?: string; detail?: string } | null>(null);
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemResult, setRedeemResult] = useState<{ ok: boolean; error?: string; detail?: string } | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -230,7 +232,9 @@ export default function SettingsPage() {
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
               autoComplete="off"
             />
-            <p className="text-xs text-muted mt-1">Pozostaw puste, aby nie zmieniać zapisanego tokenu. Po wklejeniu nowego tokenu użyj „Sprawdź połączenie”.</p>
+            <p className="text-xs text-muted mt-1">
+              Pozostaw puste, aby nie zmieniać zapisanego tokenu. Jeśli po wklejeniu tokenu z MCU nadal masz 401, użyj „Wymień token” – token z MCU bywa tokenem do jednorazowej wymiany na token dostępu.
+            </p>
           </div>
           <div>
             <label className="block text-sm text-muted mb-1">Ścieżka zapytania o faktury (opcjonalnie)</label>
@@ -282,6 +286,7 @@ export default function SettingsPage() {
             disabled={testing || !ksef.token.trim()}
             onClick={async () => {
               setTestResult(null);
+              setRedeemResult(null);
               setTesting(true);
               try {
                 const res = await fetch("/api/ksef/test-connection", {
@@ -306,6 +311,40 @@ export default function SettingsPage() {
           >
             {testing ? "Sprawdzanie…" : "Sprawdź połączenie"}
           </button>
+          <button
+            type="button"
+            disabled={redeeming || !ksef.token.trim()}
+            onClick={async () => {
+              setRedeemResult(null);
+              setTestResult(null);
+              setRedeeming(true);
+              try {
+                const res = await fetch("/api/ksef/redeem-token", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ apiUrl: ksef.apiUrl || "https://api.ksef.mf.gov.pl", token: ksef.token }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (data.ok === true && data.accessToken) {
+                  setKsef((s) => ({ ...s, token: data.accessToken }));
+                  setRedeemResult({ ok: true });
+                } else {
+                  setRedeemResult({
+                    ok: false,
+                    error: data.error ?? "Wymiana tokena nie powiodła się.",
+                    detail: data.detail,
+                  });
+                }
+              } catch {
+                setRedeemResult({ ok: false, error: "Błąd połączenia z serwerem." });
+              } finally {
+                setRedeeming(false);
+              }
+            }}
+            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+          >
+            {redeeming ? "Wymiana…" : "Wymień token"}
+          </button>
         </div>
         {testResult && (
           <div className={`mt-3 p-3 rounded-lg text-sm ${testResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
@@ -315,6 +354,18 @@ export default function SettingsPage() {
               <>
                 <p>{testResult.error ?? "Błąd połączenia."}</p>
                 {testResult.detail && <p className="mt-1 text-xs opacity-90">{testResult.detail}</p>}
+              </>
+            )}
+          </div>
+        )}
+        {redeemResult && (
+          <div className={`mt-3 p-3 rounded-lg text-sm ${redeemResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
+            {redeemResult.ok ? (
+              <p>Otrzymano token dostępu. Kliknij „Zapisz ustawienia KSEF”, aby go zapisać.</p>
+            ) : (
+              <>
+                <p>{redeemResult.error ?? "Wymiana tokena nie powiodła się."}</p>
+                {redeemResult.detail && <p className="mt-1 text-xs opacity-90">{redeemResult.detail}</p>}
               </>
             )}
           </div>
