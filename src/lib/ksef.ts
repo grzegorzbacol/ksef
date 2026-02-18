@@ -130,9 +130,10 @@ function mapKsef2MetadataToRaw(item: Record<string, unknown>): KsefInvoiceRaw {
   const buyerId = buyer?.identifier as Record<string, unknown> | undefined;
   const str = (v: unknown) => (v != null ? String(v) : undefined);
   const num = (v: unknown) => (typeof v === "number" ? v : v != null ? Number(v) : undefined);
+  const ksefNum = str(item.ksefNumber ?? item.referenceNumber);
   return {
-    number: str(item.invoiceNumber ?? item.ksefNumber),
-    referenceNumber: str(item.ksefNumber),
+    number: str(item.invoiceNumber ?? item.ksefNumber ?? item.referenceNumber),
+    referenceNumber: ksefNum,
     issueDate: str(item.issueDate),
     saleDate: str(item.invoicingDate),
     sellerNip: str(seller?.nip ?? seller?.["nip"]),
@@ -390,8 +391,8 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
   }
 }
 
-/** Domyślna ścieżka do pobrania pliku PDF faktury po numerze KSEF (referenceNumber). */
-const DEFAULT_INVOICE_PDF_PATH = "/v2/invoices/{referenceNumber}/file";
+/** Domyślna ścieżka KSEF 2.0: pobranie faktury po numerze KSeF (zwraca XML). Placeholder: {referenceNumber}. */
+const DEFAULT_INVOICE_PDF_PATH = "/v2/invoices/ksef/{referenceNumber}";
 
 export type KsefInvoicePdfResult =
   | { success: true; pdf: ArrayBuffer }
@@ -441,20 +442,28 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
       }
       return { success: false, error: errMsg };
     }
-    const contentType = res.headers.get("Content-Type") || "";
-    if (!contentType.includes("pdf")) {
+    const contentType = (res.headers.get("Content-Type") || "").toLowerCase();
+    const body = await res.arrayBuffer();
+    if (!body.byteLength) {
+      return { success: false, error: "Pusta odpowiedź z KSEF." };
+    }
+
+    if (contentType.includes("pdf")) {
+      return { success: true, pdf: body };
+    }
+
+    if (contentType.includes("xml")) {
       return {
         success: false,
-        error: "KSEF nie zwrócił PDF (Content-Type: " + contentType + ").",
+        error:
+          "KSEF zwraca fakturę w formacie XML (API 2.0 nie udostępnia PDF). W Ustawieniach możesz podać własną ścieżkę do usługi zwracającej PDF.",
       };
     }
 
-    const pdf = await res.arrayBuffer();
-    if (!pdf.byteLength) {
-      return { success: false, error: "Pusta odpowiedź PDF z KSEF." };
-    }
-
-    return { success: true, pdf };
+    return {
+      success: false,
+      error: "KSEF nie zwrócił PDF (Content-Type: " + contentType + ").",
+    };
   };
 
   try {
