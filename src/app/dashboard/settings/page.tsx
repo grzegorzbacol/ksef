@@ -207,10 +207,13 @@ export default function SettingsPage() {
         <p className="text-muted text-sm mb-2">
           Uzupełnij dane, aby aplikacja mogła łączyć się z KSEF. Wymagane minimum: URL API i token.
         </p>
-        <p className="text-muted text-xs mb-4">
-          Token z MCU (Moduł certyfikatów i uprawnień na{" "}
+        <p className="text-muted text-xs mb-2">
+          <strong>Kolejność:</strong> (1) Wklej w „Token” cały token z MCU (np. ref|nip-XXX|secret z portalu{" "}
           <a href="https://ksef.mf.gov.pl" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ksef.mf.gov.pl</a>
-          ) nie wklejasz bezpośrednio – wklej go w pole „Token”, podaj NIP firmy i kliknij <strong>„Zaloguj tokenem KSeF”</strong>. Aplikacja zaszyfruje token i wymieni go na token dostępu (JWT), który zostanie wpisany w pole. Na końcu kliknij „Zapisz ustawienia KSEF”.
+          ). (2) Wpisz NIP. (3) Kliknij <strong>„Zaloguj tokenem KSeF”</strong> – w pole wpisze się token dostępu (JWT). (4) Kliknij „Zapisz ustawienia KSEF”. Dopiero potem „Sprawdź połączenie” – działa tylko z JWT w polu, nie z tokenem z MCU.
+        </p>
+        <p className="text-muted text-xs mb-4">
+          Przy 401: upewnij się, że najpierw wykonałeś krok 3 (Zaloguj tokenem KSeF). W polu musi być JWT, nie surowy token z MCU.
         </p>
 
         <div className="space-y-4">
@@ -235,7 +238,7 @@ export default function SettingsPage() {
               autoComplete="off"
             />
             <p className="text-xs text-muted mt-1">
-              Wklej cały token z MCU (np. „referencja | nip-XXX | secret”) – aplikacja użyje właściwej części do szyfrowania. Podaj NIP i kliknij „Zaloguj tokenem KSeF”.
+              Wklej cały token z MCU (np. „ref|nip-XXX|secret” – ze spacjami lub bez) – aplikacja użyje właściwej części do szyfrowania. Podaj NIP i kliknij „Zaloguj tokenem KSeF”.
             </p>
           </div>
           <div>
@@ -326,6 +329,7 @@ export default function SettingsPage() {
           <button
             type="button"
             disabled={testing || !ksef.token.trim()}
+            title={ksef.token.includes("|") ? "Najpierw użyj „Zaloguj tokenem KSeF” – w polu musi być JWT." : undefined}
             onClick={async () => {
               setTestResult(null);
               setRedeemResult(null);

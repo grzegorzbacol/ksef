@@ -40,10 +40,14 @@ export async function POST(req: NextRequest) {
     if (res.ok) {
       return NextResponse.json({ ok: true, status: res.status, message: "Połączenie z KSEF poprawne." });
     }
+    const errMsg =
+      res.status === 401
+        ? "KSEF odrzucił token (401). Jeśli w polu Token masz token z MCU (tekst z „|”, np. ref|nip-XXX|secret), najpierw kliknij „Zaloguj tokenem KSeF” – do połączenia potrzebny jest token dostępu (JWT), nie token z MCU."
+        : `KSEF zwrócił ${res.status}.`;
     return NextResponse.json({
       ok: false,
       status: res.status,
-      error: res.status === 401 ? "KSEF odrzucił token (401)." : `KSEF zwrócił ${res.status}.`,
+      error: errMsg,
       detail: detail || undefined,
     });
   } catch (e) {
