@@ -33,27 +33,44 @@ model Product {
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  type          String        @default("sales") // "cost" = faktura kosztowa, "sales" = faktura sprzedaży
-  number        String        @unique
-  issueDate     DateTime
-  saleDate      DateTime?
-  sellerName    String
-  sellerNip     String
-  buyerName     String
-  buyerNip      String
-  netAmount     Float
-  vatAmount     Float
-  grossAmount   Float
-  currency      String        @default("PLN")
-  ksefSentAt    DateTime?
-  ksefId        String?
-  ksefStatus    String?
-  source        String        @default("manual")
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  payment       Payment?
-  items         InvoiceItem[]
+  id               String        @id @default(cuid())
+  type             String        @default("sales") // "cost" = faktura kosztowa, "sales" = faktura sprzedaży
+  number           String        @unique
+  issueDate        DateTime
+  saleDate         DateTime?
+  sellerName       String
+  sellerNip        String
+  buyerName        String
+  buyerNip         String
+  netAmount        Float
+  vatAmount        Float
+  grossAmount      Float
+  currency         String        @default("PLN")
+  ksefSentAt       DateTime?
+  ksefId           String?
+  ksefStatus       String?
+  source           String        @default("manual") // manual | ksef | mail
+  emailSubject     String?       // temat maila (dla source=mail)
+  emailBody        String?       @db.Text // treść wiadomości
+  emailFrom        String?       // nadawca
+  emailReceivedAt  DateTime?     // data otrzymania
+  emailMessageId   String?       // Message-ID do deduplikacji
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  payment          Payment?
+  items            InvoiceItem[]
+  emailAttachments InvoiceEmailAttachment[]
+}
+
+model InvoiceEmailAttachment {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  filename   String
+  contentType String  @default("application/octet-stream")
+  size       Int      @default(0)
+  storedPath String   // ścieżka do pliku na dysku
+  createdAt  DateTime @default(now())
 }
 
 model InvoiceItem {

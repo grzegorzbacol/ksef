@@ -6,3 +6,4 @@ node_modules
 prisma/dev.db
 .DS_Store
 php/config.local.php
+uploads/

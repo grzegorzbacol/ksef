@@ -75,6 +75,19 @@ export default function InvoicesPage() {
 
   const invoiceType = "sales" as const;
 
+  function sourceLabel(source: string): string {
+    switch (source) {
+      case "ksef":
+        return "KSEF";
+      case "manual":
+        return "Wprowadzona ręcznie";
+      case "mail":
+        return "Mail";
+      default:
+        return source || "—";
+    }
+  }
+
   function loadInvoices() {
     setLoading(true);
     fetch(`/api/invoices?type=${invoiceType}&payment=true`)
@@ -440,6 +453,7 @@ export default function InvoicesPage() {
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Nabywca</th>
                 <th className="p-3 text-right">Brutto</th>
+                <th className="p-3">Źródło</th>
                 <th className="p-3">KSEF</th>
                 <th className="p-3">Rozliczono</th>
                 <th className="p-3 w-20"></th>
@@ -452,6 +466,7 @@ export default function InvoicesPage() {
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
                   <td className="p-3">{inv.buyerName}</td>
                   <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
+                  <td className="p-3">{sourceLabel(inv.source)}</td>
                   <td className="p-3">
                     {inv.ksefSentAt ? (
                       <span className="text-success">Wysłano</span>

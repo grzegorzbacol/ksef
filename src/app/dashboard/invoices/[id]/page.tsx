@@ -119,7 +119,7 @@ export default function InvoiceDetailPage() {
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
 
   const isCost = invoice.type === "cost";
-  const listHref = isCost ? "/dashboard/invoices" : "/dashboard/invoices-sales";
+  const listHref = isCost ? "/dashboard/invoices-sales" : "/dashboard/invoices";
   const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
 
   return (

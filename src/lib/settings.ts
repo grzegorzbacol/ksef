@@ -82,3 +82,53 @@ export async function setCompanySettings(data: CompanySettings): Promise<void> {
     await setSetting(keys[i], values[i] ?? "");
   }
 }
+
+export type MailSettings = {
+  imapHost: string;
+  imapPort: string;
+  imapUser: string;
+  imapPassword: string;
+  imapSecure: boolean;
+  imapFolder: string;
+  emailAddress: string; // adres na który przychodzą faktury
+};
+
+const MAIL_KEYS = [
+  "mail_imap_host",
+  "mail_imap_port",
+  "mail_imap_user",
+  "mail_imap_password",
+  "mail_imap_secure",
+  "mail_imap_folder",
+  "mail_email_address",
+] as const;
+
+export async function getMailSettings(): Promise<MailSettings> {
+  const [imapHost, imapPort, imapUser, imapPassword, imapSecure, imapFolder, emailAddress] = await Promise.all(
+    MAIL_KEYS.map((k) => getSetting(k))
+  );
+  return {
+    imapHost: imapHost?.trim() || "",
+    imapPort: imapPort?.trim() || "993",
+    imapUser: imapUser?.trim() || "",
+    imapPassword: imapPassword?.trim() || "",
+    imapSecure: imapSecure !== "false" && imapSecure !== "0",
+    imapFolder: imapFolder?.trim() || "INBOX",
+    emailAddress: emailAddress?.trim() || "",
+  };
+}
+
+export async function setMailSettings(data: MailSettings): Promise<void> {
+  const values = [
+    data.imapHost,
+    data.imapPort,
+    data.imapUser,
+    data.imapPassword,
+    data.imapSecure ? "true" : "false",
+    data.imapFolder,
+    data.emailAddress,
+  ];
+  for (let i = 0; i < MAIL_KEYS.length; i++) {
+    await setSetting(MAIL_KEYS[i], values[i] ?? "");
+  }
+}
