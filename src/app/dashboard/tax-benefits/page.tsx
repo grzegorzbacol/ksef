@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
+import { MonthYearFilter } from "@/components/MonthYearFilter";
 
 type Car = {
   id: string;
@@ -26,6 +27,7 @@ type Invoice = {
   vatDeductionPercent?: number | null;
   costDeductionPercent?: number | null;
   expenseType?: string;
+  includedInCosts?: boolean;
   car?: Car | null;
 };
 
@@ -39,10 +41,17 @@ export default function TaxBenefitsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [company, setCompany] = useState<CompanyTax | null>(null);
   const [loading, setLoading] = useState(true);
+  const now = new Date();
+  const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
+  const [year, setYear] = useState<number | null>(now.getFullYear());
 
   useEffect(() => {
+    setLoading(true);
+    const params = new URLSearchParams({ type: "cost", payment: "true" });
+    if (month != null) params.set("month", String(month));
+    if (year != null) params.set("year", String(year));
     Promise.all([
-      fetch("/api/invoices?type=cost&payment=true").then((r) => r.json()),
+      fetch(`/api/invoices?${params}`).then((r) => r.json()),
       fetch("/api/settings/company").then((r) => r.json()),
     ])
       .then(([invData, companyData]) => {
@@ -55,15 +64,45 @@ export default function TaxBenefitsPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <p className="text-muted">Ładowanie…</p>;
+  }, [month, year]);
 
   const config: CompanyTax = company ?? {
     pitRate: 0.12,
     healthRate: 0.09,
     isVatPayer: true,
   };
+
+  const totals = invoices.reduce(
+    (acc, inv) => {
+      const result = computePurchaseInvoiceTaxBenefit(
+        {
+          grossAmount: inv.grossAmount,
+          netAmount: inv.netAmount,
+          vatAmount: inv.vatAmount,
+          vatDeductionPercent: inv.vatDeductionPercent ?? 1,
+          costDeductionPercent: inv.costDeductionPercent ?? 1,
+          includedInCosts: inv.includedInCosts ?? false,
+          car: inv.expenseType === "car" && inv.car
+            ? {
+                value: inv.car.value,
+                limit100k: inv.car.limit100k,
+                limit150k: inv.car.limit150k,
+                limit200k: inv.car.limit200k,
+                vatDeductionPercent: inv.car.vatDeductionPercent,
+              }
+            : undefined,
+        },
+        config
+      );
+      return {
+        gross: acc.gross + inv.grossAmount,
+        taxBenefit: acc.taxBenefit + result.totalTaxBenefit,
+        realCost: acc.realCost + result.realCost,
+      };
+    },
+    { gross: 0, taxBenefit: 0, realCost: 0 }
+  );
+  const currency = invoices[0]?.currency ?? "PLN";
 
   return (
     <div>
@@ -85,7 +124,13 @@ export default function TaxBenefitsPage() {
         .
       </p>
 
-      {invoices.length === 0 ? (
+      <div className="mb-4">
+        <MonthYearFilter month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
+      </div>
+
+      {loading ? (
+        <p className="text-muted">Ładowanie…</p>
+      ) : invoices.length === 0 ? (
         <p className="text-muted">Brak faktur zakupu. Dodaj faktury w module Faktury zakupu.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
@@ -96,6 +141,7 @@ export default function TaxBenefitsPage() {
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
                 <th className="p-3 text-left">Typ wydatku</th>
+                <th className="p-3 text-center">Ujęta</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3 text-right">Korzyść podatkowa</th>
                 <th className="p-3 text-right">Realny koszt</th>
@@ -111,6 +157,7 @@ export default function TaxBenefitsPage() {
                     vatAmount: inv.vatAmount,
                     vatDeductionPercent: inv.vatDeductionPercent ?? 1,
                     costDeductionPercent: inv.costDeductionPercent ?? 1,
+                    includedInCosts: inv.includedInCosts ?? false,
                     car: inv.expenseType === "car" && inv.car
                       ? {
                           value: inv.car.value,
@@ -130,6 +177,9 @@ export default function TaxBenefitsPage() {
                     <td className="p-3">{inv.sellerName}</td>
                     <td className="p-3 text-muted text-sm">
                       {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
+                    </td>
+                    <td className="p-3 text-center">
+                      {inv.includedInCosts ? "Tak" : "—"}
                     </td>
                     <td className="p-3 text-right">
                       {inv.grossAmount.toFixed(2)} {inv.currency}
@@ -152,6 +202,23 @@ export default function TaxBenefitsPage() {
                 );
               })}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border bg-bg/50 font-medium">
+                <td className="p-3" colSpan={5}>
+                  Suma
+                </td>
+                <td className="p-3 text-right">
+                  {totals.gross.toFixed(2)} {currency}
+                </td>
+                <td className="p-3 text-right text-success">
+                  {totals.taxBenefit.toFixed(2)} {currency}
+                </td>
+                <td className="p-3 text-right">
+                  {totals.realCost.toFixed(2)} {currency}
+                </td>
+                <td className="p-3"></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

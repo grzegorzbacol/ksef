@@ -107,6 +107,7 @@ type Invoice = {
   costDeductionPercent?: number | null;
   expenseType?: string;
   carId?: string | null;
+  includedInCosts?: boolean;
   car?: {
     id: string;
     name: string;
@@ -165,6 +166,7 @@ export default function InvoiceDetailPage() {
   const [savingExpenseType, setSavingExpenseType] = useState(false);
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
+  const [savingIncludedInCosts, setSavingIncludedInCosts] = useState(false);
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -678,6 +680,7 @@ export default function InvoiceDetailPage() {
               vatAmount: invoice.vatAmount,
               vatDeductionPercent: Number.isNaN(vatDed) ? 1 : Math.max(0, Math.min(1, vatDed)),
               costDeductionPercent: Number.isNaN(costDed) ? 1 : Math.max(0, Math.min(1, costDed)),
+              includedInCosts: invoice.includedInCosts ?? false,
               car: invoice.expenseType === "car" && invoice.car
                 ? {
                     value: invoice.car.value,
@@ -693,6 +696,40 @@ export default function InvoiceDetailPage() {
           return (
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Korzyści podatkowe</h2>
+            <label className="flex items-center gap-2 mb-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={invoice.includedInCosts ?? false}
+                disabled={savingIncludedInCosts}
+                onChange={async () => {
+                  const next = !(invoice.includedInCosts ?? false);
+                  setSavingIncludedInCosts(true);
+                  try {
+                    const res = await fetch(`/api/invoices/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ includedInCosts: next }),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}));
+                      alert(d.error || "Błąd zapisu");
+                      return;
+                    }
+                    const updated = await res.json();
+                    setInvoice(updated);
+                  } finally {
+                    setSavingIncludedInCosts(false);
+                  }
+                }}
+                className="rounded border-border"
+              />
+              <span>Ujęta w kosztach</span>
+            </label>
+            <p className="text-muted text-xs mb-2">
+              {invoice.includedInCosts
+                ? "Faktura ujęta w kosztach – nie generuje korzyści podatkowej."
+                : null}
+            </p>
             <p className="text-muted text-sm mb-3">
               Obliczenia dla tej faktury zakupowej na podstawie ustawień firmy (
               <Link href="/dashboard/settings" className="text-accent hover:underline">Ustawienia → Dane firmy</Link>
@@ -717,7 +754,7 @@ export default function InvoiceDetailPage() {
                 <> Wydatek samochodowy ({invoice.car.name}): limit kosztu i {(invoice.car.vatDeductionPercent * 100).toFixed(0)}% VAT z definicji pojazdu.</>
               )}
             </p>
-            {invoice.expenseType !== "car" && (
+            {invoice.expenseType !== "car" && !(invoice.includedInCosts ?? false) && (
             <>
               <div className="flex flex-wrap items-end gap-4">
                 <div>
