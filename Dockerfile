@@ -12,4 +12,4 @@ RUN npm run build
 
 EXPOSE 3000
 # DATABASE_URL ustaw w Coolify (Environment). Przy starcie: migracja + seed + serwer
-CMD npm run start:prod
+CMD ["sh", "-c", "npm run start:prod"]
