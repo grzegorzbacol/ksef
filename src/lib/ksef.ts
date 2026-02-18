@@ -120,19 +120,21 @@ function mapKsef2MetadataToRaw(item: Record<string, unknown>): KsefInvoiceRaw {
   const seller = item.seller as Record<string, unknown> | undefined;
   const buyer = item.buyer as Record<string, unknown> | undefined;
   const buyerId = buyer?.identifier as Record<string, unknown> | undefined;
+  const str = (v: unknown) => (v != null ? String(v) : undefined);
+  const num = (v: unknown) => (typeof v === "number" ? v : v != null ? Number(v) : undefined);
   return {
-    number: item.invoiceNumber ?? item.ksefNumber,
-    referenceNumber: item.ksefNumber,
-    issueDate: item.issueDate,
-    saleDate: item.invoicingDate,
-    sellerNip: seller?.nip ?? (seller as Record<string, unknown> | undefined)?.["nip"],
-    sellerName: seller?.name ?? (seller as Record<string, unknown> | undefined)?.["name"],
-    buyerNip: buyerId?.value ?? buyer?.["nip"],
-    buyerName: buyer?.name ?? (buyer as Record<string, unknown> | undefined)?.["name"],
-    netAmount: item.netAmount,
-    vatAmount: item.vatAmount,
-    grossAmount: item.grossAmount,
-    currency: item.currency,
+    number: str(item.invoiceNumber ?? item.ksefNumber),
+    referenceNumber: str(item.ksefNumber),
+    issueDate: str(item.issueDate),
+    saleDate: str(item.invoicingDate),
+    sellerNip: str(seller?.nip ?? seller?.["nip"]),
+    sellerName: str(seller?.name ?? seller?.["name"]),
+    buyerNip: str(buyerId?.value ?? buyer?.["nip"]),
+    buyerName: str(buyer?.name ?? buyer?.["name"]),
+    netAmount: num(item.netAmount),
+    vatAmount: num(item.vatAmount),
+    grossAmount: num(item.grossAmount),
+    currency: str(item.currency),
   };
 }
 
