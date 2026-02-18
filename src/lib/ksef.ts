@@ -108,6 +108,10 @@ function parseKsefResponse(body: unknown): KsefInvoiceRaw[] {
     const o = body as Record<string, unknown>;
     if (Array.isArray(o.invoices)) return o.invoices as KsefInvoiceRaw[];
     if (Array.isArray(o.items)) return o.items as KsefInvoiceRaw[];
+    if (Array.isArray(o.invoiceMetadataList)) return o.invoiceMetadataList as KsefInvoiceRaw[];
+    if (Array.isArray(o.results)) return o.results as KsefInvoiceRaw[];
+    if (Array.isArray(o.records)) return o.records as KsefInvoiceRaw[];
+    if (Array.isArray(o.elements)) return o.elements as KsefInvoiceRaw[];
     if (Array.isArray(o.lista)) return o.lista as KsefInvoiceRaw[];
     if (Array.isArray(o.data)) return o.data as KsefInvoiceRaw[];
     if (Array.isArray(o.wynik)) return o.wynik as KsefInvoiceRaw[];
@@ -188,51 +192,66 @@ export async function fetchInvoicesFromKsef(
       pageSize: "100",
     });
     const url = `${apiUrl}${queryPath}?${queryParams}`;
-    const body = {
-      subjectType: "Subject1",
-      dateRange: {
-        dateType: "Issue",
-        from: `${from}T00:00:00`,
-        to: `${to}T23:59:59`,
-      },
+
+    const fetchForSubject = async (subjectType: "Subject1" | "Subject2"): Promise<KsefInvoiceRaw[]> => {
+      const body = {
+        subjectType,
+        dateRange: {
+          dateType: "Issue",
+          from: `${from}T00:00:00`,
+          to: `${to}T23:59:59`,
+        },
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${tokenForHeader}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        let errMsg = `KSEF API ${res.status}: ${res.statusText}`;
+        try {
+          const json = JSON.parse(text);
+          errMsg = json.message ?? json.error ?? text?.slice(0, 200) ?? errMsg;
+        } catch {
+          if (text) errMsg += ` – ${text.slice(0, 150)}`;
+        }
+        if (res.status === 401) {
+          errMsg =
+            "KSEF odrzucił token (401). Token mógł wygasnąć – w KSEF 2.0 tokeny dostępu są krótkoterminowe. Uzyskaj nowy token w portalu KSEF i wklej go w Ustawieniach → Integracja KSEF.";
+        }
+        throw new Error(errMsg);
+      }
+
+      const data = await res.json().catch(() => ({}));
+      let rawList = parseKsefResponse(data);
+      rawList = rawList.map((r) => {
+        const o = r as Record<string, unknown>;
+        return isKsef2Metadata(o) ? mapKsef2MetadataToRaw(o) : (r as KsefInvoiceRaw);
+      });
+      return rawList;
     };
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${tokenForHeader}`,
-      },
-      body: JSON.stringify(body),
-    });
+    // KSEF może zwracać dane zależnie od kontekstu podmiotu; pobieramy oba i łączymy.
+    const [list1, list2] = await Promise.all([
+      fetchForSubject("Subject1"),
+      fetchForSubject("Subject2"),
+    ]);
 
-    if (!res.ok) {
-      const text = await res.text();
-      let errMsg = `KSEF API ${res.status}: ${res.statusText}`;
-      try {
-        const json = JSON.parse(text);
-        errMsg = json.message ?? json.error ?? text?.slice(0, 200) ?? errMsg;
-      } catch {
-        if (text) errMsg += ` – ${text.slice(0, 150)}`;
-      }
-      if (res.status === 401) {
-        errMsg =
-          "KSEF odrzucił token (401). Token mógł wygasnąć – w KSEF 2.0 tokeny dostępu są krótkoterminowe. Uzyskaj nowy token w portalu KSEF i wklej go w Ustawieniach → Integracja KSEF.";
-      }
-      return { success: false, error: errMsg };
-    }
-
-    const data = await res.json().catch(() => ({}));
-    let rawList = parseKsefResponse(data);
-    rawList = rawList.map((r) => {
-      const o = r as Record<string, unknown>;
-      return isKsef2Metadata(o) ? mapKsef2MetadataToRaw(o) : (r as KsefInvoiceRaw);
-    });
+    const seen = new Set<string>();
     const invoices: KsefInvoiceNormalized[] = [];
-
-    for (const raw of rawList) {
+    for (const raw of [...list1, ...list2]) {
       const normalized = normalizeKsefInvoice(raw as KsefInvoiceRaw);
-      if (normalized) invoices.push(normalized);
+      if (!normalized) continue;
+      const key = `${normalized.number}|${normalized.issueDate}|${normalized.sellerNip}|${normalized.buyerNip}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      invoices.push(normalized);
     }
 
     return { success: true, invoices, count: invoices.length };

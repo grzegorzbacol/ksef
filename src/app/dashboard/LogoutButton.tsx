@@ -12,8 +12,12 @@ export function LogoutButton({ login }: { login: string }) {
   }
 
   return (
-    <button type="button" onClick={handleLogout} className="text-muted hover:text-text">
-      Wyloguj ({login})
+    <button
+      type="button"
+      onClick={handleLogout}
+      className="mt-1 w-full rounded-lg px-3 py-2 text-left text-sm text-muted hover:bg-card hover:text-text transition-colors"
+    >
+      Wyloguj
     </button>
   );
 }

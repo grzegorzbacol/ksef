@@ -1,31 +1,48 @@
 import Link from "next/link";
 
+const cards = [
+  {
+    href: "/dashboard/invoices",
+    title: "Faktury kosztowe",
+    description: "Wystawianie, wysyłka do KSEF, pobieranie z KSEF",
+  },
+  {
+    href: "/dashboard/invoices-sales",
+    title: "Faktury sprzedaży",
+    description: "Faktury sprzedaży i zarządzanie nimi",
+  },
+  {
+    href: "/dashboard/statistics",
+    title: "Statystyki",
+    description: "Podsumowania i grupowanie faktur",
+  },
+  {
+    href: "/dashboard/rozrachunki",
+    title: "Rozrachunki",
+    description: "Rozliczenia faktur z datą",
+  },
+];
+
 export default function DashboardPage() {
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-6">Panel główny</h1>
+      <h1 className="text-2xl font-semibold tracking-tight mb-2">Panel główny</h1>
+      <p className="text-[var(--text-secondary)] text-sm mb-8">
+        Wybierz moduł, aby przejść do zarządzania fakturami, statystykami lub rozrachunkami.
+      </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link
-          href="/dashboard/invoices"
-          className="rounded-xl border border-border bg-card p-6 hover:border-accent transition-colors"
-        >
-          <h2 className="font-medium text-accent mb-1">Faktury</h2>
-          <p className="text-sm text-muted">Wystawianie, wysyłka do KSEF, pobieranie z KSEF</p>
-        </Link>
-        <Link
-          href="/dashboard/statistics"
-          className="rounded-xl border border-border bg-card p-6 hover:border-accent transition-colors"
-        >
-          <h2 className="font-medium text-accent mb-1">Statystyki</h2>
-          <p className="text-sm text-muted">Podsumowania i grupowanie faktur</p>
-        </Link>
-        <Link
-          href="/dashboard/rozrachunki"
-          className="rounded-xl border border-border bg-card p-6 hover:border-accent transition-colors"
-        >
-          <h2 className="font-medium text-accent mb-1">Rozrachunki</h2>
-          <p className="text-sm text-muted">Rozliczenia faktur z datą</p>
-        </Link>
+        {cards.map((card) => (
+          <Link
+            key={card.href}
+            href={card.href}
+            className="group rounded-xl border border-border bg-card p-6 shadow-card transition-all duration-200 hover:border-border-focus hover:bg-[var(--card-hover)] hover:shadow-card-lg"
+          >
+            <h2 className="font-medium text-accent mb-1.5 group-hover:text-[var(--accent-hover)] transition-colors">
+              {card.title}
+            </h2>
+            <p className="text-sm text-muted leading-relaxed">{card.description}</p>
+          </Link>
+        ))}
       </div>
     </div>
   );

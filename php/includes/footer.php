@@ -1,6 +1,6 @@
 </main>
 <footer class="footer container">
-    <p>KSEF – Zarządzanie fakturami</p>
+    <p>BONEA ERP</p>
 </footer>
 </body>
 </html>

@@ -1,4 +1,4 @@
-# KSEF – Zarządzanie fakturami
+# BONEA ERP
 
 Aplikacja do wystawiania faktur, wysyłki i pobierania z KSEF, statystyk oraz rejestracji płatności.
 

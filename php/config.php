@@ -4,7 +4,7 @@
  */
 session_start();
 
-define('APP_NAME', 'KSEF – Faktury');
+define('APP_NAME', 'BONEA ERP');
 
 if (file_exists(__DIR__ . '/config.local.php')) {
     require __DIR__ . '/config.local.php';

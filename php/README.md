@@ -1,4 +1,4 @@
-# KSEF – Zarządzanie fakturami (PHP, seohost.pl)
+# BONEA ERP (PHP, seohost.pl)
 
 Wersja w **PHP + MySQL** pod hosting współdzielony (np. **seohost.pl**).
 
