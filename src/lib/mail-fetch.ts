@@ -408,7 +408,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
           const prefix = "FK";
           const year = issueDate.getFullYear();
 
-          async function nextMailInvoiceNumber(): Promise<string> {
+          const nextMailInvoiceNumber = async (): Promise<string> => {
             const key = `invoice_counter_cost_${year}`;
             const row = await prisma.setting.findUnique({ where: { key } });
             const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
@@ -418,7 +418,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
               update: { value: String(nextSeq) },
             });
             return `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
-          }
+          };
 
           let number = parsed.invoice.number;
           const isPlaceholder = !number || number.startsWith("MAIL-");
