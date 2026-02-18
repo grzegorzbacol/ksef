@@ -90,6 +90,7 @@ export default function InvoicesSalesPage() {
   });
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
+  const PURCHASE_VAT_RATES = [0.8, 23] as const;
   const [manualLine, setManualLine] = useState({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -113,6 +114,7 @@ export default function InvoicesSalesPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
+  const [customVatRowIndex, setCustomVatRowIndex] = useState<number | null>(null);
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
   const [year, setYear] = useState<number | null>(now.getFullYear());
@@ -373,6 +375,7 @@ function InvoiceNumberCell({
     }
     setShowForm(false);
     setLines([]);
+    setCustomVatRowIndex(null);
     setManualLine({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
     setAttachmentFile(null);
     setForm({
@@ -777,15 +780,28 @@ function InvoiceNumberCell({
               </div>
               <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">VAT %</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={manualLine.vatRate}
-                  onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-14 box-border"
-                />
+                <select
+                  value={PURCHASE_VAT_RATES.includes(parseFloat(manualLine.vatRate) as 0.8 | 23) ? manualLine.vatRate : "other"}
+                  onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value === "other" ? "" : e.target.value }))}
+                  className="rounded border border-border bg-bg px-3 py-2 w-20 box-border"
+                >
+                  {PURCHASE_VAT_RATES.map((r) => (
+                    <option key={r} value={String(r)}>{r}%</option>
+                  ))}
+                  <option value="other">Inna</option>
+                </select>
+                {manualLine.vatRate === "" || !PURCHASE_VAT_RATES.includes(parseFloat(manualLine.vatRate) as 0.8 | 23) ? (
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={manualLine.vatRate}
+                    onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value }))}
+                    placeholder="%"
+                    className="rounded border border-border bg-bg px-2 py-1 w-14 mt-1 box-border text-sm"
+                  />
+                ) : null}
               </div>
               <button
                 type="button"
@@ -846,16 +862,39 @@ function InvoiceNumberCell({
                           />
                         </td>
                         <td className="p-2 text-right align-middle whitespace-nowrap">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            max="100"
-                            value={l.vatRate}
-                            onChange={(e) => updateLine(i, "vatRate", e.target.value)}
-                            className="w-12 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
-                          />
-                          %
+                          <select
+                            value={
+                              customVatRowIndex === i || !PURCHASE_VAT_RATES.includes(l.vatRate as 0.8 | 23)
+                                ? "other"
+                                : String(l.vatRate)
+                            }
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "other") setCustomVatRowIndex(i);
+                              else {
+                                setCustomVatRowIndex((prev) => (prev === i ? null : prev));
+                                updateLine(i, "vatRate", parseFloat(v));
+                              }
+                            }}
+                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
+                          >
+                            {PURCHASE_VAT_RATES.map((r) => (
+                              <option key={r} value={String(r)}>{r}%</option>
+                            ))}
+                            <option value="other">Inna…</option>
+                          </select>
+                          {(customVatRowIndex === i || !PURCHASE_VAT_RATES.includes(l.vatRate as 0.8 | 23)) && (
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={l.vatRate}
+                              onChange={(e) => updateLine(i, "vatRate", e.target.value)}
+                              onBlur={() => setCustomVatRowIndex((prev) => (prev === i ? null : prev))}
+                              className="w-14 rounded border border-border bg-bg px-2 py-1 text-right inline-block mt-1"
+                            />
+                          )}
                         </td>
                         <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
                         <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
