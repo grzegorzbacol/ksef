@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 type KsefSettings = {
@@ -136,6 +137,19 @@ export default function SettingsPage() {
       <p className="text-muted text-sm mb-6">
         Konfiguracja integracji z KSEF, dane firmy (wystawcy faktur) i inne parametry.
       </p>
+
+      <div className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8">
+        <h2 className="font-medium mb-2">Faktury z maila</h2>
+        <p className="text-muted text-sm mb-4">
+          Ustawienia IMAP i import faktur z poczty e-mail.
+        </p>
+        <Link
+          href="/dashboard/mail-invoices"
+          className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
+        >
+          Otwórz Faktury z maila
+        </Link>
+      </div>
 
       <form onSubmit={handleCompanySubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8">
         <h2 className="font-medium mb-4">Dane firmy (sprzedawcy)</h2>

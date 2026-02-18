@@ -7,7 +7,6 @@ const navItems = [
   { href: "/dashboard", label: "Start" },
   { href: "/dashboard/invoices", label: "Faktury sprzedaży" },
   { href: "/dashboard/invoices-sales", label: "Faktury zakupu" },
-  { href: "/dashboard/mail-invoices", label: "Faktury z maila" },
   { href: "/dashboard/contractors", label: "Kontrahenci" },
   { href: "/dashboard/ksef", label: "KSEF" },
   { href: "/dashboard/warehouse", label: "Magazyn" },
