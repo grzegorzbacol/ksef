@@ -328,13 +328,13 @@ export default function InvoicesPage() {
           <div className="border-t border-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
             <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
-            <div className="flex flex-wrap gap-2 items-end mb-4">
-              <div>
+            <div className="flex flex-wrap gap-3 items-end mb-4">
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Produkt</label>
                 <select
                   value={addProductId}
                   onChange={(e) => setAddProductId(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px]"
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px] max-w-[280px]"
                 >
                   <option value="">— wybierz —</option>
                   {products.map((p) => (
@@ -344,7 +344,7 @@ export default function InvoicesPage() {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Ilość</label>
                 <input
                   type="number"
@@ -352,21 +352,30 @@ export default function InvoicesPage() {
                   min="0.01"
                   value={addQty}
                   onChange={(e) => setAddQty(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
                 />
               </div>
               <button
                 type="button"
                 onClick={addLineFromWarehouse}
                 disabled={!addProductId}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
               >
                 Dodaj do faktury
               </button>
             </div>
             {lines.length > 0 && (
               <div className="overflow-x-auto rounded border border-border mb-4">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed">
+                  <colgroup>
+                    <col style={{ width: "auto" }} />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "72px" }} />
+                    <col style={{ width: "80px" }} />
+                    <col style={{ width: "80px" }} />
+                    <col style={{ width: "56px" }} />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-border bg-bg/50">
                       <th className="p-2 text-left">Nazwa</th>
@@ -375,36 +384,36 @@ export default function InvoicesPage() {
                       <th className="p-2 text-right">VAT %</th>
                       <th className="p-2 text-right">Netto</th>
                       <th className="p-2 text-right">VAT</th>
-                      <th className="p-2 w-12"></th>
+                      <th className="p-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {lines.map((l, i) => (
                       <tr key={i} className="border-b border-border">
-                        <td className="p-2">{l.name}</td>
-                        <td className="p-2">
+                        <td className="p-2 overflow-hidden text-ellipsis align-middle">{l.name}</td>
+                        <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
                             type="number"
                             step="0.01"
                             min="0.01"
                             value={l.quantity}
                             onChange={(e) => updateLine(i, "quantity", e.target.value)}
-                            className="w-20 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
                           />
                           <span className="ml-1">{l.unit}</span>
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 text-right align-middle">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
                             value={l.unitPriceNet}
                             onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
-                            className="w-24 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-full max-w-[88px] rounded border border-border bg-bg px-2 py-1 text-right box-border"
                             title="Cena netto za jednostkę – edytowalna"
                           />
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
                             type="number"
                             step="0.01"
@@ -412,14 +421,14 @@ export default function InvoicesPage() {
                             max="100"
                             value={l.vatRate}
                             onChange={(e) => updateLine(i, "vatRate", e.target.value)}
-                            className="w-14 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-12 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
                           />
                           %
                         </td>
-                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
-                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
-                        <td className="p-2">
-                          <button type="button" onClick={() => removeLine(i)} className="text-red-400 hover:underline">
+                        <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
+                        <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
+                        <td className="p-2 align-middle">
+                          <button type="button" onClick={() => removeLine(i)} className="text-red-400 hover:underline whitespace-nowrap">
                             Usuń
                           </button>
                         </td>
