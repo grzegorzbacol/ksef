@@ -21,7 +21,7 @@ export default async function DashboardLayout({
             href="/dashboard"
             className="text-lg font-semibold text-accent tracking-tight hover:text-[var(--accent-hover)] transition-colors"
           >
-            BONEA CRM
+            BONEA ERP
           </Link>
         </div>
         <DashboardNav />
