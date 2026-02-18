@@ -18,12 +18,81 @@ type Stats = {
   cost: StatsBlock;
 };
 
+type GroupedInvoice = {
+  grossAmount: number;
+  netAmount: number;
+  vatAmount: number;
+};
+
+type PartySummary = {
+  label: string;
+  count: number;
+  gross: number;
+  net: number;
+  vat: number;
+};
+
+function formatCurrency(value: number) {
+  return `${value.toFixed(2)} PLN`;
+}
+
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-");
+  return `${month}.${year}`;
+}
+
+function summarizeParties(grouped: Record<string, GroupedInvoice[]>) {
+  return Object.entries(grouped)
+    .map(([label, list]) => ({
+      label,
+      count: list.length,
+      gross: list.reduce((sum, row) => sum + row.grossAmount, 0),
+      net: list.reduce((sum, row) => sum + row.netAmount, 0),
+      vat: list.reduce((sum, row) => sum + row.vatAmount, 0),
+    }))
+    .sort((a, b) => b.gross - a.gross);
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+  valueClassName = "",
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-sm text-muted">{label}</p>
+      <p className={`text-2xl font-semibold ${valueClassName}`}>{value}</p>
+      {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
+    </div>
+  );
+}
+
+function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  return (
+    <div className="mb-4">
+      <h2 className="text-lg font-medium">{title}</h2>
+      {subtitle ? <p className="text-sm text-muted mt-1">{subtitle}</p> : null}
+    </div>
+  );
+}
+
 export default function StatisticsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [groupBy, setGroupBy] = useState<"none" | "month" | "buyer">("none");
-  const [groupedSales, setGroupedSales] = useState<Record<string, unknown[]> | null>(null);
-  const [groupedCost, setGroupedCost] = useState<Record<string, unknown[]> | null>(null);
+  const [groupedSales, setGroupedSales] = useState<Record<string, GroupedInvoice[]> | null>(null);
+  const [groupedCost, setGroupedCost] = useState<Record<string, GroupedInvoice[]> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [partyLoading, setPartyLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/stats")
@@ -33,61 +102,252 @@ export default function StatisticsPage() {
   }, []);
 
   useEffect(() => {
-    if (groupBy === "none") {
-      setGroupedSales(null);
-      setGroupedCost(null);
-      return;
-    }
-    const q = groupBy === "month" ? "groupBy=month" : "groupBy=buyer";
     Promise.all([
-      fetch(`/api/invoices?${q}&type=sales`).then((r) => r.json()),
-      fetch(`/api/invoices?${q}&type=cost`).then((r) => r.json()),
+      fetch("/api/invoices?groupBy=buyer&type=sales").then((r) => r.json()),
+      fetch("/api/invoices?groupBy=buyer&type=cost").then((r) => r.json()),
     ])
       .then(([salesData, costData]) => {
         setGroupedSales(salesData.data || {});
         setGroupedCost(costData.data || {});
       })
       .catch(() => {
-        setGroupedSales(null);
-        setGroupedCost(null);
-      });
+        setGroupedSales({});
+        setGroupedCost({});
+      })
+      .finally(() => setPartyLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (groupBy === "none") {
+      return;
+    }
+    if (groupBy === "buyer" && groupedSales && groupedCost) return;
+
+    if (groupBy === "buyer") {
+      Promise.all([
+        fetch("/api/invoices?groupBy=buyer&type=sales").then((r) => r.json()),
+        fetch("/api/invoices?groupBy=buyer&type=cost").then((r) => r.json()),
+      ])
+        .then(([salesData, costData]) => {
+          setGroupedSales(salesData.data || {});
+          setGroupedCost(costData.data || {});
+        })
+        .catch(() => {
+          setGroupedSales({});
+          setGroupedCost({});
+        });
+    }
   }, [groupBy]);
 
   if (loading || !stats) return <p className="text-muted">Ładowanie…</p>;
 
-  function StatsCards({ title, s }: { title: string; s: StatsBlock }) {
+  const totalGross = stats.sales.totalGross + stats.cost.totalGross;
+  const totalPaidGross = stats.sales.paidGross + stats.cost.paidGross;
+  const totalUnpaidGross = stats.sales.unpaidGross + stats.cost.unpaidGross;
+  const totalInvoices = stats.sales.totalInvoices + stats.cost.totalInvoices;
+  const grossBalance = stats.sales.totalGross - stats.cost.totalGross;
+  const paymentCoverage = totalGross > 0 ? (totalPaidGross / totalGross) * 100 : 0;
+  const unpaidShare = totalGross > 0 ? (totalUnpaidGross / totalGross) * 100 : 0;
+  const marginPercent = stats.sales.totalGross > 0 ? (grossBalance / stats.sales.totalGross) * 100 : 0;
+
+  const monthMap = new Map<string, { salesGross: number; costGross: number; salesCount: number; costCount: number }>();
+  for (const [monthKey, value] of stats.sales.byMonth) {
+    monthMap.set(monthKey, {
+      salesGross: value.gross,
+      costGross: monthMap.get(monthKey)?.costGross ?? 0,
+      salesCount: value.count,
+      costCount: monthMap.get(monthKey)?.costCount ?? 0,
+    });
+  }
+  for (const [monthKey, value] of stats.cost.byMonth) {
+    monthMap.set(monthKey, {
+      salesGross: monthMap.get(monthKey)?.salesGross ?? 0,
+      costGross: value.gross,
+      salesCount: monthMap.get(monthKey)?.salesCount ?? 0,
+      costCount: value.count,
+    });
+  }
+
+  const monthSeries = Array.from(monthMap.entries())
+    .map(([monthKey, values]) => ({
+      monthKey,
+      ...values,
+      diffGross: values.salesGross - values.costGross,
+    }))
+    .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+  const maxMonthGross = Math.max(
+    1,
+    ...monthSeries.map((m) => Math.max(m.salesGross, m.costGross)),
+  );
+
+  const topSalesParties = groupedSales ? summarizeParties(groupedSales).slice(0, 5) : [];
+  const topCostParties = groupedCost ? summarizeParties(groupedCost).slice(0, 5) : [];
+
+  function StatsCards({ title, s, type }: { title: string; s: StatsBlock; type: "sales" | "cost" }) {
+    const coverage = s.totalGross > 0 ? (s.paidGross / s.totalGross) * 100 : 0;
+    const unpaid = s.totalGross > 0 ? (s.unpaidGross / s.totalGross) * 100 : 0;
+
     return (
-      <div className="mb-8">
-        <h2 className="text-lg font-medium mb-4">{title}</h2>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Liczba faktur</p>
-            <p className="text-2xl font-semibold">{s.totalInvoices}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Suma brutto (PLN)</p>
-            <p className="text-2xl font-semibold">{s.totalGross.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Rozliczone (brutto)</p>
-            <p className="text-2xl font-semibold text-success">{s.paidGross.toFixed(2)}</p>
-            <p className="text-xs text-muted">{s.paidCount} faktur</p>
-          </div>
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Nierozliczone (brutto)</p>
-            <p className="text-2xl font-semibold text-warning">{s.unpaidGross.toFixed(2)}</p>
-          </div>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <SectionTitle
+          title={title}
+          subtitle={type === "sales" ? "Przychody, wpływy i skuteczność rozliczeń." : "Koszty, wydatki i obciążenie płatnościami."}
+        />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Liczba faktur" value={String(s.totalInvoices)} />
+          <MetricCard label="Suma brutto" value={formatCurrency(s.totalGross)} />
+          <MetricCard
+            label="Rozliczone"
+            value={formatCurrency(s.paidGross)}
+            hint={`${s.paidCount} faktur • ${formatPercent(coverage)}`}
+            valueClassName="text-success"
+          />
+          <MetricCard
+            label="Nierozliczone"
+            value={formatCurrency(s.unpaidGross)}
+            hint={formatPercent(unpaid)}
+            valueClassName="text-warning"
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold mb-6">Statystyki</h1>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold mb-2">Statystyki i dashboard</h1>
+        <p className="text-sm text-muted">
+          Rozbudowany podgląd finansowy: KPI globalne, trendy miesięczne, bilans oraz najwięksi kontrahenci.
+        </p>
+      </div>
 
-      <StatsCards title="Faktury sprzedaży" s={stats.sales} />
-      <StatsCards title="Faktury zakupu (kosztowe)" s={stats.cost} />
+      <section>
+        <SectionTitle title="KPI globalne" subtitle="Szybki obraz sytuacji finansowej dla sprzedaży i kosztów." />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard label="Wszystkie faktury" value={String(totalInvoices)} />
+          <MetricCard label="Łączny obrót brutto" value={formatCurrency(totalGross)} />
+          <MetricCard
+            label="Bilans brutto (sprzedaż - koszty)"
+            value={formatCurrency(grossBalance)}
+            valueClassName={grossBalance >= 0 ? "text-success" : "text-warning"}
+          />
+          <MetricCard label="Pokrycie rozliczeń" value={formatPercent(paymentCoverage)} hint={`Nierozliczone: ${formatPercent(unpaidShare)}`} />
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <SectionTitle title="Kondycja finansowa" subtitle="Zestawienie relacji między przychodami, kosztami i płatnościami." />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-sm text-muted mb-1">Przychody brutto</p>
+            <p className="text-xl font-semibold text-success">{formatCurrency(stats.sales.totalGross)}</p>
+            <p className="text-xs text-muted mt-1">Faktur sprzedaży: {stats.sales.totalInvoices}</p>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-sm text-muted mb-1">Koszty brutto</p>
+            <p className="text-xl font-semibold text-warning">{formatCurrency(stats.cost.totalGross)}</p>
+            <p className="text-xs text-muted mt-1">Faktur kosztowych: {stats.cost.totalInvoices}</p>
+          </div>
+          <div className="rounded-lg border border-border p-4">
+            <p className="text-sm text-muted mb-1">Marża brutto</p>
+            <p className={`text-xl font-semibold ${grossBalance >= 0 ? "text-success" : "text-warning"}`}>
+              {formatCurrency(grossBalance)}
+            </p>
+            <p className="text-xs text-muted mt-1">Marża względna: {formatPercent(marginPercent)}</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <SectionTitle title="Trend miesięczny (ostatnie miesiące)" subtitle="Porównanie sprzedaży i kosztów w czasie." />
+        {monthSeries.length === 0 ? (
+          <p className="text-sm text-muted">Brak danych miesięcznych do wyświetlenia trendu.</p>
+        ) : (
+          <div className="space-y-3">
+            {monthSeries.map((month) => {
+              const salesWidth = (month.salesGross / maxMonthGross) * 100;
+              const costWidth = (month.costGross / maxMonthGross) * 100;
+
+              return (
+                <div key={month.monthKey} className="rounded-lg border border-border p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{formatMonthLabel(month.monthKey)}</p>
+                    <p className={`text-sm ${month.diffGross >= 0 ? "text-success" : "text-warning"}`}>
+                      Bilans: {formatCurrency(month.diffGross)}
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs text-muted">
+                        <span>Sprzedaż</span>
+                        <span>{formatCurrency(month.salesGross)} • {month.salesCount} faktur</span>
+                      </div>
+                      <div className="h-2 rounded bg-bg">
+                        <div className="h-2 rounded bg-success" style={{ width: `${salesWidth}%` }} />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs text-muted">
+                        <span>Koszty</span>
+                        <span>{formatCurrency(month.costGross)} • {month.costCount} faktur</span>
+                      </div>
+                      <div className="h-2 rounded bg-bg">
+                        <div className="h-2 rounded bg-warning" style={{ width: `${costWidth}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-border bg-card p-5">
+          <SectionTitle title="Top nabywcy (sprzedaż)" subtitle="Najwięksi odbiorcy wg wartości brutto." />
+          {partyLoading ? (
+            <p className="text-sm text-muted">Ładowanie kontrahentów…</p>
+          ) : topSalesParties.length === 0 ? (
+            <p className="text-sm text-muted">Brak danych o nabywcach.</p>
+          ) : (
+            <div className="space-y-3">
+              {topSalesParties.map((party) => (
+                <div key={party.label} className="rounded-lg border border-border p-3">
+                  <p className="font-medium text-accent mb-1">{party.label}</p>
+                  <p className="text-sm text-muted">Faktur: {party.count}</p>
+                  <p className="text-sm">Brutto: {formatCurrency(party.gross)}</p>
+                  <p className="text-xs text-muted">Netto: {formatCurrency(party.net)} • VAT: {formatCurrency(party.vat)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <SectionTitle title="Top dostawcy (koszty)" subtitle="Najwięksi dostawcy wg wartości brutto." />
+          {partyLoading ? (
+            <p className="text-sm text-muted">Ładowanie kontrahentów…</p>
+          ) : topCostParties.length === 0 ? (
+            <p className="text-sm text-muted">Brak danych o dostawcach.</p>
+          ) : (
+            <div className="space-y-3">
+              {topCostParties.map((party) => (
+                <div key={party.label} className="rounded-lg border border-border p-3">
+                  <p className="font-medium text-accent mb-1">{party.label}</p>
+                  <p className="text-sm text-muted">Faktur: {party.count}</p>
+                  <p className="text-sm">Brutto: {formatCurrency(party.gross)}</p>
+                  <p className="text-xs text-muted">Netto: {formatCurrency(party.net)} • VAT: {formatCurrency(party.vat)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <StatsCards title="Faktury sprzedaży" s={stats.sales} type="sales" />
+      <StatsCards title="Faktury zakupu (kosztowe)" s={stats.cost} type="cost" />
 
       <div className="mb-6">
         <p className="text-sm text-muted mb-2">Grupowanie</p>
@@ -126,15 +386,19 @@ export default function StatisticsPage() {
                   <tr className="border-b border-border bg-bg/50">
                     <th className="p-3 text-left">Miesiąc</th>
                     <th className="p-3 text-right">Liczba</th>
-                    <th className="p-3 text-right">Brutto</th>
+                      <th className="p-3 text-right">Brutto</th>
+                      <th className="p-3 text-right">Udział</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.sales.byMonth.map(([key, v]) => (
                     <tr key={`s-${key}`} className="border-b border-border">
-                      <td className="p-3">{key}</td>
+                      <td className="p-3">{formatMonthLabel(key)}</td>
                       <td className="p-3 text-right">{v.count}</td>
-                      <td className="p-3 text-right">{v.gross.toFixed(2)}</td>
+                      <td className="p-3 text-right">{formatCurrency(v.gross)}</td>
+                      <td className="p-3 text-right">
+                        {formatPercent(stats.sales.totalGross > 0 ? (v.gross / stats.sales.totalGross) * 100 : 0)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -150,14 +414,18 @@ export default function StatisticsPage() {
                     <th className="p-3 text-left">Miesiąc</th>
                     <th className="p-3 text-right">Liczba</th>
                     <th className="p-3 text-right">Brutto</th>
+                    <th className="p-3 text-right">Udział</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.cost.byMonth.map(([key, v]) => (
                     <tr key={`c-${key}`} className="border-b border-border">
-                      <td className="p-3">{key}</td>
+                      <td className="p-3">{formatMonthLabel(key)}</td>
                       <td className="p-3 text-right">{v.count}</td>
-                      <td className="p-3 text-right">{v.gross.toFixed(2)}</td>
+                      <td className="p-3 text-right">{formatCurrency(v.gross)}</td>
+                      <td className="p-3 text-right">
+                        {formatPercent(stats.cost.totalGross > 0 ? (v.gross / stats.cost.totalGross) * 100 : 0)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -176,14 +444,12 @@ export default function StatisticsPage() {
             <div>
               <h2 className="font-medium mb-4">Faktury sprzedaży – według nabywców</h2>
               <div className="space-y-4">
-                {Object.entries(groupedSales).map(([label, list]) => (
-                  <div key={label} className="rounded-xl border border-border bg-card p-4">
-                    <p className="font-medium text-accent mb-2">{label}</p>
-                    <p className="text-sm text-muted">Faktur: {(list as unknown[]).length}</p>
-                    <p className="text-sm">
-                      Suma brutto:{" "}
-                      {(list as { grossAmount: number }[]).reduce((s, i) => s + i.grossAmount, 0).toFixed(2)} PLN
-                    </p>
+                {summarizeParties(groupedSales).map((party) => (
+                  <div key={party.label} className="rounded-xl border border-border bg-card p-4">
+                    <p className="font-medium text-accent mb-2">{party.label}</p>
+                    <p className="text-sm text-muted">Faktur: {party.count}</p>
+                    <p className="text-sm">Suma brutto: {formatCurrency(party.gross)}</p>
+                    <p className="text-xs text-muted">Netto: {formatCurrency(party.net)} • VAT: {formatCurrency(party.vat)}</p>
                   </div>
                 ))}
               </div>
@@ -193,14 +459,12 @@ export default function StatisticsPage() {
             <div>
               <h2 className="font-medium mb-4">Faktury zakupu – według dostawców</h2>
               <div className="space-y-4">
-                {Object.entries(groupedCost).map(([label, list]) => (
-                  <div key={label} className="rounded-xl border border-border bg-card p-4">
-                    <p className="font-medium text-accent mb-2">{label}</p>
-                    <p className="text-sm text-muted">Faktur: {(list as unknown[]).length}</p>
-                    <p className="text-sm">
-                      Suma brutto:{" "}
-                      {(list as { grossAmount: number }[]).reduce((s, i) => s + i.grossAmount, 0).toFixed(2)} PLN
-                    </p>
+                {summarizeParties(groupedCost).map((party) => (
+                  <div key={party.label} className="rounded-xl border border-border bg-card p-4">
+                    <p className="font-medium text-accent mb-2">{party.label}</p>
+                    <p className="text-sm text-muted">Faktur: {party.count}</p>
+                    <p className="text-sm">Suma brutto: {formatCurrency(party.gross)}</p>
+                    <p className="text-xs text-muted">Netto: {formatCurrency(party.net)} • VAT: {formatCurrency(party.vat)}</p>
                   </div>
                 ))}
               </div>
