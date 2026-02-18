@@ -50,14 +50,15 @@ export async function POST(req: NextRequest) {
       if (Array.isArray(u)) return u.includes("KsefTokenEncryption");
       return u === "KsefTokenEncryption";
     });
-    const certB64 = certItem?.certificate ?? (keyList as CertEntry[])[0]?.certificate;
-    if (!certB64) {
+    let certB64Raw = certItem?.certificate ?? (keyList as CertEntry[])[0]?.certificate;
+    if (!certB64Raw) {
       return NextResponse.json({
         ok: false,
         error: "Brak certyfikatu KsefTokenEncryption w odpowiedzi KSEF.",
         detail: `Otrzymano ${keyList.length} element(ów). Pierwszy: ${JSON.stringify((keyList as CertEntry[])[0]).slice(0, 200)}`,
       });
     }
+    const certB64 = certB64Raw.replace(/\s/g, "");
 
     // 2. Pobierz challenge
     const challengeRes = await fetch(`${base}/auth/challenge`, { method: "POST", headers: { "Content-Type": "application/json" } });
@@ -79,46 +80,57 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Odpowiedź challenge nie zawiera challenge lub timestamp." });
     }
 
-    // Zgodnie z dokumentacją KSEF: zaszyfrowany ma być ciąg "token|timestampMs" (timestamp w milisekundach).
-    // Używamy całego tokena wklejanego z MCU (np. ref|nip-XXX|secret) – tak jak w oficjalnym kliencie C# (tokenResponse.Token).
-    const tokenToEncrypt = token.trim();
-    if (!tokenToEncrypt) {
+    const tokenTrimmed = token.trim();
+    if (!tokenTrimmed) {
       return NextResponse.json({ ok: false, error: "Wpisz token z MCU." });
     }
+    // Dwa warianty: pełny token (jak z API) lub tylko ostatni segment (secret) – portal MCU zwraca ref|nip-XXX|secret
+    const lastSegment =
+      tokenTrimmed.includes("|") ?
+        (tokenTrimmed.split("|").map((s) => s.trim()).pop() ?? "").trim() || tokenTrimmed
+      : tokenTrimmed;
 
-    // 3. Zaszyfruj token|timestampMs (RSA-OAEP SHA-256) – specyfikacja: timestamp w milisekundach (Unix)
-    const payload = `${tokenToEncrypt}|${timestampMs}`;
-    const payloadBuf = Buffer.from(payload, "utf8");
     const certBuf = Buffer.from(certB64, "base64");
-    let encryptedBuf: Buffer;
-    let lastErr: Error | null = null;
-    try {
-      const x509 = new X509Certificate(certBuf);
-      const publicKey = x509.publicKey;
-      encryptedBuf = publicEncrypt(
-        { key: publicKey, padding: 1, oaepHash: "sha256" },
-        payloadBuf
-      );
-    } catch (e) {
-      lastErr = e instanceof Error ? e : new Error(String(e));
+    function encryptPayload(payload: string): string {
+      const payloadBuf = Buffer.from(payload, "utf8");
+      let encryptedBuf: Buffer;
+      let lastErr: Error | null = null;
       try {
-        const publicKey = createPublicKey({ key: certBuf, format: "der", type: "spki" });
+        const x509 = new X509Certificate(certBuf);
         encryptedBuf = publicEncrypt(
-          { key: publicKey, padding: 1, oaepHash: "sha256" },
+          { key: x509.publicKey, padding: 1, oaepHash: "sha256" },
           payloadBuf
         );
-      } catch (e2) {
-        return NextResponse.json({
-          ok: false,
-          error: "Szyfrowanie tokenu nie powiodło się (klucz publiczny KSEF).",
-          detail: lastErr?.message ?? (e2 instanceof Error ? e2.message : String(e2)),
-        });
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error(String(e));
+        try {
+          const publicKey = createPublicKey({ key: certBuf, format: "der", type: "spki" });
+          encryptedBuf = publicEncrypt(
+            { key: publicKey, padding: 1, oaepHash: "sha256" },
+            payloadBuf
+          );
+        } catch (e2) {
+          throw new Error(lastErr?.message ?? (e2 instanceof Error ? e2.message : String(e2)));
+        }
       }
+      return encryptedBuf.toString("base64");
     }
-    const encryptedToken = encryptedBuf.toString("base64");
 
-    // 4. Uwierzytelnienie tokenem KSeF
-    const ksefTokenRes = await fetch(`${base}/auth/ksef-token`, {
+    // 3. Zaszyfruj token|timestampMs (RSA-OAEP SHA-256) – spec: timestamp w ms (Unix)
+    let payload = `${tokenTrimmed}|${timestampMs}`;
+    let encryptedToken = "";
+    try {
+      encryptedToken = encryptPayload(payload);
+    } catch (e) {
+      return NextResponse.json({
+        ok: false,
+        error: "Szyfrowanie tokenu nie powiodło się (klucz publiczny KSEF).",
+        detail: e instanceof Error ? e.message : String(e),
+      });
+    }
+
+    // 4. Uwierzytelnienie tokenem KSeF (próba 1: pełny token)
+    let ksefTokenRes = await fetch(`${base}/auth/ksef-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -127,7 +139,34 @@ export async function POST(req: NextRequest) {
         encryptedToken,
       }),
     });
-    const ksefTokenText = await ksefTokenRes.text();
+    let ksefTokenText = await ksefTokenRes.text();
+
+    // Fallback: przy 450 "Invalid token encryption" spróbuj z ostatnim segmentem (secret)
+    if (!ksefTokenRes.ok && lastSegment !== tokenTrimmed) {
+      const detailLower = ksefTokenText.toLowerCase();
+      if (
+        (ksefTokenRes.status === 450 || ksefTokenRes.status === 401) &&
+        (detailLower.includes("invalid") && detailLower.includes("encryption"))
+      ) {
+        payload = `${lastSegment}|${timestampMs}`;
+        try {
+          encryptedToken = encryptPayload(payload);
+          ksefTokenRes = await fetch(`${base}/auth/ksef-token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              challenge,
+              contextIdentifier: { type: "Nip", value: nip },
+              encryptedToken,
+            }),
+          });
+          ksefTokenText = await ksefTokenRes.text();
+        } catch {
+          // zostaw pierwotną odpowiedź
+        }
+      }
+    }
+
     if (!ksefTokenRes.ok) {
       let detail: string | undefined;
       try {
