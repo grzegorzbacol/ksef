@@ -481,7 +481,7 @@ export default function InvoicesSalesPage() {
                 <th className="p-3 text-left">Nabywca</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3">KSEF</th>
-                <th className="p-3">Opłacono</th>
+                <th className="p-3">Rozliczono</th>
                 <th className="p-3"></th>
               </tr>
             </thead>
@@ -508,10 +508,10 @@ export default function InvoicesSalesPage() {
                   <td className="p-3">
                     {inv.payment ? (
                       <span className="text-success">
-                        Tak ({new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")})
+                        Tak, {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
                       </span>
                     ) : (
-                      <Link href="/dashboard/payments" className="text-muted hover:text-text">
+                      <Link href="/dashboard/rozrachunki" className="text-muted hover:text-text">
                         Nie
                       </Link>
                     )}

@@ -12,7 +12,7 @@ type Invoice = {
   payment?: { paidAt: string } | null;
 };
 
-export default function PaymentsPage() {
+export default function RozrachunkiPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -55,26 +55,26 @@ export default function PaymentsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-2">Płatności</h1>
+      <h1 className="text-2xl font-semibold mb-2">Rozrachunki</h1>
       <p className="text-muted text-sm mb-6">
-        Zaznacz checkbox, aby zarejestrować opłacenie faktury (zapisujemy datę kliknięcia).
+        Zaznacz checkbox, aby zarejestrować rozliczenie faktury (zapisujemy datę).
       </p>
 
       <div className="mb-6 flex gap-4 text-sm">
-        <span className="text-success">Opłacone: {paidCount}</span>
-        <span className="text-warning">Nieopłacone: {unpaidCount}</span>
+        <span className="text-success">Rozliczone: {paidCount}</span>
+        <span className="text-warning">Nierozliczone: {unpaidCount}</span>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-bg/50">
-              <th className="p-3 text-left w-12">Opłacono</th>
+              <th className="p-3 text-left w-12">Rozliczono</th>
               <th className="p-3 text-left">Numer</th>
               <th className="p-3 text-left">Data</th>
               <th className="p-3 text-left">Nabywca</th>
               <th className="p-3 text-right">Brutto</th>
-              <th className="p-3 text-left">Data opłacenia</th>
+              <th className="p-3 text-left">Data rozliczenia</th>
             </tr>
           </thead>
           <tbody>

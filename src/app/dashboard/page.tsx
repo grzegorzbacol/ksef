@@ -20,11 +20,11 @@ export default function DashboardPage() {
           <p className="text-sm text-muted">Podsumowania i grupowanie faktur</p>
         </Link>
         <Link
-          href="/dashboard/payments"
+          href="/dashboard/rozrachunki"
           className="rounded-xl border border-border bg-card p-6 hover:border-accent transition-colors"
         >
-          <h2 className="font-medium text-accent mb-1">Płatności</h2>
-          <p className="text-sm text-muted">Checklist opłaconych faktur z datą</p>
+          <h2 className="font-medium text-accent mb-1">Rozrachunki</h2>
+          <p className="text-sm text-muted">Rozliczenia faktur z datą</p>
         </Link>
       </div>
     </div>

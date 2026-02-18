@@ -43,8 +43,8 @@ export default async function DashboardLayout({
             <Link href="/dashboard/statistics" className="text-muted hover:text-text">
               Statystyki
             </Link>
-            <Link href="/dashboard/payments" className="text-muted hover:text-text">
-              Płatności
+            <Link href="/dashboard/rozrachunki" className="text-muted hover:text-text">
+              Rozrachunki
             </Link>
             <LogoutButton login={session.login} />
           </nav>

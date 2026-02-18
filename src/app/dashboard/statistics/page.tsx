@@ -69,12 +69,12 @@ export default function StatisticsPage() {
             <p className="text-2xl font-semibold">{s.totalGross.toFixed(2)}</p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Opłacone (brutto)</p>
+            <p className="text-sm text-muted">Rozliczone (brutto)</p>
             <p className="text-2xl font-semibold text-success">{s.paidGross.toFixed(2)}</p>
             <p className="text-xs text-muted">{s.paidCount} faktur</p>
           </div>
           <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-sm text-muted">Nieopłacone (brutto)</p>
+            <p className="text-sm text-muted">Nierozliczone (brutto)</p>
             <p className="text-2xl font-semibold text-warning">{s.unpaidGross.toFixed(2)}</p>
           </div>
         </div>

@@ -131,7 +131,7 @@ export default function InvoiceDetailPage() {
           <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
           <dt className="text-muted">Źródło</dt>
           <dd>{invoice.source === "ksef" ? "Pobrano z KSEF" : "Wystawiona ręcznie"}</dd>
-          <dt className="text-muted">Opłacono</dt>
+          <dt className="text-muted">Rozliczono</dt>
           <dd>
             {invoice.payment
               ? `Tak – ${new Date(invoice.payment.paidAt).toLocaleString("pl-PL")}`
@@ -140,8 +140,8 @@ export default function InvoiceDetailPage() {
         </dl>
         <div className="flex gap-3 pt-2">
           <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} />
-          <Link href="/dashboard/payments" className="rounded border border-border px-4 py-2 hover:border-accent">
-            Moduł płatności
+          <Link href="/dashboard/rozrachunki" className="rounded border border-border px-4 py-2 hover:border-accent">
+            Moduł rozrachunków
           </Link>
         </div>
       </div>

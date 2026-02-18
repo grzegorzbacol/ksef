@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "KSEF – Zarządzanie fakturami",
-  description: "Wystawianie, KSEF, statystyki i płatności",
+  description: "Wystawianie, KSEF, statystyki i rozrachunki",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
