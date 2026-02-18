@@ -4,13 +4,33 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
-function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; invoiceNumber: string }) {
+function DownloadPdfButton({
+  invoiceId,
+  invoiceNumber,
+  ksefId,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  ksefId: string | null;
+}) {
   const [loading, setLoading] = useState(false);
+  const hasKsefId = !!ksefId?.trim();
   async function handleDownload() {
     setLoading(true);
     try {
       const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { credentials: "include" });
-      if (!res.ok) throw new Error("Błąd pobierania");
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = "Nie udało się pobrać PDF z KSEF.";
+        try {
+          const data = JSON.parse(text);
+          if (data?.error) msg = data.error;
+        } catch {
+          if (text) msg = text.slice(0, 200);
+        }
+        alert(msg);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -19,7 +39,7 @@ function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; in
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Nie udało się pobrać PDF.");
+      alert("Nie udało się pobrać PDF z KSEF.");
     } finally {
       setLoading(false);
     }
@@ -28,10 +48,11 @@ function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; in
     <button
       type="button"
       onClick={handleDownload}
-      disabled={loading}
+      disabled={loading || !hasKsefId}
+      title={!hasKsefId ? "PDF tylko z KSEF. Pobierz tę fakturę z KSEF (lista faktur → Pobierz z KSEF), aby mieć numer KSEF." : undefined}
       className="rounded bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
     >
-      {loading ? "Pobieranie…" : "Pobierz PDF"}
+      {loading ? "Pobieranie…" : "Pobierz PDF z KSEF"}
     </button>
   );
 }
@@ -139,7 +160,7 @@ export default function InvoiceDetailPage() {
           </dd>
         </dl>
         <div className="flex gap-3 pt-2">
-          <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} />
+          <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} ksefId={invoice.ksefId} />
           <Link href="/dashboard/rozrachunki" className="rounded border border-border px-4 py-2 hover:border-accent">
             Moduł rozrachunków
           </Link>
