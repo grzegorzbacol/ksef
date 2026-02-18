@@ -3,7 +3,7 @@ FROM node:20-alpine
 WORKDIR /app
 ENV PORT=3000
 # OpenSSL i libc6-compat – wymagane przez silnik Prisma w Alpine
-RUN apk add --no-cache openssl libc6-compat
+RUN apk add --no-cache openssl libc6-compat curl
 # NODE_ENV=production dopiero po buildzie – do buildu potrzebne są devDependencies (tailwindcss)
 COPY package*.json ./
 COPY prisma ./prisma/

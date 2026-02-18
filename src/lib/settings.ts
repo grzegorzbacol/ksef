@@ -132,3 +132,61 @@ export async function setMailSettings(data: MailSettings): Promise<void> {
     await setSetting(MAIL_KEYS[i], values[i] ?? "");
   }
 }
+
+const PAYMENT_REMINDER_EMAIL_KEY = "payment_reminder_email";
+const DEFAULT_REMINDER_EMAIL = "grzegorz@bacol.pl";
+
+export async function getPaymentReminderEmail(): Promise<string> {
+  const v = await getSetting(PAYMENT_REMINDER_EMAIL_KEY);
+  return (v?.trim() || DEFAULT_REMINDER_EMAIL) || DEFAULT_REMINDER_EMAIL;
+}
+
+export async function setPaymentReminderEmail(email: string): Promise<void> {
+  await setSetting(PAYMENT_REMINDER_EMAIL_KEY, (email || DEFAULT_REMINDER_EMAIL).trim());
+}
+
+export type SmtpSettings = {
+  host: string;
+  port: string;
+  user: string;
+  password: string;
+  from: string;
+  secure: boolean;
+};
+
+const SMTP_KEYS = [
+  "smtp_host",
+  "smtp_port",
+  "smtp_user",
+  "smtp_password",
+  "smtp_from",
+  "smtp_secure",
+] as const;
+
+export async function getSmtpSettings(): Promise<SmtpSettings> {
+  const [host, port, user, password, from, secure] = await Promise.all(
+    SMTP_KEYS.map((k) => getSetting(k))
+  );
+  return {
+    host: host?.trim() || "",
+    port: port?.trim() || "587",
+    user: user?.trim() || "",
+    password: password?.trim() || "",
+    from: from?.trim() || "",
+    secure: secure === "true" || secure === "1",
+  };
+}
+
+export async function setSmtpSettings(data: SmtpSettings): Promise<void> {
+  const values = [
+    data.host,
+    data.port,
+    data.user,
+    data.password,
+    data.from,
+    data.secure ? "true" : "false",
+  ];
+  for (let i = 0; i < SMTP_KEYS.length; i++) {
+    await setSetting(SMTP_KEYS[i], values[i] ?? "");
+  }
+}

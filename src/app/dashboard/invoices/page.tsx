@@ -143,6 +143,20 @@ export default function InvoicesPage() {
     setLines((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function updateLine(index: number, field: keyof InvoiceLine, value: string | number) {
+    setLines((prev) =>
+      prev.map((l, i) => {
+        if (i !== index) return l;
+        if (field === "name" || field === "unit") return { ...l, [field]: String(value) };
+        const numVal = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(numVal) || numVal < 0) return l;
+        if (field === "vatRate" && numVal > 100) return l;
+        if (field === "quantity" && numVal <= 0) return l;
+        return { ...l, [field]: numVal };
+      })
+    );
+  }
+
   const totalsFromLines = (() => {
     let net = 0, vat = 0;
     for (const l of lines) {
@@ -368,9 +382,40 @@ export default function InvoicesPage() {
                     {lines.map((l, i) => (
                       <tr key={i} className="border-b border-border">
                         <td className="p-2">{l.name}</td>
-                        <td className="p-2 text-right">{l.quantity} {l.unit}</td>
-                        <td className="p-2 text-right">{l.unitPriceNet.toFixed(2)}</td>
-                        <td className="p-2 text-right">{l.vatRate}%</td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={l.quantity}
+                            onChange={(e) => updateLine(i, "quantity", e.target.value)}
+                            className="w-20 rounded border border-border bg-bg px-2 py-1 text-right"
+                          />
+                          <span className="ml-1">{l.unit}</span>
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={l.unitPriceNet}
+                            onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
+                            className="w-24 rounded border border-border bg-bg px-2 py-1 text-right"
+                            title="Cena netto za jednostkę – edytowalna"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={l.vatRate}
+                            onChange={(e) => updateLine(i, "vatRate", e.target.value)}
+                            className="w-14 rounded border border-border bg-bg px-2 py-1 text-right"
+                          />
+                          %
+                        </td>
                         <td className="p-2 text-right">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
                         <td className="p-2 text-right">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
                         <td className="p-2">

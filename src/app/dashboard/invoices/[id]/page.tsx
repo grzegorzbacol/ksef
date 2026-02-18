@@ -93,6 +93,8 @@ type Invoice = {
   ksefId: string | null;
   ksefStatus: string | null;
   source: string;
+  paymentDueDate?: string | null;
+  recurringCode?: string | null;
   emailSubject?: string | null;
   emailBody?: string | null;
   emailFrom?: string | null;
@@ -107,11 +109,22 @@ export default function InvoiceDetailPage() {
   const id = params.id as string;
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingAmount, setSavingAmount] = useState(false);
+  const [editNet, setEditNet] = useState("");
+  const [editVat, setEditVat] = useState("");
+  const [editGross, setEditGross] = useState("");
 
   useEffect(() => {
     fetch(`/api/invoices/${id}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then(setInvoice)
+      .then((inv) => {
+        setInvoice(inv);
+        if (inv) {
+          setEditNet(String(inv.netAmount ?? 0));
+          setEditVat(String(inv.vatAmount ?? 0));
+          setEditGross(String(inv.grossAmount ?? 0));
+        }
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -119,13 +132,13 @@ export default function InvoiceDetailPage() {
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
 
   const isCost = invoice.type === "cost";
-  const listHref = isCost ? "/dashboard/invoices-sales" : "/dashboard/invoices";
+  const listHref = isCost ? "/dashboard/rozrachunki" : "/dashboard/invoices";
   const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
 
   return (
     <div>
       <div className="mb-4">
-        <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Lista faktur kosztowych" : "Lista faktur sprzedaży"}</Link>
+        <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Rozrachunki" : "Lista faktur sprzedaży"}</Link>
       </div>
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h1 className="text-xl font-semibold">{typeLabel} {invoice.number}</h1>
@@ -162,13 +175,21 @@ export default function InvoiceDetailPage() {
           )}
           <dt className="text-muted">KSEF</dt>
           <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
+          <dt className="text-muted">Termin płatności</dt>
+          <dd>
+            {invoice.paymentDueDate
+              ? new Date(invoice.paymentDueDate).toLocaleDateString("pl-PL")
+              : "–"}
+          </dd>
           <dt className="text-muted">Źródło</dt>
           <dd>
-            {invoice.source === "ksef"
-              ? "Pobrano z KSEF"
-              : invoice.source === "mail"
-                ? "Mail"
-                : "Wystawiona ręcznie"}
+            {invoice.source === "recurring"
+              ? "Rozrachunek cykliczny"
+              : invoice.source === "ksef"
+                ? "Pobrano z KSEF"
+                : invoice.source === "mail"
+                  ? "Mail"
+                  : "Wystawiona ręcznie"}
           </dd>
           <dt className="text-muted">Rozliczono</dt>
           <dd>
@@ -177,6 +198,82 @@ export default function InvoiceDetailPage() {
               : "Nie"}
           </dd>
         </dl>
+        {isCost && (
+          <div className="mt-6 pt-6 border-t border-border">
+            <h2 className="font-medium mb-3">Uzupełnij kwotę (rozrachunek cykliczny)</h2>
+            <p className="text-muted text-sm mb-3">
+              Wpisz kwoty i zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
+            </p>
+            <div className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-xs text-muted mb-1">Netto</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editNet}
+                  onChange={(e) => setEditNet(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-28"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">VAT</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editVat}
+                  onChange={(e) => setEditVat(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-28"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Brutto</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editGross}
+                  onChange={(e) => setEditGross(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-28"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={savingAmount}
+                onClick={async () => {
+                  const net = parseFloat(editNet);
+                  const vat = parseFloat(editVat);
+                  const gross = parseFloat(editGross);
+                  if (Number.isNaN(net) || Number.isNaN(vat) || Number.isNaN(gross) || net < 0 || vat < 0 || gross < 0) {
+                    alert("Wpisz poprawne kwoty (liczby ≥ 0).");
+                    return;
+                  }
+                  setSavingAmount(true);
+                  try {
+                    const res = await fetch(`/api/invoices/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ netAmount: net, vatAmount: vat, grossAmount: gross }),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}));
+                      alert(d.error || "Błąd zapisu");
+                      return;
+                    }
+                    const updated = await res.json();
+                    setInvoice(updated);
+                  } finally {
+                    setSavingAmount(false);
+                  }
+                }}
+                className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {savingAmount ? "Zapisywanie…" : "Zapisz kwoty"}
+              </button>
+            </div>
+          </div>
+        )}
         {invoice.source === "mail" && (invoice.emailSubject || invoice.emailBody || (invoice.emailAttachments && invoice.emailAttachments.length > 0)) && (
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Treść maila</h2>

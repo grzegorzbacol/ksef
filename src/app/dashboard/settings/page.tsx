@@ -21,6 +21,30 @@ type CompanySettings = {
   city: string;
 };
 
+type PaymentReminderSettings = {
+  paymentReminderEmail: string;
+  smtp: {
+    host: string;
+    port: string;
+    user: string;
+    password: string;
+    from: string;
+    secure: boolean;
+  };
+};
+
+const emptyPaymentReminder: PaymentReminderSettings = {
+  paymentReminderEmail: "grzegorz@bacol.pl",
+  smtp: {
+    host: "",
+    port: "587",
+    user: "",
+    password: "",
+    from: "",
+    secure: true,
+  },
+};
+
 const emptyKsef: KsefSettings = {
   apiUrl: "",
   token: "",
@@ -53,13 +77,18 @@ export default function SettingsPage() {
   const [redeemResult, setRedeemResult] = useState<{ ok: boolean; error?: string; detail?: string } | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginResult, setLoginResult] = useState<{ ok: boolean; error?: string; detail?: string } | null>(null);
+  const [paymentReminder, setPaymentReminder] = useState<PaymentReminderSettings>(emptyPaymentReminder);
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [showSmtp, setShowSmtp] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/settings/ksef").then((r) => r.json()),
       fetch("/api/settings/company").then((r) => r.json()),
+      fetch("/api/settings/payment-reminders").then((r) => r.json()),
     ])
-      .then(([ksefData, companyData]) => {
+      .then(([ksefData, companyData, reminderData]) => {
         setKsef({
           apiUrl: ksefData.apiUrl ?? "",
           token: ksefData.token === "********" ? "" : (ksefData.token ?? ""),
@@ -76,6 +105,18 @@ export default function SettingsPage() {
           postalCode: companyData.postalCode ?? "",
           city: companyData.city ?? "",
         });
+        if (reminderData.paymentReminderEmail != null || reminderData.smtp) {
+          setPaymentReminder({
+            paymentReminderEmail: reminderData.paymentReminderEmail ?? emptyPaymentReminder.paymentReminderEmail,
+            smtp: reminderData.smtp
+              ? {
+                  ...emptyPaymentReminder.smtp,
+                  ...reminderData.smtp,
+                  password: reminderData.smtp.password ?? "",
+                }
+              : emptyPaymentReminder.smtp,
+          });
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -150,6 +191,170 @@ export default function SettingsPage() {
           Otwórz Faktury z maila
         </Link>
       </div>
+
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setReminderMessage(null);
+          setSavingReminder(true);
+          try {
+            const res = await fetch("/api/settings/payment-reminders", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                paymentReminderEmail: paymentReminder.paymentReminderEmail,
+                smtp: paymentReminder.smtp,
+              }),
+            });
+            if (!res.ok) {
+              setReminderMessage({ type: "error", text: "Zapis nie powiódł się." });
+              return;
+            }
+            setReminderMessage({ type: "ok", text: "Ustawienia przypomnień zapisane." });
+          } finally {
+            setSavingReminder(false);
+          }
+        }}
+        className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8"
+      >
+        <h2 className="font-medium mb-2">Przypomnienia o terminie płatności</h2>
+        <p className="text-muted text-sm mb-4">
+          W dniu terminu płatności rozrachunku zostanie wysłany e-mail na podany adres. Ustaw SMTP poniżej, aby włączyć wysyłkę.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-muted mb-1">Adres e-mail na przypomnienia</label>
+            <input
+              type="email"
+              value={paymentReminder.paymentReminderEmail}
+              onChange={(e) =>
+                setPaymentReminder((s) => ({ ...s, paymentReminderEmail: e.target.value }))
+              }
+              placeholder="grzegorz@bacol.pl"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+            />
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowSmtp((v) => !v)}
+              className="text-sm text-accent hover:underline"
+            >
+              {showSmtp ? "Ukryj ustawienia SMTP" : "Pokaż ustawienia SMTP (wysyłka e-mail)"}
+            </button>
+            {showSmtp && (
+              <div className="mt-3 space-y-3 p-3 rounded-lg border border-border bg-bg/50">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Host SMTP</label>
+                    <input
+                      type="text"
+                      value={paymentReminder.smtp.host}
+                      onChange={(e) =>
+                        setPaymentReminder((s) => ({
+                          ...s,
+                          smtp: { ...s.smtp, host: e.target.value },
+                        }))
+                      }
+                      placeholder="smtp.example.com"
+                      className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Port</label>
+                    <input
+                      type="text"
+                      value={paymentReminder.smtp.port}
+                      onChange={(e) =>
+                        setPaymentReminder((s) => ({
+                          ...s,
+                          smtp: { ...s.smtp, port: e.target.value },
+                        }))
+                      }
+                      placeholder="587"
+                      className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Użytkownik SMTP</label>
+                  <input
+                    type="text"
+                    value={paymentReminder.smtp.user}
+                    onChange={(e) =>
+                      setPaymentReminder((s) => ({
+                        ...s,
+                        smtp: { ...s.smtp, user: e.target.value },
+                      }))
+                    }
+                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Hasło SMTP</label>
+                  <input
+                    type="password"
+                    value={paymentReminder.smtp.password}
+                    onChange={(e) =>
+                      setPaymentReminder((s) => ({
+                        ...s,
+                        smtp: { ...s.smtp, password: e.target.value },
+                      }))
+                    }
+                    placeholder="Pozostaw puste, aby nie zmieniać"
+                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Adres nadawcy (From)</label>
+                  <input
+                    type="text"
+                    value={paymentReminder.smtp.from}
+                    onChange={(e) =>
+                      setPaymentReminder((s) => ({
+                        ...s,
+                        smtp: { ...s.smtp, from: e.target.value },
+                      }))
+                    }
+                    placeholder="aplikacja@example.com"
+                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={paymentReminder.smtp.secure}
+                    onChange={(e) =>
+                      setPaymentReminder((s) => ({
+                        ...s,
+                        smtp: { ...s.smtp, secure: e.target.checked },
+                      }))
+                    }
+                    className="rounded border-border"
+                  />
+                  Połączenie SSL/TLS
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+        {reminderMessage && (
+          <p
+            className={`mt-4 text-sm ${
+              reminderMessage.type === "ok" ? "text-success" : "text-red-400"
+            }`}
+          >
+            {reminderMessage.text}
+          </p>
+        )}
+        <button
+          type="submit"
+          disabled={savingReminder}
+          className="mt-4 rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {savingReminder ? "Zapisywanie…" : "Zapisz przypomnienia"}
+        </button>
+      </form>
 
       <form onSubmit={handleCompanySubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8">
         <h2 className="font-medium mb-4">Dane firmy (sprzedawcy)</h2>

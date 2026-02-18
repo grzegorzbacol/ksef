@@ -73,6 +73,8 @@ export default function InvoicesSalesPage() {
   });
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
+  const [manualLine, setManualLine] = useState({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const invoiceType = "cost" as const;
@@ -141,8 +143,44 @@ function sourceLabel(source: string): string {
     setAddQty("1");
   }
 
+  function addManualLine() {
+    const name = manualLine.name.trim();
+    if (!name) return;
+    const qty = parseFloat(manualLine.quantity) || 1;
+    if (qty <= 0) return;
+    const unitPriceNet = parseFloat(manualLine.unitPriceNet);
+    if (isNaN(unitPriceNet) || unitPriceNet < 0) return;
+    const vatRate = parseFloat(manualLine.vatRate);
+    if (isNaN(vatRate) || vatRate < 0 || vatRate > 100) return;
+    setLines((prev) => [
+      ...prev,
+      {
+        name,
+        quantity: qty,
+        unit: manualLine.unit.trim() || "szt.",
+        unitPriceNet,
+        vatRate,
+      },
+    ]);
+    setManualLine({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
+  }
+
   function removeLine(index: number) {
     setLines((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateLine(index: number, field: keyof InvoiceLine, value: string | number) {
+    setLines((prev) =>
+      prev.map((l, i) => {
+        if (i !== index) return l;
+        if (field === "name" || field === "unit") return { ...l, [field]: String(value) };
+        const numVal = typeof value === "string" ? parseFloat(value) : value;
+        if (isNaN(numVal) || numVal < 0) return l;
+        if (field === "vatRate" && numVal > 100) return l;
+        if (field === "quantity" && numVal <= 0) return l;
+        return { ...l, [field]: numVal };
+      })
+    );
   }
 
   const totalsFromLines = (() => {
@@ -184,8 +222,23 @@ function sourceLabel(source: string): string {
       alert(d.error || "Błąd zapisu");
       return;
     }
+    const created = await res.json();
+    if (attachmentFile) {
+      const fd = new FormData();
+      fd.append("file", attachmentFile);
+      const attRes = await fetch(`/api/invoices/${created.id}/attachments`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!attRes.ok) {
+        const d = await attRes.json().catch(() => ({}));
+        alert(`Faktura zapisana, ale załącznik nie został dodany: ${d.error || "błąd"}`);
+      }
+    }
     setShowForm(false);
     setLines([]);
+    setManualLine({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
+    setAttachmentFile(null);
     setForm({
       issueDate: new Date().toISOString().slice(0, 10),
       saleDate: "",
@@ -272,7 +325,7 @@ function sourceLabel(source: string): string {
       {showForm && (
         <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
           <h2 className="font-medium">Nowa faktura zakupu</h2>
-          <p className="text-muted text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie. Faktury trafiają od razu do rozrachunków.</p>
+          <p className="text-muted text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie. Faktury trafiają od razu do rozrachunków. Możesz wpisać dane ręcznie, dodać pozycje z magazynu lub ręcznie (nazwa, ilość, cena, VAT) oraz załączyć plik (np. skan faktury).</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-muted mb-1">Data wystawienia</label>
@@ -393,6 +446,71 @@ function sourceLabel(source: string): string {
                 Dodaj do faktury
               </button>
             </div>
+            <div className="flex flex-wrap gap-2 items-end mb-4">
+              <span className="text-muted text-sm mr-2">lub pozycja ręczna:</span>
+              <div>
+                <label className="block text-xs text-muted mb-1">Nazwa</label>
+                <input
+                  type="text"
+                  value={manualLine.name}
+                  onChange={(e) => setManualLine((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Nazwa towaru/usługi"
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[160px]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Ilość</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={manualLine.quantity}
+                  onChange={(e) => setManualLine((p) => ({ ...p, quantity: e.target.value }))}
+                  className="rounded border border-border bg-bg px-3 py-2 w-20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">j.m.</label>
+                <input
+                  type="text"
+                  value={manualLine.unit}
+                  onChange={(e) => setManualLine((p) => ({ ...p, unit: e.target.value }))}
+                  placeholder="szt."
+                  className="rounded border border-border bg-bg px-3 py-2 w-16"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Cena netto</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={manualLine.unitPriceNet}
+                  onChange={(e) => setManualLine((p) => ({ ...p, unitPriceNet: e.target.value }))}
+                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">VAT %</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={manualLine.vatRate}
+                  onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value }))}
+                  className="rounded border border-border bg-bg px-3 py-2 w-14"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addManualLine}
+                disabled={!manualLine.name.trim()}
+                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50"
+              >
+                Dodaj pozycję ręcznie
+              </button>
+            </div>
             {lines.length > 0 && (
               <div className="overflow-x-auto rounded border border-border mb-4">
                 <table className="w-full text-sm">
@@ -411,9 +529,40 @@ function sourceLabel(source: string): string {
                     {lines.map((l, i) => (
                       <tr key={i} className="border-b border-border">
                         <td className="p-2">{l.name}</td>
-                        <td className="p-2 text-right">{l.quantity} {l.unit}</td>
-                        <td className="p-2 text-right">{l.unitPriceNet.toFixed(2)}</td>
-                        <td className="p-2 text-right">{l.vatRate}%</td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={l.quantity}
+                            onChange={(e) => updateLine(i, "quantity", e.target.value)}
+                            className="w-20 rounded border border-border bg-bg px-2 py-1 text-right"
+                          />
+                          <span className="ml-1">{l.unit}</span>
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={l.unitPriceNet}
+                            onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
+                            className="w-24 rounded border border-border bg-bg px-2 py-1 text-right"
+                            title="Cena netto za jednostkę – edytowalna"
+                          />
+                        </td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={l.vatRate}
+                            onChange={(e) => updateLine(i, "vatRate", e.target.value)}
+                            className="w-14 rounded border border-border bg-bg px-2 py-1 text-right"
+                          />
+                          %
+                        </td>
                         <td className="p-2 text-right">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
                         <td className="p-2 text-right">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
                         <td className="p-2">
@@ -476,6 +625,19 @@ function sourceLabel(source: string): string {
                 className="w-full rounded border border-border bg-bg px-3 py-2"
               />
             </div>
+          </div>
+          <div className="border-t border-border pt-4">
+            <label className="block text-sm text-muted mb-1">Załącznik (opcjonalnie)</label>
+            <input
+              type="file"
+              onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+              className="w-full max-w-md text-sm text-muted file:mr-3 file:rounded file:border-0 file:bg-accent file:px-4 file:py-2 file:text-white file:hover:opacity-90"
+            />
+            {attachmentFile && (
+              <p className="text-sm text-muted mt-1">
+                Wybrany plik: {attachmentFile.name}
+              </p>
+            )}
           </div>
           <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90">
             Zapisz fakturę zakupu
