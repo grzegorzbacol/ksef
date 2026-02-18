@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchInvoicesFromKsef } from "@/lib/ksef";
+import { getCompanySettings } from "@/lib/settings";
+
+function normNip(v: string | undefined | null): string {
+  return String(v ?? "").replace(/\D/g, "");
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -19,14 +24,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z KSEF" }, { status: 200 });
   }
 
+  const company = await getCompanySettings();
+  const companyNip = normNip(company.nip);
   const imported = result.invoices || [];
   for (const inv of imported) {
     if (!inv?.number) continue;
     try {
+      const sellerNip = normNip(inv.sellerNip);
+      const buyerNip = normNip(inv.buyerNip);
+      const type =
+        companyNip && buyerNip === companyNip
+          ? "cost"
+          : companyNip && sellerNip === companyNip
+            ? "sales"
+            : "cost";
       await prisma.invoice.upsert({
         where: { number: inv.number },
         create: {
-          type: "sales",
+          type,
           number: inv.number,
           issueDate: inv.issueDate ? new Date(inv.issueDate) : new Date(),
           saleDate: inv.saleDate ? new Date(inv.saleDate) : null,

@@ -187,16 +187,6 @@ export default function InvoicesSalesPage() {
     loadInvoices();
   }
 
-  async function sendToKsef(id: string) {
-    const res = await fetch(`/api/invoices/${id}/ksef`, { method: "POST" });
-    if (!res.ok) {
-      const d = await res.json().catch(() => ({}));
-      alert(d.error || "Błąd wysyłki do KSEF");
-      return;
-    }
-    loadInvoices();
-  }
-
   async function fetchFromKsef() {
     setFetchKsefLoading(true);
     const res = await fetch("/api/ksef/fetch", {
@@ -496,13 +486,7 @@ export default function InvoicesSalesPage() {
                     {inv.ksefSentAt ? (
                       <span className="text-success">Wysłano</span>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => sendToKsef(inv.id)}
-                        className="text-accent hover:underline"
-                      >
-                        Wyślij do KSEF
-                      </button>
+                      <span className="text-muted">—</span>
                     )}
                   </td>
                   <td className="p-3">
