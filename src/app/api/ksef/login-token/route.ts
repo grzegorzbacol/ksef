@@ -87,8 +87,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Nie udało się odczytać tokenu (format: referencja|nip-XXX|secret)." });
     }
 
-    // 3. Zaszyfruj token|timestampMs (RSA-OAEP SHA-256) kluczem publicznym z certyfikatu KSEF
-    const payload = `${tokenToEncrypt}|${timestampMs}`;
+    // 3. Zaszyfruj token|timestamp (RSA-OAEP SHA-256). KSEF często oczekuje timestampu w sekundach (Unix), nie w ms.
+    const timestampForPayload = Math.floor(timestampMs / 1000);
+    const payload = `${tokenToEncrypt}|${timestampForPayload}`;
     const payloadBuf = Buffer.from(payload, "utf8");
     const certBuf = Buffer.from(certB64, "base64");
     let encryptedBuf: Buffer;
