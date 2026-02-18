@@ -115,6 +115,31 @@ function parseKsefResponse(body: unknown): KsefInvoiceRaw[] {
   return [];
 }
 
+/** Mapuje metadane faktury z odpowiedzi KSEF 2.0 (seller/buyer jako obiekty) na KsefInvoiceRaw. */
+function mapKsef2MetadataToRaw(item: Record<string, unknown>): KsefInvoiceRaw {
+  const seller = item.seller as Record<string, unknown> | undefined;
+  const buyer = item.buyer as Record<string, unknown> | undefined;
+  const buyerId = buyer?.identifier as Record<string, unknown> | undefined;
+  return {
+    number: item.invoiceNumber ?? item.ksefNumber,
+    referenceNumber: item.ksefNumber,
+    issueDate: item.issueDate,
+    saleDate: item.invoicingDate,
+    sellerNip: seller?.nip ?? (seller as Record<string, unknown> | undefined)?.["nip"],
+    sellerName: seller?.name ?? (seller as Record<string, unknown> | undefined)?.["name"],
+    buyerNip: buyerId?.value ?? buyer?.["nip"],
+    buyerName: buyer?.name ?? (buyer as Record<string, unknown> | undefined)?.["name"],
+    netAmount: item.netAmount,
+    vatAmount: item.vatAmount,
+    grossAmount: item.grossAmount,
+    currency: item.currency,
+  };
+}
+
+function isKsef2Metadata(item: Record<string, unknown>): boolean {
+  return typeof item.seller === "object" || typeof item.buyer === "object";
+}
+
 /** Sprawdza, czy KSEF jest skonfigurowany (ustawienia lub env: URL + token). */
 export async function isKsefConfigured(): Promise<boolean> {
   const envOk = !!process.env.KSEF_API_URL?.trim() && !!process.env.KSEF_TOKEN?.trim();
@@ -134,7 +159,7 @@ export async function fetchInvoicesFromKsef(
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
   const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
-  const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/api/online/Query/Invoice/Sync";
+  const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/v2/invoices/query/metadata";
 
   if (!token) {
     return {
@@ -155,12 +180,19 @@ export async function fetchInvoicesFromKsef(
   const to = dateTo.slice(0, 10);
 
   try {
-    const url = `${apiUrl}${queryPath}`;
+    const queryParams = new URLSearchParams({
+      sortOrder: "Asc",
+      pageOffset: "0",
+      pageSize: "100",
+    });
+    const url = `${apiUrl}${queryPath}?${queryParams}`;
     const body = {
-      dateFrom: from,
-      dateTo: to,
-      pageSize: 100,
-      pageOffset: 0,
+      subjectType: "Subject1",
+      dateRange: {
+        dateType: "Issue",
+        from: `${from}T00:00:00`,
+        to: `${to}T23:59:59`,
+      },
     };
 
     const res = await fetch(url, {
@@ -185,7 +217,11 @@ export async function fetchInvoicesFromKsef(
     }
 
     const data = await res.json().catch(() => ({}));
-    const rawList = parseKsefResponse(data);
+    let rawList = parseKsefResponse(data);
+    rawList = rawList.map((r) => {
+      const o = r as Record<string, unknown>;
+      return isKsef2Metadata(o) ? mapKsef2MetadataToRaw(o) : (r as KsefInvoiceRaw);
+    });
     const invoices: KsefInvoiceNormalized[] = [];
 
     for (const raw of rawList) {

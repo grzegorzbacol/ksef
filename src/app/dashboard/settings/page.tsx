@@ -110,7 +110,7 @@ export default function SettingsPage() {
               type="text"
               value={ksef.queryPath}
               onChange={(e) => setKsef((s) => ({ ...s, queryPath: e.target.value }))}
-              placeholder="/api/online/Query/Invoice/Sync"
+              placeholder="/v2/invoices/query/metadata"
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
             />
           </div>

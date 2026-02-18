@@ -1,8 +1,40 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+
+function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; invoiceNumber: string }) {
+  const [loading, setLoading] = useState(false);
+  async function handleDownload() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`, { credentials: "include" });
+      if (!res.ok) throw new Error("Błąd pobierania");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Faktura_${invoiceNumber.replace(/\//g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Nie udało się pobrać PDF.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={loading}
+      className="rounded bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+    >
+      {loading ? "Pobieranie…" : "Pobierz PDF"}
+    </button>
+  );
+}
 
 type InvoiceItem = {
   id: string;
@@ -103,7 +135,8 @@ export default function InvoiceDetailPage() {
           </dd>
         </dl>
         <div className="flex gap-3 pt-2">
-          <Link href="/dashboard/payments" className="rounded bg-accent px-4 py-2 text-white hover:opacity-90">
+          <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} />
+          <Link href="/dashboard/payments" className="rounded border border-border px-4 py-2 hover:border-accent">
             Moduł płatności
           </Link>
         </div>

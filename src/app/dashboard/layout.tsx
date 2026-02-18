@@ -25,6 +25,9 @@ export default async function DashboardLayout({
             <Link href="/dashboard/invoices" className="text-muted hover:text-text">
               Faktury
             </Link>
+            <Link href="/dashboard/contractors" className="text-muted hover:text-text">
+              Kontrahenci
+            </Link>
             <Link href="/dashboard/ksef" className="text-muted hover:text-text">
               KSEF
             </Link>
