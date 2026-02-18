@@ -198,7 +198,8 @@ export default function ContractorsPage() {
                   <td className="p-3 text-muted">
                     {[c.postalCode, c.city].filter(Boolean).join(" ") || c.address || "–"}
                   </td>
-                  <td className="p-3 flex gap-2">
+                  <td className="p-3">
+                    <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => openEdit(c)}
@@ -213,6 +214,7 @@ export default function ContractorsPage() {
                     >
                       Usuń
                     </button>
+                    </div>
                   </td>
                 </tr>
               ))}

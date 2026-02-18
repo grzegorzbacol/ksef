@@ -50,7 +50,7 @@ type InvoiceLine = {
   vatRate: number;
 };
 
-export default function InvoicesPage() {
+export default function InvoicesSalesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -74,7 +74,7 @@ export default function InvoicesPage() {
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
 
-  const invoiceType = "cost" as const;
+  const invoiceType = "sales" as const;
 
   function loadInvoices() {
     setLoading(true);
@@ -98,8 +98,8 @@ export default function InvoicesPage() {
           if (company?.name || company?.nip) {
             setForm((f) => ({
               ...f,
-              buyerName: company.name ?? f.buyerName,
-              buyerNip: company.nip ?? f.buyerNip,
+              sellerName: company.name ?? f.sellerName,
+              sellerNip: company.nip ?? f.sellerNip,
             }));
           }
         })
@@ -219,7 +219,7 @@ export default function InvoicesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Faktury kosztowe</h1>
+        <h1 className="text-2xl font-semibold">Faktury sprzedaży</h1>
         <div className="flex flex-wrap gap-3">
           <div className="flex gap-2 items-center text-sm">
             <input
@@ -248,15 +248,15 @@ export default function InvoicesPage() {
             onClick={() => setShowForm((v) => !v)}
             className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
           >
-            {showForm ? "Anuluj" : "Nowa faktura kosztowa"}
+            {showForm ? "Anuluj" : "Nowa faktura sprzedaży"}
           </button>
         </div>
       </div>
 
       {showForm && (
         <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
-          <h2 className="font-medium">Nowa faktura kosztowa</h2>
-          <p className="text-muted text-sm">Faktura kosztowa – my jesteśmy nabywcą. Numer (FK/rok/numer) nadawany automatycznie.</p>
+          <h2 className="font-medium">Nowa faktura sprzedaży</h2>
+          <p className="text-muted text-sm">Faktura sprzedaży – my jesteśmy sprzedawcą. Numer (FV/rok/numer) nadawany automatycznie.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm text-muted mb-1">Data wystawienia</label>
@@ -278,31 +278,8 @@ export default function InvoicesPage() {
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className="block text-sm text-muted mb-1">Dostawca (sprzedawca)</label>
-              <select
-                value=""
-                onChange={(e) => {
-                  const id = e.target.value;
-                  if (!id) return;
-                  const c = contractors.find((x) => x.id === id);
-                  if (c) {
-                    setForm((p) => ({ ...p, sellerName: c.name, sellerNip: c.nip }));
-                  }
-                  e.target.value = "";
-                }}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
-              >
-                <option value="">— wybierz dostawcę z bazy kontrahentów —</option>
-                {contractors.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.nip})
-                  </option>
-                ))}
-              </select>
-            </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Sprzedawca – nazwa</label>
+              <label className="block text-sm text-muted mb-1">Sprzedawca (nasza firma) – nazwa</label>
               <input
                 value={form.sellerName}
                 onChange={(e) => setForm((p) => ({ ...p, sellerName: e.target.value }))}
@@ -319,8 +296,31 @@ export default function InvoicesPage() {
                 required
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm text-muted mb-1">Nabywca (kontrahent)</label>
+              <select
+                value=""
+                onChange={(e) => {
+                  const id = e.target.value;
+                  if (!id) return;
+                  const c = contractors.find((x) => x.id === id);
+                  if (c) {
+                    setForm((p) => ({ ...p, buyerName: c.name, buyerNip: c.nip }));
+                  }
+                  e.target.value = "";
+                }}
+                className="w-full rounded border border-border bg-bg px-3 py-2"
+              >
+                <option value="">— wybierz nabywcę z bazy kontrahentów —</option>
+                {contractors.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.nip})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Nabywca (nasza firma) – nazwa</label>
+              <label className="block text-sm text-muted mb-1">Nabywca – nazwa</label>
               <input
                 value={form.buyerName}
                 onChange={(e) => setForm((p) => ({ ...p, buyerName: e.target.value }))}
@@ -462,7 +462,7 @@ export default function InvoicesPage() {
             </div>
           </div>
           <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90">
-            Zapisz fakturę kosztową
+            Zapisz fakturę sprzedaży
           </button>
         </form>
       )}
@@ -470,7 +470,7 @@ export default function InvoicesPage() {
       {loading ? (
         <p className="text-muted">Ładowanie…</p>
       ) : invoices.length === 0 ? (
-        <p className="text-muted">Brak faktur kosztowych. Dodaj pierwszą lub pobierz z KSEF.</p>
+        <p className="text-muted">Brak faktur sprzedaży. Dodaj pierwszą lub pobierz z KSEF.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full text-sm">
@@ -478,7 +478,7 @@ export default function InvoicesPage() {
               <tr className="border-b border-border bg-card">
                 <th className="p-3 text-left">Numer</th>
                 <th className="p-3 text-left">Data</th>
-                <th className="p-3 text-left">Dostawca</th>
+                <th className="p-3 text-left">Nabywca</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3">KSEF</th>
                 <th className="p-3">Opłacono</th>
@@ -490,7 +490,7 @@ export default function InvoicesPage() {
                 <tr key={inv.id} className="border-b border-border">
                   <td className="p-3 font-medium">{inv.number}</td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.sellerName}</td>
+                  <td className="p-3">{inv.buyerName}</td>
                   <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
                   <td className="p-3">
                     {inv.ksefSentAt ? (

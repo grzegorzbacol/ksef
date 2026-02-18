@@ -37,7 +37,7 @@ export default function KsefPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
+      if (!res.ok || data.ok === false) {
         setMessage({ type: "error", text: data.error || "Błąd pobierania z KSEF" });
         return;
       }

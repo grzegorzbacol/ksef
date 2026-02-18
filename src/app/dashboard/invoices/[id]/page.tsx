@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 
 function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; invoiceNumber: string }) {
@@ -49,6 +49,7 @@ type InvoiceItem = {
 
 type Invoice = {
   id: string;
+  type?: string;
   number: string;
   issueDate: string;
   saleDate: string | null;
@@ -70,7 +71,6 @@ type Invoice = {
 
 export default function InvoiceDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,13 +85,17 @@ export default function InvoiceDetailPage() {
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
 
+  const isCost = invoice.type === "cost";
+  const listHref = isCost ? "/dashboard/invoices" : "/dashboard/invoices-sales";
+  const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
+
   return (
     <div>
       <div className="mb-4">
-        <Link href="/dashboard/invoices" className="text-accent hover:underline">← Lista faktur</Link>
+        <Link href={listHref} className="text-accent hover:underline">← {isCost ? "Lista faktur kosztowych" : "Lista faktur sprzedaży"}</Link>
       </div>
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h1 className="text-xl font-semibold">Faktura {invoice.number}</h1>
+        <h1 className="text-xl font-semibold">{typeLabel} {invoice.number}</h1>
         <dl className="grid gap-2 sm:grid-cols-2">
           <dt className="text-muted">Data wystawienia</dt>
           <dd>{new Date(invoice.issueDate).toLocaleDateString("pl-PL")}</dd>

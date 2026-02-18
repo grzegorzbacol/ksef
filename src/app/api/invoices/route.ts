@@ -13,6 +13,7 @@ const itemSchema = z.object({
 });
 
 const createSchema = z.object({
+  type: z.enum(["cost", "sales"]).default("sales"),
   number: z.string().optional(),
   issueDate: z.string(),
   saleDate: z.string().optional(),
@@ -34,8 +35,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const groupBy = searchParams.get("groupBy"); // month | buyer | null
   const includePayment = searchParams.get("payment") === "true";
+  const typeFilter = searchParams.get("type"); // "cost" | "sales"
 
   const invoices = await prisma.invoice.findMany({
+    where: typeFilter === "cost" || typeFilter === "sales" ? { type: typeFilter } : undefined,
     orderBy: { issueDate: "desc" },
     include: includePayment ? { payment: true } : undefined,
   });
@@ -51,13 +54,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (groupBy === "buyer") {
-    const byBuyer: Record<string, typeof invoices> = {};
+    const byParty: Record<string, typeof invoices> = {};
     for (const inv of invoices) {
-      const key = `${inv.buyerNip} | ${inv.buyerName}`;
-      if (!byBuyer[key]) byBuyer[key] = [];
-      byBuyer[key].push(inv);
+      const key = typeFilter === "cost"
+        ? `${inv.sellerNip} | ${inv.sellerName}`
+        : `${inv.buyerNip} | ${inv.buyerName}`;
+      if (!byParty[key]) byParty[key] = [];
+      byParty[key].push(inv);
     }
-    return NextResponse.json({ groupBy: "buyer", data: byBuyer });
+    return NextResponse.json({ groupBy: "buyer", data: byParty });
   }
 
   return NextResponse.json(invoices);
@@ -94,11 +99,14 @@ export async function POST(req: NextRequest) {
 
   const issueDate = new Date(data.issueDate);
 
+  const invoiceType = data.type === "cost" ? "cost" : "sales";
+  const prefix = invoiceType === "cost" ? "FK" : "FV";
+
   const invoice = await prisma.$transaction(async (tx) => {
     let number = data.number?.trim();
     if (!number) {
       const year = issueDate.getFullYear();
-      const key = `invoice_counter_${year}`;
+      const key = `invoice_counter_${invoiceType}_${year}`;
       const row = await tx.setting.findUnique({ where: { key } });
       const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
       await tx.setting.upsert({
@@ -106,11 +114,12 @@ export async function POST(req: NextRequest) {
         create: { key, value: String(nextSeq) },
         update: { value: String(nextSeq) },
       });
-      number = `FV/${year}/${String(nextSeq).padStart(4, "0")}`;
+      number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
     }
 
     return tx.invoice.create({
       data: {
+        type: invoiceType,
         number,
         issueDate,
         saleDate: data.saleDate ? new Date(data.saleDate) : null,

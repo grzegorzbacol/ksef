@@ -23,7 +23,10 @@ export default async function DashboardLayout({
               Start
             </Link>
             <Link href="/dashboard/invoices" className="text-muted hover:text-text">
-              Faktury
+              Faktury kosztowe
+            </Link>
+            <Link href="/dashboard/invoices-sales" className="text-muted hover:text-text">
+              Faktury sprzedaży
             </Link>
             <Link href="/dashboard/contractors" className="text-muted hover:text-text">
               Kontrahenci

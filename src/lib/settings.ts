@@ -41,3 +41,38 @@ export async function getKsefSettings(): Promise<{
     nip: nip?.trim() || "",
   };
 }
+
+export type CompanySettings = {
+  name: string;
+  nip: string;
+  address: string;
+  postalCode: string;
+  city: string;
+};
+
+const COMPANY_KEYS = ["company_name", "company_nip", "company_address", "company_postal_code", "company_city"] as const;
+
+export async function getCompanySettings(): Promise<CompanySettings> {
+  const [name, nip, address, postalCode, city] = await Promise.all([
+    getSetting("company_name"),
+    getSetting("company_nip"),
+    getSetting("company_address"),
+    getSetting("company_postal_code"),
+    getSetting("company_city"),
+  ]);
+  return {
+    name: name?.trim() || "",
+    nip: nip?.trim() || "",
+    address: address?.trim() || "",
+    postalCode: postalCode?.trim() || "",
+    city: city?.trim() || "",
+  };
+}
+
+export async function setCompanySettings(data: CompanySettings): Promise<void> {
+  const keys = COMPANY_KEYS;
+  const values = [data.name, data.nip, data.address, data.postalCode, data.city];
+  for (let i = 0; i < keys.length; i++) {
+    await setSetting(keys[i], values[i] ?? "");
+  }
+}

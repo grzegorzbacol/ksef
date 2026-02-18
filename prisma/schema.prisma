@@ -34,6 +34,7 @@ model Product {
 
 model Invoice {
   id            String        @id @default(cuid())
+  type          String        @default("sales") // "cost" = faktura kosztowa, "sales" = faktura sprzedaży
   number        String        @unique
   issueDate     DateTime
   saleDate      DateTime?

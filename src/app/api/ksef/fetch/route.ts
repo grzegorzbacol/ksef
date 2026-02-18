@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
   const result = await fetchInvoicesFromKsef(from, to);
   if (!result.success) {
-    return NextResponse.json({ error: result.error || "Błąd pobierania z KSEF" }, { status: 502 });
+    return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z KSEF" }, { status: 200 });
   }
 
   const imported = result.invoices || [];
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
       await prisma.invoice.upsert({
         where: { number: inv.number },
         create: {
+          type: "sales",
           number: inv.number,
           issueDate: inv.issueDate ? new Date(inv.issueDate) : new Date(),
           saleDate: inv.saleDate ? new Date(inv.saleDate) : null,

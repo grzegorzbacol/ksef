@@ -215,6 +215,10 @@ export async function fetchInvoicesFromKsef(
       } catch {
         if (text) errMsg += ` – ${text.slice(0, 150)}`;
       }
+      if (res.status === 401) {
+        errMsg =
+          "KSEF odrzucił token (401). Token mógł wygasnąć – w KSEF 2.0 tokeny dostępu są krótkoterminowe. Uzyskaj nowy token w portalu KSEF i wklej go w Ustawieniach → Integracja KSEF.";
+      }
       return { success: false, error: errMsg };
     }
 
