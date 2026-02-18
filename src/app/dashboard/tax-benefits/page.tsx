@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
 
+type Car = {
+  id: string;
+  name: string;
+  value: number;
+  limit100k: number;
+  limit150k: number;
+  limit200k: number;
+  vatDeductionPercent: number;
+};
+
 type Invoice = {
   id: string;
   number: string;
@@ -15,6 +25,8 @@ type Invoice = {
   currency: string;
   vatDeductionPercent?: number | null;
   costDeductionPercent?: number | null;
+  expenseType?: string;
+  car?: Car | null;
 };
 
 type CompanyTax = {
@@ -38,7 +50,7 @@ export default function TaxBenefitsPage() {
         setCompany({
           pitRate: companyData?.pitRate != null ? Number(companyData.pitRate) : 0.12,
           healthRate: companyData?.healthRate != null ? Number(companyData.healthRate) : 0.09,
-          isVatPayer: companyData?.isVatPayer !== false && companyData?.isVatPayer !== "false",
+          isVatPayer: companyData?.isVatPayer !== false && String(companyData?.isVatPayer) !== "false",
         });
       })
       .catch(() => {})
@@ -83,6 +95,7 @@ export default function TaxBenefitsPage() {
                 <th className="p-3 text-left">Numer</th>
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
+                <th className="p-3 text-left">Typ wydatku</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3 text-right">Korzyść podatkowa</th>
                 <th className="p-3 text-right">Realny koszt</th>
@@ -98,6 +111,15 @@ export default function TaxBenefitsPage() {
                     vatAmount: inv.vatAmount,
                     vatDeductionPercent: inv.vatDeductionPercent ?? 1,
                     costDeductionPercent: inv.costDeductionPercent ?? 1,
+                    car: inv.expenseType === "car" && inv.car
+                      ? {
+                          value: inv.car.value,
+                          limit100k: inv.car.limit100k,
+                          limit150k: inv.car.limit150k,
+                          limit200k: inv.car.limit200k,
+                          vatDeductionPercent: inv.car.vatDeductionPercent,
+                        }
+                      : undefined,
                   },
                   config
                 );
@@ -106,6 +128,9 @@ export default function TaxBenefitsPage() {
                     <td className="p-3 font-medium">{inv.number}</td>
                     <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
                     <td className="p-3">{inv.sellerName}</td>
+                    <td className="p-3 text-muted text-sm">
+                      {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
+                    </td>
                     <td className="p-3 text-right">
                       {inv.grossAmount.toFixed(2)} {inv.currency}
                     </td>

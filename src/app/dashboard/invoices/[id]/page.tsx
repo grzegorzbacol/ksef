@@ -105,6 +105,27 @@ type Invoice = {
   emailAttachments?: EmailAttachment[];
   vatDeductionPercent?: number | null;
   costDeductionPercent?: number | null;
+  expenseType?: string;
+  carId?: string | null;
+  car?: {
+    id: string;
+    name: string;
+    value: number;
+    limit100k: number;
+    limit150k: number;
+    limit200k: number;
+    vatDeductionPercent: number;
+  } | null;
+};
+
+type Car = {
+  id: string;
+  name: string;
+  value: number;
+  limit100k: number;
+  limit150k: number;
+  limit200k: number;
+  vatDeductionPercent: number;
 };
 
 type Contractor = {
@@ -140,6 +161,10 @@ export default function InvoiceDetailPage() {
   const [savingDeduction, setSavingDeduction] = useState(false);
   const [editVatDeduction, setEditVatDeduction] = useState("");
   const [editCostDeduction, setEditCostDeduction] = useState("");
+  const [cars, setCars] = useState<Car[]>([]);
+  const [savingExpenseType, setSavingExpenseType] = useState(false);
+  const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
+  const [expenseCarId, setExpenseCarId] = useState("");
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -159,6 +184,8 @@ export default function InvoiceDetailPage() {
           setEditCostDeduction(
             inv.costDeductionPercent != null ? String(inv.costDeductionPercent) : "1"
           );
+          setExpenseType(inv.expenseType === "car" ? "car" : "standard");
+          setExpenseCarId(inv.carId ?? "");
         }
       });
   }
@@ -179,10 +206,14 @@ export default function InvoiceDetailPage() {
           setCompanyTax({
             pitRate: data?.pitRate != null ? Number(data.pitRate) : 0.12,
             healthRate: data?.healthRate != null ? Number(data.healthRate) : 0.09,
-            isVatPayer: data?.isVatPayer !== false && data?.isVatPayer !== "false",
+            isVatPayer: data?.isVatPayer !== false && String(data?.isVatPayer) !== "false",
           });
         })
         .catch(() => {});
+      fetch("/api/cars")
+        .then((r) => r.json())
+        .then((data) => setCars(Array.isArray(data) ? data : []))
+        .catch(() => setCars([]));
     }
   }, [invoice?.type]);
 
@@ -202,7 +233,7 @@ export default function InvoiceDetailPage() {
   const listHref = isCost ? "/dashboard/rozrachunki" : "/dashboard/invoices";
   const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
 
-  async function saveSellerInline() {
+  const saveSellerInline = async () => {
     if (
       editSellerName.trim() === invoice.sellerName &&
       editSellerNip.trim().replace(/\s/g, "") === (invoice.sellerNip ?? "")
@@ -227,8 +258,7 @@ export default function InvoiceDetailPage() {
       setSavingSeller(false);
       setEditingSellerInline(false);
     }
-  }
-
+  };
 
   return (
     <div>
@@ -559,6 +589,84 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         )}
+        {isCost && (
+          <div className="mt-6 pt-6 border-t border-border">
+            <h2 className="font-medium mb-2">Typ wydatku</h2>
+            <p className="text-muted text-sm mb-3">
+              Standardowy lub przypisany do samochodu (wtedy korzyści liczone według limitów i VAT z definicji pojazdu).
+            </p>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="expenseTypeDetail"
+                  checked={expenseType === "standard"}
+                  onChange={() => {
+                    setExpenseType("standard");
+                    setExpenseCarId("");
+                  }}
+                  disabled={savingExpenseType}
+                  className="rounded border-border"
+                />
+                <span>Standardowy</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="expenseTypeDetail"
+                  checked={expenseType === "car"}
+                  onChange={() => setExpenseType("car")}
+                  disabled={savingExpenseType}
+                  className="rounded border-border"
+                />
+                <span>Samochód:</span>
+              </label>
+              <select
+                value={expenseCarId}
+                onChange={(e) => setExpenseCarId(e.target.value)}
+                disabled={expenseType !== "car" || savingExpenseType}
+                className="rounded border border-border bg-bg px-3 py-2 min-w-[180px] disabled:opacity-50"
+              >
+                <option value="">— wybierz —</option>
+                {cars.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={savingExpenseType || (expenseType === "car" && !expenseCarId)}
+                onClick={async () => {
+                  setSavingExpenseType(true);
+                  try {
+                    const res = await fetch(`/api/invoices/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        expenseType: expenseType === "car" && expenseCarId ? "car" : "standard",
+                        carId: expenseType === "car" && expenseCarId ? expenseCarId : null,
+                      }),
+                    });
+                    if (!res.ok) {
+                      const d = await res.json().catch(() => ({}));
+                      alert(d.error || "Błąd zapisu");
+                      return;
+                    }
+                    const updated = await res.json();
+                    setInvoice(updated);
+                  } finally {
+                    setSavingExpenseType(false);
+                  }
+                }}
+                className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 text-sm"
+              >
+                {savingExpenseType ? "Zapisywanie…" : "Zapisz"}
+              </button>
+            </div>
+            <p className="text-muted text-xs mt-2">
+              Aktualnie: {invoice.expenseType === "car" && invoice.car ? invoice.car.name : "Standardowy"}
+            </p>
+          </div>
+        )}
         {isCost && (() => {
           const taxConfig = companyTax ?? { pitRate: 0.12, healthRate: 0.09, isVatPayer: true };
           const vatDed = parseFloat(editVatDeduction);
@@ -570,6 +678,15 @@ export default function InvoiceDetailPage() {
               vatAmount: invoice.vatAmount,
               vatDeductionPercent: Number.isNaN(vatDed) ? 1 : Math.max(0, Math.min(1, vatDed)),
               costDeductionPercent: Number.isNaN(costDed) ? 1 : Math.max(0, Math.min(1, costDed)),
+              car: invoice.expenseType === "car" && invoice.car
+                ? {
+                    value: invoice.car.value,
+                    limit100k: invoice.car.limit100k,
+                    limit150k: invoice.car.limit150k,
+                    limit200k: invoice.car.limit200k,
+                    vatDeductionPercent: invoice.car.vatDeductionPercent,
+                  }
+                : undefined,
             },
             taxConfig
           );
@@ -596,71 +713,78 @@ export default function InvoiceDetailPage() {
             <p className="text-muted text-xs mb-3">
               Założone stawki: PIT {(taxConfig.pitRate * 100).toFixed(0)}%, zdrowotna {(taxConfig.healthRate * 100).toFixed(0)}%,
               płatnik VAT: {taxConfig.isVatPayer ? "tak" : "nie"}.
+              {invoice.expenseType === "car" && invoice.car && (
+                <> Wydatek samochodowy ({invoice.car.name}): limit kosztu i {(invoice.car.vatDeductionPercent * 100).toFixed(0)}% VAT z definicji pojazdu.</>
+              )}
             </p>
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <label className="block text-xs text-muted mb-1">Udział VAT do odliczenia (0–1)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={editVatDeduction}
-                  onChange={(e) => setEditVatDeduction(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">Udział kosztu do odliczenia (0–1)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={editCostDeduction}
-                  onChange={(e) => setEditCostDeduction(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24"
-                />
-              </div>
-              <button
-                type="button"
-                disabled={savingDeduction}
-                onClick={async () => {
-                  const v = parseFloat(editVatDeduction);
-                  const c = parseFloat(editCostDeduction);
-                  if (Number.isNaN(v) || Number.isNaN(c) || v < 0 || v > 1 || c < 0 || c > 1) {
-                    alert("Wpisz wartości od 0 do 1.");
-                    return;
-                  }
-                  setSavingDeduction(true);
-                  try {
-                    const res = await fetch(`/api/invoices/${id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        vatDeductionPercent: v,
-                        costDeductionPercent: c,
-                      }),
-                    });
-                    if (!res.ok) {
-                      const d = await res.json().catch(() => ({}));
-                      alert(d.error || "Błąd zapisu");
+            {invoice.expenseType !== "car" && (
+            <>
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-xs text-muted mb-1">Udział VAT do odliczenia (0–1)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    value={editVatDeduction}
+                    onChange={(e) => setEditVatDeduction(e.target.value)}
+                    className="rounded border border-border bg-bg px-3 py-2 w-24"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">Udział kosztu do odliczenia (0–1)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="1"
+                    value={editCostDeduction}
+                    onChange={(e) => setEditCostDeduction(e.target.value)}
+                    className="rounded border border-border bg-bg px-3 py-2 w-24"
+                  />
+                </div>
+                <button
+                  type="button"
+                  disabled={savingDeduction}
+                  onClick={async () => {
+                    const v = parseFloat(editVatDeduction);
+                    const c = parseFloat(editCostDeduction);
+                    if (Number.isNaN(v) || Number.isNaN(c) || v < 0 || v > 1 || c < 0 || c > 1) {
+                      alert("Wpisz wartości od 0 do 1.");
                       return;
                     }
-                    const updated = await res.json();
-                    setInvoice(updated);
-                  } finally {
-                    setSavingDeduction(false);
-                  }
-                }}
-                className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {savingDeduction ? "Zapisywanie…" : "Zapisz udziały"}
-              </button>
-            </div>
-            <p className="text-muted text-xs mt-2">
-              Np. 1 = 100%, 0.5 = 50% VAT do odliczenia, 0.75 = 75% kosztu do odliczenia.
-            </p>
+                    setSavingDeduction(true);
+                    try {
+                      const res = await fetch(`/api/invoices/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          vatDeductionPercent: v,
+                          costDeductionPercent: c,
+                        }),
+                      });
+                      if (!res.ok) {
+                        const d = await res.json().catch(() => ({}));
+                        alert(d.error || "Błąd zapisu");
+                        return;
+                      }
+                      const updated = await res.json();
+                      setInvoice(updated);
+                    } finally {
+                      setSavingDeduction(false);
+                    }
+                  }}
+                  className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingDeduction ? "Zapisywanie…" : "Zapisz udziały"}
+                </button>
+              </div>
+              <p className="text-muted text-xs mt-2">
+                Np. 1 = 100%, 0.5 = 50% VAT do odliczenia, 0.75 = 75% kosztu do odliczenia.
+              </p>
+            </>
+            )}
           </div>
           );
         })()}

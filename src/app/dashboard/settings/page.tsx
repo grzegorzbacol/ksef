@@ -136,7 +136,7 @@ export default function SettingsPage() {
           city: companyData.city ?? "",
           pitRate: companyData.pitRate != null ? Number(companyData.pitRate) : 0.12,
           healthRate: companyData.healthRate != null ? Number(companyData.healthRate) : 0.09,
-          isVatPayer: companyData.isVatPayer !== false && companyData.isVatPayer !== "false",
+          isVatPayer: companyData.isVatPayer !== false && String(companyData.isVatPayer) !== "false",
         });
         if (reminderData.paymentReminderEmail != null || reminderData.smtp) {
           setPaymentReminder({

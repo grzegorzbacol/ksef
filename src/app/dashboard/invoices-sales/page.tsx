@@ -207,11 +207,11 @@ function InvoiceNumberCell({
   useEffect(() => {
     fetch("/api/settings/company")
       .then((r) => r.json())
-      .then((data: { pitRate?: number; healthRate?: number; isVatPayer?: boolean }) => {
+      .then((data: { pitRate?: number; healthRate?: number; isVatPayer?: boolean | string }) => {
         setCompanyTax({
           pitRate: data?.pitRate != null ? Number(data.pitRate) : 0.12,
           healthRate: data?.healthRate != null ? Number(data.healthRate) : 0.09,
-          isVatPayer: data?.isVatPayer !== false && data?.isVatPayer !== "false",
+          isVatPayer: data?.isVatPayer !== false && String(data?.isVatPayer) !== "false",
         });
       })
       .catch(() => {});
@@ -944,6 +944,7 @@ function InvoiceNumberCell({
                 <th className="p-3 text-left">Numer</th>
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
+                <th className="p-3 text-left">Typ wydatku</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3 text-right">Korzyść podatkowa</th>
                 <th className="p-3 text-right">Realny koszt</th>
@@ -1102,6 +1103,9 @@ function InvoiceNumberCell({
                         </>
                       )}
                     </div>
+                  </td>
+                  <td className="p-3 text-muted text-sm">
+                    {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
                   </td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (
