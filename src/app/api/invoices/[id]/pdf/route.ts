@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { getInvoicePdfFromKsef } from "@/lib/ksef";
 import { prisma } from "@/lib/prisma";
 import { jsPDF } from "jspdf";
 
@@ -16,6 +17,22 @@ export async function GET(
     include: { items: true },
   });
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const filename = `Faktura_${invoice.number.replace(/\//g, "-")}.pdf`;
+
+  if (invoice.ksefId && invoice.ksefId.trim() !== "") {
+    const result = await getInvoicePdfFromKsef(invoice.ksefId.trim());
+    if (result.success) {
+      return new NextResponse(result.pdf, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Content-Length": String(result.pdf.byteLength),
+        },
+      });
+    }
+  }
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const margin = 20;
@@ -89,7 +106,6 @@ export async function GET(
   addLine(`Razem brutto: ${invoice.grossAmount.toFixed(2)} ${invoice.currency}`, { bold: true });
 
   const pdfBytes = doc.output("arraybuffer");
-  const filename = `Faktura_${invoice.number.replace(/\//g, "-")}.pdf`;
 
   return new NextResponse(pdfBytes, {
     status: 200,

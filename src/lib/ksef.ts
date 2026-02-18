@@ -325,3 +325,74 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
     return { success: false, error: `Wysyłka do KSEF: ${message}` };
   }
 }
+
+/** Domyślna ścieżka do pobrania pliku PDF faktury po numerze KSEF (referenceNumber). */
+const DEFAULT_INVOICE_PDF_PATH = "/v2/invoices/{referenceNumber}/file";
+
+export type KsefInvoicePdfResult =
+  | { success: true; pdf: ArrayBuffer }
+  | { success: false; error: string };
+
+/**
+ * Pobiera PDF faktury bezpośrednio z KSEF po numerze identyfikacyjnym (ksefId / referenceNumber).
+ * Ścieżka API jest konfigurowalna przez env KSEF_INVOICE_PDF_PATH (np. /v2/invoices/{referenceNumber}/file).
+ * W treści ścieżki {referenceNumber} zostanie zastąpione przez ksefId.
+ */
+export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoicePdfResult> {
+  const s = await getKsefSettings();
+  const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  const pathTemplate =
+    s.invoicePdfPath || process.env.KSEF_INVOICE_PDF_PATH?.trim() || DEFAULT_INVOICE_PDF_PATH;
+  const path = pathTemplate.replace(/\{referenceNumber\}/g, encodeURIComponent(ksefId));
+
+  if (!token) {
+    return { success: false, error: "Brak tokenu KSEF." };
+  }
+
+  const tokenForHeader = tokenSafeForHeader(token);
+  if (!tokenForHeader) {
+    return { success: false, error: "Token KSEF zawiera niedozwolone znaki." };
+  }
+
+  try {
+    const url = `${apiUrl}${path}`;
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/pdf",
+        Authorization: `Bearer ${tokenForHeader}`,
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let errMsg = `KSEF API ${res.status}`;
+      try {
+        const json = JSON.parse(text);
+        errMsg = (json.message ?? json.error ?? errMsg) as string;
+      } catch {
+        if (text) errMsg += ` – ${text.slice(0, 120)}`;
+      }
+      return { success: false, error: errMsg };
+    }
+
+    const contentType = res.headers.get("Content-Type") || "";
+    if (!contentType.includes("pdf")) {
+      return {
+        success: false,
+        error: "KSEF nie zwrócił PDF (Content-Type: " + contentType + ").",
+      };
+    }
+
+    const pdf = await res.arrayBuffer();
+    if (!pdf.byteLength) {
+      return { success: false, error: "Pusta odpowiedź PDF z KSEF." };
+    }
+
+    return { success: true, pdf };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { success: false, error: `Pobieranie PDF z KSEF: ${message}` };
+  }
+}

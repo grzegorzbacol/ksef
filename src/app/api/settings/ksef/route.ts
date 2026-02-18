@@ -13,6 +13,7 @@ export async function GET() {
     queryPath: s.queryPath,
     sendPath: s.sendPath,
     nip: s.nip,
+    invoicePdfPath: s.invoicePdfPath,
   });
 }
 
@@ -21,13 +22,14 @@ export async function PUT(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const keys = ["ksef_api_url", "ksef_token", "ksef_query_path", "ksef_send_path", "ksef_nip"];
+  const keys = ["ksef_api_url", "ksef_token", "ksef_query_path", "ksef_send_path", "ksef_nip", "ksef_invoice_pdf_path"];
   const map: Record<string, string> = {
     ksef_api_url: "apiUrl",
     ksef_token: "token",
     ksef_query_path: "queryPath",
     ksef_send_path: "sendPath",
     ksef_nip: "nip",
+    ksef_invoice_pdf_path: "invoicePdfPath",
   };
 
   for (const key of keys) {

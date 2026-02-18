@@ -25,13 +25,15 @@ export async function getKsefSettings(): Promise<{
   queryPath: string;
   sendPath: string;
   nip: string;
+  invoicePdfPath: string;
 }> {
-  const [apiUrl, token, queryPath, sendPath, nip] = await Promise.all([
+  const [apiUrl, token, queryPath, sendPath, nip, invoicePdfPath] = await Promise.all([
     getSetting("ksef_api_url"),
     getSetting("ksef_token"),
     getSetting("ksef_query_path"),
     getSetting("ksef_send_path"),
     getSetting("ksef_nip"),
+    getSetting("ksef_invoice_pdf_path"),
   ]);
   return {
     apiUrl: apiUrl?.trim() || "",
@@ -39,6 +41,7 @@ export async function getKsefSettings(): Promise<{
     queryPath: queryPath?.trim() || "",
     sendPath: sendPath?.trim() || "",
     nip: nip?.trim() || "",
+    invoicePdfPath: invoicePdfPath?.trim() || "",
   };
 }
 

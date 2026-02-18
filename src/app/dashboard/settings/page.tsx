@@ -8,6 +8,7 @@ type KsefSettings = {
   queryPath: string;
   sendPath: string;
   nip: string;
+  invoicePdfPath: string;
 };
 
 type CompanySettings = {
@@ -24,6 +25,7 @@ const emptyKsef: KsefSettings = {
   queryPath: "",
   sendPath: "",
   nip: "",
+  invoicePdfPath: "",
 };
 
 const emptyCompany: CompanySettings = {
@@ -61,6 +63,7 @@ export default function SettingsPage() {
           queryPath: ksefData.queryPath ?? "",
           sendPath: ksefData.sendPath ?? "",
           nip: ksefData.nip ?? "",
+          invoicePdfPath: ksefData.invoicePdfPath ?? "",
         });
         setCompany({
           name: companyData.name ?? "",
@@ -88,6 +91,7 @@ export default function SettingsPage() {
           queryPath: ksef.queryPath,
           sendPath: ksef.sendPath,
           nip: ksef.nip,
+          invoicePdfPath: ksef.invoicePdfPath,
         }),
       });
       if (!res.ok) {
@@ -270,6 +274,17 @@ export default function SettingsPage() {
               placeholder="/api/online/Invoice/Send"
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
             />
+          </div>
+          <div>
+            <label className="block text-sm text-muted mb-1">Ścieżka pobierania PDF z KSEF (opcjonalnie)</label>
+            <input
+              type="text"
+              value={ksef.invoicePdfPath}
+              onChange={(e) => setKsef((s) => ({ ...s, invoicePdfPath: e.target.value }))}
+              placeholder="/v2/invoices/{referenceNumber}/file"
+              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+            />
+            <p className="text-muted text-xs mt-1">Użyj {"{referenceNumber}"} jako placeholder numeru KSEF. Puste = domyślna ścieżka.</p>
           </div>
         </div>
 
