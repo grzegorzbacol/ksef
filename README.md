@@ -7,7 +7,7 @@ Aplikacja do wystawiania faktur, wysyłki i pobierania z KSEF, statystyk oraz re
 ## Funkcje
 
 - **Logowanie** – użytkownik `grzegorzbacol`; hasło ustawiane przy pierwszym logowaniu.
-- **Faktury** – wystawianie, wysyłka do KSEF, pobieranie z KSEF (placeholdery w `src/lib/ksef.ts`).
+- **Faktury** – wystawianie, wysyłka do KSEF, pobieranie z KSEF (moduł w `src/lib/ksef.ts`).
 - **Statystyki** – sumy, grupowanie po miesiącach i nabywcach.
 - **Płatności** – checklist opłaconych faktur z zapisem daty.
 
@@ -54,6 +54,14 @@ Wymagana zmienna **`DATABASE_URL`** (PostgreSQL).
 
 ---
 
-## KSEF
+## KSEF (integracja z Krajowym Systemem e-Faktur)
 
-W `src/lib/ksef.ts` są placeholdery. Pełna integracja z KSEF wymaga certyfikatu i konfiguracji zgodnej z dokumentacją MF.
+Moduł łączy się z API KSEF i dodaje faktury z KSEF do bazy. W panelu: **KSEF** (w menu) – status połączenia i przycisk „Pobierz faktury z KSEF” z zakresem dat.
+
+**Zmienne środowiskowe (Coolify / .env):**
+- **`KSEF_API_URL`** – adres API (np. `https://api.ksef.mf.gov.pl` lub demo `https://api-demo.ksef.mf.gov.pl`).
+- **`KSEF_TOKEN`** – token JWT z portalu KSEF (uwierzytelnianie).
+
+Opcjonalnie: **`KSEF_QUERY_INVOICES_PATH`**, **`KSEF_SEND_INVOICE_PATH`** – gdy ścieżki API różnią się od domyślnych.
+
+Dokumentacja API KSeF 2.0: [ksef.mf.gov.pl](https://ksef.mf.gov.pl), [api-demo.ksef.mf.gov.pl](https://api-demo.ksef.mf.gov.pl).

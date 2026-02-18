@@ -3,8 +3,17 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
+const itemSchema = z.object({
+  productId: z.string().optional(),
+  name: z.string().min(1),
+  quantity: z.number().positive(),
+  unit: z.string().default("szt."),
+  unitPriceNet: z.number().min(0),
+  vatRate: z.number().min(0).max(100),
+});
+
 const createSchema = z.object({
-  number: z.string().min(1),
+  number: z.string().optional(),
   issueDate: z.string(),
   saleDate: z.string().optional(),
   sellerName: z.string().min(1),
@@ -15,6 +24,7 @@ const createSchema = z.object({
   vatAmount: z.number(),
   grossAmount: z.number(),
   currency: z.string().default("PLN"),
+  items: z.array(itemSchema).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -66,20 +76,75 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  const invoice = await prisma.invoice.create({
-    data: {
-      number: data.number,
-      issueDate: new Date(data.issueDate),
-      saleDate: data.saleDate ? new Date(data.saleDate) : null,
-      sellerName: data.sellerName,
-      sellerNip: data.sellerNip,
-      buyerName: data.buyerName,
-      buyerNip: data.buyerNip,
-      netAmount: data.netAmount,
-      vatAmount: data.vatAmount,
-      grossAmount: data.grossAmount,
-      currency: data.currency,
-    },
+  let netAmount = data.netAmount;
+  let vatAmount = data.vatAmount;
+  let grossAmount = data.grossAmount;
+
+  if (data.items && data.items.length > 0) {
+    netAmount = 0;
+    vatAmount = 0;
+    for (const row of data.items) {
+      const lineNet = row.quantity * row.unitPriceNet;
+      const lineVat = lineNet * (row.vatRate / 100);
+      netAmount += lineNet;
+      vatAmount += lineVat;
+    }
+    grossAmount = netAmount + vatAmount;
+  }
+
+  const issueDate = new Date(data.issueDate);
+
+  const invoice = await prisma.$transaction(async (tx) => {
+    let number = data.number?.trim();
+    if (!number) {
+      const year = issueDate.getFullYear();
+      const key = `invoice_counter_${year}`;
+      const row = await tx.setting.findUnique({ where: { key } });
+      const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
+      await tx.setting.upsert({
+        where: { key },
+        create: { key, value: String(nextSeq) },
+        update: { value: String(nextSeq) },
+      });
+      number = `FV/${year}/${String(nextSeq).padStart(4, "0")}`;
+    }
+
+    return tx.invoice.create({
+      data: {
+        number,
+        issueDate,
+        saleDate: data.saleDate ? new Date(data.saleDate) : null,
+        sellerName: data.sellerName,
+        sellerNip: data.sellerNip,
+        buyerName: data.buyerName,
+        buyerNip: data.buyerNip,
+        netAmount,
+        vatAmount,
+        grossAmount,
+        currency: data.currency,
+      },
+    });
   });
+
+  if (data.items && data.items.length > 0) {
+    for (const row of data.items) {
+      const amountNet = row.quantity * row.unitPriceNet;
+      const amountVat = amountNet * (row.vatRate / 100);
+      await prisma.invoiceItem.create({
+        data: {
+          invoiceId: invoice.id,
+          productId: row.productId || null,
+          name: row.name,
+          quantity: row.quantity,
+          unit: row.unit,
+          unitPriceNet: row.unitPriceNet,
+          vatRate: row.vatRate,
+          amountNet,
+          amountVat,
+        },
+      });
+    }
+  }
+
   return NextResponse.json(invoice);
 }

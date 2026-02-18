@@ -15,9 +15,26 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  unit        String   @default("szt.")
+  priceNet    Float
+  vatRate     Float    @default(23) // np. 23, 8, 0
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 model Invoice {
-  id            String    @id @default(cuid())
-  number        String    @unique
+  id            String        @id @default(cuid())
+  number        String        @unique
   issueDate     DateTime
   saleDate      DateTime?
   sellerName    String
@@ -27,14 +44,29 @@ model Invoice {
   netAmount     Float
   vatAmount     Float
   grossAmount   Float
-  currency      String    @default("PLN")
+  currency      String        @default("PLN")
   ksefSentAt    DateTime?
   ksefId        String?
   ksefStatus    String?
-  source        String    @default("manual") // manual | ksef
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  source        String        @default("manual")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   payment       Payment?
+  items         InvoiceItem[]
+}
+
+model InvoiceItem {
+  id           String   @id @default(cuid())
+  invoiceId    String
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  productId    String?
+  name         String
+  quantity     Float    @default(1)
+  unit         String   @default("szt.")
+  unitPriceNet Float
+  vatRate      Float    @default(23)
+  amountNet    Float
+  amountVat    Float
 }
 
 model Payment {

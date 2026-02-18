@@ -25,6 +25,15 @@ export default async function DashboardLayout({
             <Link href="/dashboard/invoices" className="text-muted hover:text-text">
               Faktury
             </Link>
+            <Link href="/dashboard/ksef" className="text-muted hover:text-text">
+              KSEF
+            </Link>
+            <Link href="/dashboard/settings" className="text-muted hover:text-text">
+              Ustawienia
+            </Link>
+            <Link href="/dashboard/warehouse" className="text-muted hover:text-text">
+              Magazyn
+            </Link>
             <Link href="/dashboard/statistics" className="text-muted hover:text-text">
               Statystyki
             </Link>

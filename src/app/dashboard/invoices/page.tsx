@@ -23,14 +23,33 @@ type Invoice = {
   payment?: { paidAt: string } | null;
 };
 
+type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  unit: string;
+  priceNet: number;
+  vatRate: number;
+};
+
+type InvoiceLine = {
+  productId?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPriceNet: number;
+  vatRate: number;
+};
+
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [lines, setLines] = useState<InvoiceLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchKsefLoading, setFetchKsefLoading] = useState(false);
   const [fetchRange, setFetchRange] = useState({ from: "", to: "" });
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
-    number: "",
     issueDate: new Date().toISOString().slice(0, 10),
     saleDate: "",
     sellerName: "",
@@ -42,6 +61,8 @@ export default function InvoicesPage() {
     grossAmount: "",
     currency: "PLN",
   });
+  const [addProductId, setAddProductId] = useState("");
+  const [addQty, setAddQty] = useState("1");
 
   function loadInvoices() {
     setLoading(true);
@@ -55,27 +76,66 @@ export default function InvoicesPage() {
     loadInvoices();
   }, []);
 
+  useEffect(() => {
+    if (showForm) fetch("/api/products").then((r) => r.json()).then(setProducts).catch(() => setProducts([]));
+  }, [showForm]);
+
+  function addLineFromWarehouse() {
+    const product = products.find((p) => p.id === addProductId);
+    if (!product) return;
+    const qty = parseFloat(addQty) || 1;
+    if (qty <= 0) return;
+    setLines((prev) => [
+      ...prev,
+      {
+        productId: product.id,
+        name: product.name,
+        quantity: qty,
+        unit: product.unit,
+        unitPriceNet: product.priceNet,
+        vatRate: product.vatRate,
+      },
+    ]);
+    setAddProductId("");
+    setAddQty("1");
+  }
+
+  function removeLine(index: number) {
+    setLines((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  const totalsFromLines = (() => {
+    let net = 0, vat = 0;
+    for (const l of lines) {
+      const lineNet = l.quantity * l.unitPriceNet;
+      net += lineNet;
+      vat += lineNet * (l.vatRate / 100);
+    }
+    return { net, vat, gross: net + vat };
+  })();
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     const net = parseFloat(form.netAmount) || 0;
     const vat = parseFloat(form.vatAmount) || 0;
     const gross = parseFloat(form.grossAmount) || net + vat;
+    const payload: Record<string, unknown> = {
+      issueDate: form.issueDate,
+      saleDate: form.saleDate || undefined,
+      sellerName: form.sellerName,
+      sellerNip: form.sellerNip,
+      buyerName: form.buyerName,
+      buyerNip: form.buyerNip,
+      netAmount: lines.length > 0 ? totalsFromLines.net : net,
+      vatAmount: lines.length > 0 ? totalsFromLines.vat : vat,
+      grossAmount: lines.length > 0 ? totalsFromLines.gross : gross,
+      currency: form.currency,
+    };
+    if (lines.length > 0) payload.items = lines;
     const res = await fetch("/api/invoices", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        number: form.number,
-        issueDate: form.issueDate,
-        saleDate: form.saleDate || undefined,
-        sellerName: form.sellerName,
-        sellerNip: form.sellerNip,
-        buyerName: form.buyerName,
-        buyerNip: form.buyerNip,
-        netAmount: net,
-        vatAmount: vat,
-        grossAmount: gross,
-        currency: form.currency,
-      }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -83,8 +143,8 @@ export default function InvoicesPage() {
       return;
     }
     setShowForm(false);
+    setLines([]);
     setForm({
-      number: "",
       issueDate: new Date().toISOString().slice(0, 10),
       saleDate: "",
       sellerName: "",
@@ -168,16 +228,8 @@ export default function InvoicesPage() {
       {showForm && (
         <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
           <h2 className="font-medium">Nowa faktura</h2>
+          <p className="text-muted text-sm">Numer faktury (FV/rok/numer) jest nadawany automatycznie przy zapisie.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm text-muted mb-1">Numer</label>
-              <input
-                value={form.number}
-                onChange={(e) => setForm((p) => ({ ...p, number: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
-                required
-              />
-            </div>
             <div>
               <label className="block text-sm text-muted mb-1">Data wystawienia</label>
               <input
@@ -235,14 +287,95 @@ export default function InvoicesPage() {
               />
             </div>
           </div>
+          <div className="border-t border-border pt-4 mt-4">
+            <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
+            <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
+            <div className="flex flex-wrap gap-2 items-end mb-4">
+              <div>
+                <label className="block text-xs text-muted mb-1">Produkt</label>
+                <select
+                  value={addProductId}
+                  onChange={(e) => setAddProductId(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px]"
+                >
+                  <option value="">— wybierz —</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} – {p.priceNet.toFixed(2)} {p.unit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Ilość</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={addQty}
+                  onChange={(e) => setAddQty(e.target.value)}
+                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addLineFromWarehouse}
+                disabled={!addProductId}
+                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50"
+              >
+                Dodaj do faktury
+              </button>
+            </div>
+            {lines.length > 0 && (
+              <div className="overflow-x-auto rounded border border-border mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-bg/50">
+                      <th className="p-2 text-left">Nazwa</th>
+                      <th className="p-2 text-right">Ilość</th>
+                      <th className="p-2 text-right">Cena netto</th>
+                      <th className="p-2 text-right">VAT %</th>
+                      <th className="p-2 text-right">Netto</th>
+                      <th className="p-2 text-right">VAT</th>
+                      <th className="p-2 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lines.map((l, i) => (
+                      <tr key={i} className="border-b border-border">
+                        <td className="p-2">{l.name}</td>
+                        <td className="p-2 text-right">{l.quantity} {l.unit}</td>
+                        <td className="p-2 text-right">{l.unitPriceNet.toFixed(2)}</td>
+                        <td className="p-2 text-right">{l.vatRate}%</td>
+                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
+                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
+                        <td className="p-2">
+                          <button type="button" onClick={() => removeLine(i)} className="text-red-400 hover:underline">
+                            Usuń
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <p className="p-2 text-right text-sm">
+                  Razem netto: <strong>{totalsFromLines.net.toFixed(2)}</strong> &nbsp;
+                  VAT: <strong>{totalsFromLines.vat.toFixed(2)}</strong> &nbsp;
+                  Brutto: <strong>{totalsFromLines.gross.toFixed(2)}</strong> {form.currency}
+                </p>
+              </div>
+            )}
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
               <label className="block text-sm text-muted mb-1">Netto</label>
               <input
                 type="number"
                 step="0.01"
-                value={form.netAmount}
+                value={lines.length > 0 ? totalsFromLines.net.toFixed(2) : form.netAmount}
                 onChange={(e) => setForm((p) => ({ ...p, netAmount: e.target.value }))}
+                readOnly={lines.length > 0}
                 className="w-full rounded border border-border bg-bg px-3 py-2"
               />
             </div>
@@ -251,8 +384,9 @@ export default function InvoicesPage() {
               <input
                 type="number"
                 step="0.01"
-                value={form.vatAmount}
+                value={lines.length > 0 ? totalsFromLines.vat.toFixed(2) : form.vatAmount}
                 onChange={(e) => setForm((p) => ({ ...p, vatAmount: e.target.value }))}
+                readOnly={lines.length > 0}
                 className="w-full rounded border border-border bg-bg px-3 py-2"
               />
             </div>
@@ -261,8 +395,9 @@ export default function InvoicesPage() {
               <input
                 type="number"
                 step="0.01"
-                value={form.grossAmount}
+                value={lines.length > 0 ? totalsFromLines.gross.toFixed(2) : form.grossAmount}
                 onChange={(e) => setForm((p) => ({ ...p, grossAmount: e.target.value }))}
+                readOnly={lines.length > 0}
                 className="w-full rounded border border-border bg-bg px-3 py-2"
               />
             </div>

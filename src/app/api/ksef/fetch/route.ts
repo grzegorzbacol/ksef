@@ -20,17 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const imported = result.invoices || [];
-  for (const inv of imported as Array<{
-    number?: string;
-    issueDate?: string;
-    sellerName?: string;
-    sellerNip?: string;
-    buyerName?: string;
-    buyerNip?: string;
-    netAmount?: number;
-    vatAmount?: number;
-    grossAmount?: number;
-  }>) {
+  for (const inv of imported) {
     if (!inv?.number) continue;
     try {
       await prisma.invoice.upsert({
@@ -38,6 +28,7 @@ export async function POST(req: NextRequest) {
         create: {
           number: inv.number,
           issueDate: inv.issueDate ? new Date(inv.issueDate) : new Date(),
+          saleDate: inv.saleDate ? new Date(inv.saleDate) : null,
           sellerName: inv.sellerName ?? "",
           sellerNip: inv.sellerNip ?? "",
           buyerName: inv.buyerName ?? "",
@@ -45,6 +36,7 @@ export async function POST(req: NextRequest) {
           netAmount: inv.netAmount ?? 0,
           vatAmount: inv.vatAmount ?? 0,
           grossAmount: inv.grossAmount ?? 0,
+          currency: inv.currency ?? "PLN",
           source: "ksef",
           ksefStatus: "received",
         },

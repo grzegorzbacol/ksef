@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 
+type InvoiceItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unitPriceNet: number;
+  vatRate: number;
+  amountNet: number;
+  amountVat: number;
+};
+
 type Invoice = {
   id: string;
   number: string;
@@ -22,6 +33,7 @@ type Invoice = {
   ksefStatus: string | null;
   source: string;
   payment?: { paidAt: string } | null;
+  items?: InvoiceItem[];
 };
 
 export default function InvoiceDetailPage() {
@@ -59,6 +71,26 @@ export default function InvoiceDetailPage() {
           <dd>{invoice.buyerName} (NIP: {invoice.buyerNip})</dd>
           <dt className="text-muted">Netto / VAT / Brutto</dt>
           <dd>{invoice.netAmount.toFixed(2)} / {invoice.vatAmount.toFixed(2)} / {invoice.grossAmount.toFixed(2)} {invoice.currency}</dd>
+          {invoice.items && invoice.items.length > 0 && (
+            <>
+              <dt className="text-muted">Pozycje</dt>
+              <dd className="col-span-2">
+                <table className="w-full text-sm border border-border rounded overflow-hidden">
+                  <thead><tr className="bg-bg/50"><th className="p-2 text-left">Nazwa</th><th className="p-2 text-right">Ilość</th><th className="p-2 text-right">Netto</th><th className="p-2 text-right">VAT</th></tr></thead>
+                  <tbody>
+                    {invoice.items.map((it) => (
+                      <tr key={it.id} className="border-t border-border">
+                        <td className="p-2">{it.name}</td>
+                        <td className="p-2 text-right">{it.quantity} {it.unit}</td>
+                        <td className="p-2 text-right">{it.amountNet.toFixed(2)}</td>
+                        <td className="p-2 text-right">{it.amountVat.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </dd>
+            </>
+          )}
           <dt className="text-muted">KSEF</dt>
           <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
           <dt className="text-muted">Źródło</dt>
