@@ -33,6 +33,20 @@ export default function RozrachunkiPage() {
     load();
   }, []);
 
+  // Automatyczne generowanie rozrachunków cyklicznych (ZUS, PIT-5, VAT-7) na bieżący miesiąc przy wejściu na stronę
+  useEffect(() => {
+    fetch("/api/recurring-settlements", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (data.created > 0) load();
+      })
+      .catch(() => {});
+  }, []);
+
   async function togglePaid(invoiceId: string) {
     setToggling(invoiceId);
     try {
@@ -116,14 +130,14 @@ export default function RozrachunkiPage() {
       <div className="mb-6 rounded-xl border border-border bg-card p-4 max-w-2xl">
         <h2 className="font-medium mb-2">Rozrachunki cykliczne (ZUS, PIT-5, VAT-7)</h2>
         <p className="text-muted text-sm mb-3">
-          Co miesiąc możesz wygenerować nowe pozycje z kwotą 0 – uzupełnisz je ręcznie w tabeli poniżej.
+          Pozycje na bieżący miesiąc są generowane automatycznie przy wejściu na tę stronę (kwota 0 – uzupełnisz ręcznie w tabeli poniżej).
         </p>
         <button
           type="button"
           onClick={generateRecurring}
-          className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
+          className="rounded-lg border border-border px-4 py-2 hover:bg-bg/80"
         >
-          Generuj na ten miesiąc
+          Wygeneruj ponownie na ten miesiąc
         </button>
       </div>
 
