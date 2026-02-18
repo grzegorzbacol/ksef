@@ -61,6 +61,17 @@ export function getCarCostLimit(car: CarTaxContext): number {
 }
 
 /**
+ * Proporcja do limitu KUP: limit / wartość pojazdu (np. 100 000 / 117 000 = 85,47%).
+ * Stosowana do każdej raty/wydatku – do kosztów podatkowych trafia (netto + nieodliczony VAT) × proporcja.
+ */
+export function getCarCostProportion(car: CarTaxContext): number {
+  const limit = getCarCostLimit(car);
+  const value = toNum(car.value);
+  if (value <= 0) return 1;
+  return Math.min(1, limit / value);
+}
+
+/**
  * Oblicza korzyści podatkowe dla faktury zakupowej (skala podatkowa).
  * Wartości null/undefined traktowane jako 0; wynik zaokrąglony do 2 miejsc po przecinku.
  * Gdy input.car jest ustawione – stosowane są stawki i limit kosztu dla wydatku samochodowego.
@@ -84,8 +95,10 @@ export function computePurchaseInvoiceTaxBenefit(
 
   if (input.car) {
     vatDeductionPct = input.car.vatDeductionPercent === 1 ? 1 : 0.5;
-    const limit = getCarCostLimit(input.car);
-    costBaseRaw = Math.min(net * costDeductionPct, limit);
+    // Do kosztów podatkowych: (netto + nieodliczony VAT) × proporcja (limit / wartość pojazdu)
+    const costBeforeProportion = net + vatAmount * (1 - vatDeductionPct);
+    const proportion = getCarCostProportion(input.car);
+    costBaseRaw = costBeforeProportion * proportion;
   } else {
     const vatDeduction = toNum(input.vatDeductionPercent);
     vatDeductionPct = vatDeduction <= 0 ? 1 : Math.min(1, vatDeduction);
