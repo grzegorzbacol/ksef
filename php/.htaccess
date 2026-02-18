@@ -1,0 +1,27 @@
+# Ochrona plików konfiguracyjnych i katalogów
+<Files "config.local.php">
+    Require all denied
+</Files>
+<Files "config.example.php">
+    Require all denied
+</Files>
+<Files "db.php">
+    Require all denied
+</Files>
+<Files "auth.php">
+    Require all denied
+</Files>
+<Files "ksef.php">
+    Require all denied
+</Files>
+
+# Katalogi – brak listowania
+Options -Indexes
+
+# Domyślna strona
+DirectoryIndex index.php
+
+# PHP (na seohost zwykle ustawione globalnie)
+<IfModule mod_php.c>
+    php_value session.cookie_httponly 1
+</IfModule>

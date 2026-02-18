@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  login     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Invoice {
+  id            String    @id @default(cuid())
+  number        String    @unique
+  issueDate     DateTime
+  saleDate      DateTime?
+  sellerName    String
+  sellerNip     String
+  buyerName     String
+  buyerNip      String
+  netAmount     Float
+  vatAmount     Float
+  grossAmount   Float
+  currency      String    @default("PLN")
+  ksefSentAt    DateTime?
+  ksefId        String?
+  ksefStatus    String?
+  source        String    @default("manual") // manual | ksef
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  payment       Payment?
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  invoiceId  String   @unique
+  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  paidAt     DateTime
+  createdAt  DateTime @default(now())
+}
