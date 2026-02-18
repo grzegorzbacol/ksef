@@ -14,18 +14,18 @@ async function main() {
   console.log("Seed: user grzegorzbacol created (password empty - set on first login)");
 
   const recurring = [
-    { code: "zus", name: "ZUS", sellerName: "Zakład Ubezpieczeń Społecznych", sellerNip: "" },
-    { code: "pit5", name: "PIT-5", sellerName: "Urząd Skarbowy", sellerNip: "" },
-    { code: "vat7", name: "VAT-7", sellerName: "Urząd Skarbowy", sellerNip: "" },
+    { code: "zus", name: "ZUS", formName: "ok", sellerName: "Zakład Ubezpieczeń Społecznych", sellerNip: "" },
+    { code: "pit5", name: "PIT-5", formName: "PIT-5", sellerName: "Urząd Skarbowy", sellerNip: "" },
+    { code: "vat7", name: "VAT-7", formName: "VAT-7", sellerName: "Urząd Skarbowy", sellerNip: "" },
   ];
   for (const r of recurring) {
     await prisma.recurringSettlement.upsert({
       where: { code: r.code },
-      update: { name: r.name, sellerName: r.sellerName, sellerNip: r.sellerNip },
+      update: { name: r.name, formName: r.formName, sellerName: r.sellerName, sellerNip: r.sellerNip },
       create: r,
     });
   }
-  console.log("Seed: recurring settlements ZUS, PIT-5, VAT-7");
+  console.log("Seed: recurring settlements ZUS (ok), US (VAT-7), US (PIT-5)");
 }
 
 main()

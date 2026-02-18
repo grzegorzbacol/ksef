@@ -69,6 +69,7 @@ model RecurringSettlement {
   id         String   @id @default(cuid())
   code       String   @unique // zus, pit5, vat7
   name       String   // ZUS, PIT-5, VAT-7
+  formName   String   @default("") // formularz: ok, VAT-7, PIT-5 (nazewnictwo: ZUS - ok, US - VAT-7, US - PIT-5)
   sellerName String   @default("") // np. "Zakład Ubezpieczeń Społecznych"
   sellerNip  String   @default("") // NIP wystawcy / odbiorcy (opcjonalnie)
   createdAt  DateTime @default(now())

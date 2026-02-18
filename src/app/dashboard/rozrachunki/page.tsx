@@ -16,8 +16,16 @@ type Invoice = {
   handedOverToAccountant?: boolean;
 };
 
+type RecurringSettlement = {
+  code: string;
+  name: string;
+  formName: string;
+  sellerName: string;
+};
+
 export default function RozrachunkiPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [recurring, setRecurring] = useState<RecurringSettlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -37,6 +45,13 @@ export default function RozrachunkiPage() {
 
   useEffect(() => {
     load();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/recurring-settlements")
+      .then((r) => r.json())
+      .then((data) => setRecurring(Array.isArray(data) ? data : []))
+      .catch(() => setRecurring([]));
   }, []);
 
   // Automatyczne generowanie rozrachunków cyklicznych (ZUS, PIT-5, VAT-7) na bieżący miesiąc przy wejściu na stronę
@@ -171,6 +186,17 @@ export default function RozrachunkiPage() {
 
       <div className="mb-6 rounded-xl border border-border bg-card p-4 max-w-2xl">
         <h2 className="font-medium mb-2">Rozrachunki cykliczne (ZUS, PIT-5, VAT-7)</h2>
+        {recurring.length > 0 && (
+          <p className="text-muted text-sm mb-2">
+            Nazewnictwo z formularzem:{" "}
+            {recurring
+              .map((r) => {
+                const inst = r.code === "zus" ? "ZUS" : "US";
+                return r.formName ? `${inst} – ${r.formName}` : r.name;
+              })
+              .join(", ")}
+          </p>
+        )}
         <p className="text-muted text-sm mb-3">
           Pozycje na bieżący miesiąc są generowane automatycznie przy wejściu na tę stronę (kwota 0 – uzupełnisz ręcznie w tabeli poniżej).
         </p>
