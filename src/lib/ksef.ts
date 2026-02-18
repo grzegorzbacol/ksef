@@ -455,7 +455,7 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
     if (contentType.includes("xml")) {
       const { faXmlToPdf } = await import("./fa-xml-to-pdf");
       const xmlString = new TextDecoder("utf-8").decode(body);
-      const pdf = faXmlToPdf(xmlString);
+      const pdf = await faXmlToPdf(xmlString);
       if (pdf && pdf.byteLength > 0) {
         return { success: true, pdf };
       }

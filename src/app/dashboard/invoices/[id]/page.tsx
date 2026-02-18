@@ -68,6 +68,13 @@ type InvoiceItem = {
   amountVat: number;
 };
 
+type EmailAttachment = {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+};
+
 type Invoice = {
   id: string;
   type?: string;
@@ -86,8 +93,13 @@ type Invoice = {
   ksefId: string | null;
   ksefStatus: string | null;
   source: string;
+  emailSubject?: string | null;
+  emailBody?: string | null;
+  emailFrom?: string | null;
+  emailReceivedAt?: string | null;
   payment?: { paidAt: string } | null;
   items?: InvoiceItem[];
+  emailAttachments?: EmailAttachment[];
 };
 
 export default function InvoiceDetailPage() {
@@ -151,7 +163,13 @@ export default function InvoiceDetailPage() {
           <dt className="text-muted">KSEF</dt>
           <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
           <dt className="text-muted">Źródło</dt>
-          <dd>{invoice.source === "ksef" ? "Pobrano z KSEF" : "Wystawiona ręcznie"}</dd>
+          <dd>
+            {invoice.source === "ksef"
+              ? "Pobrano z KSEF"
+              : invoice.source === "mail"
+                ? "Mail"
+                : "Wystawiona ręcznie"}
+          </dd>
           <dt className="text-muted">Rozliczono</dt>
           <dd>
             {invoice.payment
@@ -159,6 +177,55 @@ export default function InvoiceDetailPage() {
               : "Nie"}
           </dd>
         </dl>
+        {invoice.source === "mail" && (invoice.emailSubject || invoice.emailBody || (invoice.emailAttachments && invoice.emailAttachments.length > 0)) && (
+          <div className="mt-6 pt-6 border-t border-border">
+            <h2 className="font-medium mb-3">Treść maila</h2>
+            {invoice.emailFrom && (
+              <p className="text-sm text-muted mb-1">
+                <strong>Od:</strong> {invoice.emailFrom}
+              </p>
+            )}
+            {invoice.emailReceivedAt && (
+              <p className="text-sm text-muted mb-2">
+                <strong>Data:</strong> {new Date(invoice.emailReceivedAt).toLocaleString("pl-PL")}
+              </p>
+            )}
+            {invoice.emailSubject && (
+              <p className="text-sm mb-2">
+                <strong>Temat:</strong> {invoice.emailSubject}
+              </p>
+            )}
+            {invoice.emailBody && (
+              <div className="rounded border border-border bg-bg p-3 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto mb-4">
+                {invoice.emailBody}
+              </div>
+            )}
+            {invoice.emailAttachments && invoice.emailAttachments.length > 0 && (
+              <div>
+                <strong className="block mb-2">Załączniki:</strong>
+                <ul className="space-y-1">
+                  {invoice.emailAttachments.map((att) => (
+                    <li key={att.id}>
+                      <a
+                        href={`/api/invoices/${id}/attachments/${encodeURIComponent(att.filename)}`}
+                        download
+                        className="text-accent hover:underline"
+                      >
+                        {att.filename}
+                        {att.size > 0 && (
+                          <span className="text-muted text-xs ml-2">
+                            ({(att.size / 1024).toFixed(1)} KB)
+                          </span>
+                        )}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           <DownloadPdfButton invoiceId={id} invoiceNumber={invoice.number} ksefId={invoice.ksefId} />
           <Link href="/dashboard/rozrachunki" className="rounded border border-border px-4 py-2 hover:border-accent">
