@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchInvoicesFromKsef } from "@/lib/ksef";
-import { getCompanySettings } from "@/lib/settings";
-
-function normNip(v: string | undefined | null): string {
-  return String(v ?? "").replace(/\D/g, "");
-}
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -24,23 +19,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z KSEF" }, { status: 200 });
   }
 
-  const company = await getCompanySettings();
-  const companyNip = normNip(company.nip);
   const imported = result.invoices || [];
   for (const inv of imported) {
     if (!inv?.number) continue;
     try {
-      const sellerNip = normNip(inv.sellerNip);
-      const buyerNip = normNip(inv.buyerNip);
-      // KSEF 2.0 metadata: Subject1/Subject2 mogą mapować seller/buyer odwrotnie niż FA (P_13/P_15).
-      // Faktury pobrane z KSEF to głównie zakup (otrzymane). Gdy nasz NIP w polu "seller" metadanych
-      // = faktura otrzymana (zakup). Gdy w "buyer" = faktura wystawiona (sprzedaż).
-      const type =
-        companyNip && sellerNip === companyNip
-          ? "cost"   // nasz NIP w seller (metadata) → faktura zakupu (otrzymana)
-          : companyNip && buyerNip === companyNip
-            ? "sales" // nasz NIP w buyer (metadata) → faktura sprzedaży (wystawiona)
-            : "cost"; // brak dopasowania → domyślnie zakup
+      // Wszystkie faktury pobrane z KSEF traktujemy jako zakup – przycisk jest tylko na stronie Faktury zakupu.
+      const type = "cost" as const;
       await prisma.invoice.upsert({
         where: { number: inv.number },
         create: {
@@ -75,6 +59,12 @@ export async function POST(req: NextRequest) {
       // duplicate number - skip
     }
   }
+
+  // Popraw też istniejące faktury KSEF (np. po wcześniejszym błędnym przypisaniu).
+  await prisma.invoice.updateMany({
+    where: { source: "ksef" },
+    data: { type: "cost" },
+  });
 
   return NextResponse.json({ ok: true, imported: imported.length });
 }
