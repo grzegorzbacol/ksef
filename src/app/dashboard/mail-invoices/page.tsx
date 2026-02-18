@@ -210,7 +210,8 @@ export default function MailInvoicesPage() {
         <h2 className="font-medium mb-2">Faktury pobrane z maila</h2>
         <p className="text-muted text-sm mb-4">
           Faktury ze źródłem „Mail” trafiają do listy <Link href="/dashboard/invoices-sales" className="text-accent hover:underline">Faktury zakupu</Link>.
-          Tam zobaczysz kolumnę „Źródło” z wartością „Mail”. Kliknij „Szczegóły” przy fakturze, aby zobaczyć treść maila i załączniki.
+          W tabeli możesz: <strong>przypisać kontrahenta</strong> (dropdown przy dostawcy) oraz <strong>ustawić jako opłaconą</strong> (checkbox w kolumnie „Rozliczono”).
+          Kliknij „Szczegóły” przy fakturze, aby zobaczyć treść maila, załączniki, przypisać kontrahenta lub oznaczyć płatność.
         </p>
         <Link href="/dashboard/invoices-sales" className="text-accent hover:underline">
           → Przejdź do faktur zakupu

@@ -32,6 +32,9 @@ export async function PATCH(
     netAmount?: number;
     vatAmount?: number;
     grossAmount?: number;
+    sellerName?: string;
+    sellerNip?: string;
+    handedOverToAccountant?: boolean;
   } = {};
   if (body.paymentDueDate !== undefined) {
     update.paymentDueDate =
@@ -43,6 +46,10 @@ export async function PATCH(
   if (typeof body.vatAmount === "number" && body.vatAmount >= 0) update.vatAmount = body.vatAmount;
   if (typeof body.grossAmount === "number" && body.grossAmount >= 0)
     update.grossAmount = body.grossAmount;
+  if (typeof body.sellerName === "string") update.sellerName = body.sellerName.trim();
+  if (typeof body.sellerNip === "string") update.sellerNip = body.sellerNip.trim().replace(/\s/g, "");
+  if (typeof body.handedOverToAccountant === "boolean")
+    update.handedOverToAccountant = body.handedOverToAccountant;
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Brak pól do aktualizacji" }, { status: 400 });
   }

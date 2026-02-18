@@ -104,18 +104,27 @@ type Invoice = {
   emailAttachments?: EmailAttachment[];
 };
 
+type Contractor = {
+  id: string;
+  name: string;
+  nip: string;
+};
+
 export default function InvoiceDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingAmount, setSavingAmount] = useState(false);
+  const [savingContractor, setSavingContractor] = useState(false);
+  const [togglingPaid, setTogglingPaid] = useState(false);
   const [editNet, setEditNet] = useState("");
   const [editVat, setEditVat] = useState("");
   const [editGross, setEditGross] = useState("");
 
-  useEffect(() => {
-    fetch(`/api/invoices/${id}`)
+  function loadInvoice() {
+    return fetch(`/api/invoices/${id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((inv) => {
         setInvoice(inv);
@@ -124,9 +133,21 @@ export default function InvoiceDetailPage() {
           setEditVat(String(inv.vatAmount ?? 0));
           setEditGross(String(inv.grossAmount ?? 0));
         }
-      })
-      .finally(() => setLoading(false));
+      });
+  }
+
+  useEffect(() => {
+    loadInvoice().finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (invoice?.type === "cost") {
+      fetch("/api/contractors")
+        .then((r) => r.json())
+        .then((data) => setContractors(Array.isArray(data) ? data : []))
+        .catch(() => setContractors([]));
+    }
+  }, [invoice?.type]);
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
@@ -198,6 +219,91 @@ export default function InvoiceDetailPage() {
               : "Nie"}
           </dd>
         </dl>
+        {isCost && (
+          <div className="mt-6 pt-6 border-t border-border space-y-4">
+            <div>
+              <h2 className="font-medium mb-2">Ustaw jako opłaconą</h2>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!invoice.payment}
+                  disabled={togglingPaid}
+                  onChange={async () => {
+                    setTogglingPaid(true);
+                    try {
+                      const res = await fetch("/api/payments/toggle", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ invoiceId: id }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        alert(data.error || "Błąd");
+                        return;
+                      }
+                      loadInvoice();
+                    } finally {
+                      setTogglingPaid(false);
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                />
+                <span className="text-sm">
+                  {invoice.payment ? "Opłacona" : "Oznacz jako opłaconą"}
+                </span>
+              </label>
+            </div>
+            <div>
+              <h2 className="font-medium mb-2">Przypisz kontrahenta</h2>
+              <p className="text-muted text-sm mb-2">
+                Wybierz dostawcę z bazy kontrahentów, aby uzupełnić dane sprzedawcy.
+              </p>
+              <div className="flex flex-wrap gap-2 items-end">
+                <select
+                  id="contractor-select"
+                  onChange={async (e) => {
+                    const contractorId = e.target.value;
+                    if (!contractorId) return;
+                    const c = contractors.find((x) => x.id === contractorId);
+                    if (!c) return;
+                    setSavingContractor(true);
+                    try {
+                      const res = await fetch(`/api/invoices/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ sellerName: c.name, sellerNip: c.nip }),
+                      });
+                      if (!res.ok) {
+                        const d = await res.json().catch(() => ({}));
+                        alert(d.error || "Błąd zapisu");
+                        return;
+                      }
+                      const updated = await res.json();
+                      setInvoice(updated);
+                      e.target.value = "";
+                    } finally {
+                      setSavingContractor(false);
+                    }
+                  }}
+                  disabled={savingContractor || contractors.length === 0}
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[220px] disabled:opacity-50"
+                >
+                  <option value="">— wybierz kontrahenta —</option>
+                  {contractors.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.nip})
+                    </option>
+                  ))}
+                </select>
+                {contractors.length === 0 && (
+                  <Link href="/dashboard/contractors" className="text-sm text-accent hover:underline">
+                    Dodaj kontrahentów
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {isCost && (
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Uzupełnij kwotę (rozrachunek cykliczny)</h2>

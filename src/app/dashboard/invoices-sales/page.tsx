@@ -76,6 +76,11 @@ export default function InvoicesSalesPage() {
   const [manualLine, setManualLine] = useState({ name: "", quantity: "1", unit: "szt.", unitPriceNet: "", vatRate: "23" });
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingPaidId, setTogglingPaidId] = useState<string | null>(null);
+  const [assigningContractorId, setAssigningContractorId] = useState<string | null>(null);
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [editingAmountValue, setEditingAmountValue] = useState("");
+  const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
 
   const invoiceType = "cost" as const;
 
@@ -92,6 +97,65 @@ function sourceLabel(source: string): string {
   }
 }
 
+function InvoiceNumberCell({
+  invoiceId,
+  invoiceNumber,
+  onError,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  onError: (msg: string) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  async function handleDownload(e: React.MouseEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/download`, { credentials: "include" });
+      if (!res.ok) {
+        const text = await res.text();
+        let msg = "Nie udało się pobrać pliku faktury.";
+        try {
+          const data = JSON.parse(text);
+          if (data?.error) msg = data.error;
+        } catch {
+          if (text) msg = text.slice(0, 200);
+        }
+        onError(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition");
+      let filename = `Faktura_${invoiceNumber.replace(/\//g, "-")}.pdf`;
+      if (disposition) {
+        const match = /filename="?([^";\n]+)"?/.exec(disposition);
+        if (match?.[1]) filename = match[1].trim();
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      onError("Nie udało się pobrać pliku faktury.");
+    } finally {
+      setLoading(false);
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={loading}
+      className="font-medium text-left text-accent hover:underline disabled:opacity-70"
+      title="Pobierz plik faktury"
+    >
+      {loading ? "Pobieranie…" : invoiceNumber}
+    </button>
+  );
+}
+
   function loadInvoices() {
     setLoading(true);
     fetch(`/api/invoices?type=${invoiceType}&payment=true`)
@@ -102,6 +166,13 @@ function sourceLabel(source: string): string {
 
   useEffect(() => {
     loadInvoices();
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/contractors")
+      .then((r) => r.json())
+      .then((data) => setContractors(Array.isArray(data) ? data : []))
+      .catch(() => setContractors([]));
   }, []);
 
   useEffect(() => {
@@ -285,6 +356,64 @@ function sourceLabel(source: string): string {
     }
   }
 
+  async function togglePaid(inv: Invoice) {
+    setTogglingPaidId(inv.id);
+    try {
+      const res = await fetch("/api/payments/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: inv.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) alert(data.error || "Błąd");
+      else loadInvoices();
+    } finally {
+      setTogglingPaidId(null);
+    }
+  }
+
+  async function saveAmount(invoiceId: string, valueStr: string) {
+    const num = parseFloat(valueStr.replace(",", "."));
+    if (Number.isNaN(num) || num < 0) {
+      setEditingAmountId(null);
+      return;
+    }
+    setSavingAmountId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grossAmount: num }),
+      });
+      if (!res.ok) alert("Błąd zapisu kwoty");
+      else loadInvoices();
+    } finally {
+      setSavingAmountId(null);
+      setEditingAmountId(null);
+    }
+  }
+
+  async function assignContractor(inv: Invoice, contractorId: string) {
+    const c = contractors.find((x) => x.id === contractorId);
+    if (!c) return;
+    setAssigningContractorId(inv.id);
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sellerName: c.name, sellerNip: c.nip }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error || "Błąd zapisu");
+        return;
+      }
+      loadInvoices();
+    } finally {
+      setAssigningContractorId(null);
+    }
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -410,13 +539,13 @@ function sourceLabel(source: string): string {
           <div className="border-t border-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
             <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
-            <div className="flex flex-wrap gap-2 items-end mb-4">
-              <div>
+            <div className="flex flex-wrap gap-3 items-end mb-4">
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Produkt</label>
                 <select
                   value={addProductId}
                   onChange={(e) => setAddProductId(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px]"
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px] max-w-[280px]"
                 >
                   <option value="">— wybierz —</option>
                   {products.map((p) => (
@@ -426,7 +555,7 @@ function sourceLabel(source: string): string {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Ilość</label>
                 <input
                   type="number"
@@ -434,31 +563,31 @@ function sourceLabel(source: string): string {
                   min="0.01"
                   value={addQty}
                   onChange={(e) => setAddQty(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
                 />
               </div>
               <button
                 type="button"
                 onClick={addLineFromWarehouse}
                 disabled={!addProductId}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
               >
                 Dodaj do faktury
               </button>
             </div>
-            <div className="flex flex-wrap gap-2 items-end mb-4">
-              <span className="text-muted text-sm mr-2">lub pozycja ręczna:</span>
-              <div>
+            <div className="flex flex-wrap gap-3 items-end mb-4">
+              <span className="text-muted text-sm self-center flex-shrink-0">lub pozycja ręczna:</span>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Nazwa</label>
                 <input
                   type="text"
                   value={manualLine.name}
                   onChange={(e) => setManualLine((p) => ({ ...p, name: e.target.value }))}
                   placeholder="Nazwa towaru/usługi"
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[160px]"
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[140px] max-w-[200px] box-border"
                 />
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Ilość</label>
                 <input
                   type="number"
@@ -466,20 +595,20 @@ function sourceLabel(source: string): string {
                   min="0.01"
                   value={manualLine.quantity}
                   onChange={(e) => setManualLine((p) => ({ ...p, quantity: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-20"
+                  className="rounded border border-border bg-bg px-3 py-2 w-20 box-border"
                 />
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">j.m.</label>
                 <input
                   type="text"
                   value={manualLine.unit}
                   onChange={(e) => setManualLine((p) => ({ ...p, unit: e.target.value }))}
                   placeholder="szt."
-                  className="rounded border border-border bg-bg px-3 py-2 w-16"
+                  className="rounded border border-border bg-bg px-3 py-2 w-16 box-border"
                 />
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">Cena netto</label>
                 <input
                   type="number"
@@ -487,10 +616,10 @@ function sourceLabel(source: string): string {
                   min="0"
                   value={manualLine.unitPriceNet}
                   onChange={(e) => setManualLine((p) => ({ ...p, unitPriceNet: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24"
+                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
                 />
               </div>
-              <div>
+              <div className="flex-shrink-0">
                 <label className="block text-xs text-muted mb-1">VAT %</label>
                 <input
                   type="number"
@@ -499,21 +628,30 @@ function sourceLabel(source: string): string {
                   max="100"
                   value={manualLine.vatRate}
                   onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-14"
+                  className="rounded border border-border bg-bg px-3 py-2 w-14 box-border"
                 />
               </div>
               <button
                 type="button"
                 onClick={addManualLine}
                 disabled={!manualLine.name.trim()}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50"
+                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
               >
                 Dodaj pozycję ręcznie
               </button>
             </div>
             {lines.length > 0 && (
               <div className="overflow-x-auto rounded border border-border mb-4">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm table-fixed">
+                  <colgroup>
+                    <col style={{ width: "auto" }} />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "100px" }} />
+                    <col style={{ width: "72px" }} />
+                    <col style={{ width: "80px" }} />
+                    <col style={{ width: "80px" }} />
+                    <col style={{ width: "56px" }} />
+                  </colgroup>
                   <thead>
                     <tr className="border-b border-border bg-bg/50">
                       <th className="p-2 text-left">Nazwa</th>
@@ -522,36 +660,36 @@ function sourceLabel(source: string): string {
                       <th className="p-2 text-right">VAT %</th>
                       <th className="p-2 text-right">Netto</th>
                       <th className="p-2 text-right">VAT</th>
-                      <th className="p-2 w-12"></th>
+                      <th className="p-2"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {lines.map((l, i) => (
                       <tr key={i} className="border-b border-border">
-                        <td className="p-2">{l.name}</td>
-                        <td className="p-2">
+                        <td className="p-2 overflow-hidden text-ellipsis align-middle">{l.name}</td>
+                        <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
                             type="number"
                             step="0.01"
                             min="0.01"
                             value={l.quantity}
                             onChange={(e) => updateLine(i, "quantity", e.target.value)}
-                            className="w-20 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
                           />
                           <span className="ml-1">{l.unit}</span>
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 text-right align-middle">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
                             value={l.unitPriceNet}
                             onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
-                            className="w-24 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-full max-w-[88px] rounded border border-border bg-bg px-2 py-1 text-right box-border"
                             title="Cena netto za jednostkę – edytowalna"
                           />
                         </td>
-                        <td className="p-2">
+                        <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
                             type="number"
                             step="0.01"
@@ -559,14 +697,14 @@ function sourceLabel(source: string): string {
                             max="100"
                             value={l.vatRate}
                             onChange={(e) => updateLine(i, "vatRate", e.target.value)}
-                            className="w-14 rounded border border-border bg-bg px-2 py-1 text-right"
+                            className="w-12 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
                           />
                           %
                         </td>
-                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
-                        <td className="p-2 text-right">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
-                        <td className="p-2">
-                          <button type="button" onClick={() => removeLine(i)} className="text-red-400 hover:underline">
+                        <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet).toFixed(2)}</td>
+                        <td className="p-2 text-right align-middle">{(l.quantity * l.unitPriceNet * (l.vatRate / 100)).toFixed(2)}</td>
+                        <td className="p-2 align-middle">
+                          <button type="button" onClick={() => removeLine(i)} className="text-red-400 hover:underline whitespace-nowrap">
                             Usuń
                           </button>
                         </td>
@@ -666,21 +804,96 @@ function sourceLabel(source: string): string {
             <tbody>
               {invoices.map((inv) => (
                 <tr key={inv.id} className="border-b border-border">
-                  <td className="p-3 font-medium">{inv.number}</td>
-                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.sellerName}</td>
-                  <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
-                  <td className="p-3">{sourceLabel(inv.source)}</td>
                   <td className="p-3">
-                    {inv.payment ? (
-                      <span className="text-success">
-                        Tak, {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
+                    <InvoiceNumberCell
+                      invoiceId={inv.id}
+                      invoiceNumber={inv.number}
+                      onError={(msg) => alert(msg)}
+                    />
+                  </td>
+                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
+                  <td className="p-3">
+                    <div className="space-y-1">
+                      <span>{inv.sellerName}</span>
+                      {inv.source === "mail" && contractors.length > 0 && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (v) assignContractor(inv, v);
+                            e.target.value = "";
+                          }}
+                          disabled={assigningContractorId === inv.id}
+                          className="block w-full max-w-[200px] rounded border border-border bg-bg px-2 py-1 text-xs text-muted disabled:opacity-50"
+                          title="Przypisz kontrahenta (dla faktur z maila)"
+                        >
+                          <option value="">— przypisz kontrahenta —</option>
+                          {contractors.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name} ({c.nip})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3 text-right">
+                    {editingAmountId === inv.id ? (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editingAmountValue}
+                          onChange={(e) => setEditingAmountValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingAmountId === inv.id) saveAmount(inv.id, editingAmountValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                            if (e.key === "Escape") {
+                              setEditingAmountId(null);
+                              setEditingAmountValue("");
+                            }
+                          }}
+                          disabled={savingAmountId === inv.id}
+                          autoFocus
+                          className="w-24 rounded border border-border bg-bg px-2 py-1 text-right text-sm"
+                        />
+                        <span className="text-muted text-sm">{inv.currency}</span>
                       </span>
                     ) : (
-                      <Link href="/dashboard/rozrachunki" className="text-muted hover:text-text">
-                        Nie
-                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAmountId(inv.id);
+                          setEditingAmountValue(inv.grossAmount.toFixed(2));
+                        }}
+                        title="Kliknij, aby szybko edytować kwotę (np. ZUS, US)"
+                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {inv.grossAmount.toFixed(2)} {inv.currency}
+                      </button>
                     )}
+                  </td>
+                  <td className="p-3">{sourceLabel(inv.source)}</td>
+                  <td className="p-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!inv.payment}
+                        disabled={togglingPaidId === inv.id}
+                        onChange={() => togglePaid(inv)}
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                        title="Oznacz jako opłaconą"
+                      />
+                      {inv.payment ? (
+                        <span className="text-success text-sm">
+                          Tak, {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
+                        </span>
+                      ) : (
+                        <span className="text-muted text-sm">Nie</span>
+                      )}
+                    </label>
                   </td>
                   <td className="p-3 flex gap-2">
                     <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">

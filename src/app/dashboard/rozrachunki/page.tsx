@@ -12,6 +12,8 @@ type Invoice = {
   currency: string;
   paymentDueDate: string | null;
   payment?: { paidAt: string } | null;
+  source: string;
+  handedOverToAccountant?: boolean;
 };
 
 export default function RozrachunkiPage() {
@@ -20,6 +22,10 @@ export default function RozrachunkiPage() {
   const [toggling, setToggling] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [updatingDueId, setUpdatingDueId] = useState<string | null>(null);
+  const [updatingAccountantId, setUpdatingAccountantId] = useState<string | null>(null);
+  const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
+  const [editingAmountValue, setEditingAmountValue] = useState("");
+  const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -95,6 +101,42 @@ export default function RozrachunkiPage() {
     }
   }
 
+  async function toggleHandedOverToAccountant(invoiceId: string, current: boolean) {
+    setUpdatingAccountantId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handedOverToAccountant: !current }),
+      });
+      if (!res.ok) alert("Błąd zapisu");
+      else load();
+    } finally {
+      setUpdatingAccountantId(null);
+    }
+  }
+
+  async function saveAmount(invoiceId: string, valueStr: string) {
+    const num = parseFloat(valueStr.replace(",", "."));
+    if (Number.isNaN(num) || num < 0) {
+      setEditingAmountId(null);
+      return;
+    }
+    setSavingAmountId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ grossAmount: num }),
+      });
+      if (!res.ok) alert("Błąd zapisu kwoty");
+      else load();
+    } finally {
+      setSavingAmountId(null);
+      setEditingAmountId(null);
+    }
+  }
+
   if (loading) return <p className="text-muted">Ładowanie…</p>;
 
   const paidCount = invoices.filter((i) => i.payment).length;
@@ -157,13 +199,14 @@ export default function RozrachunkiPage() {
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Termin płatności</th>
               <th className="p-3 text-left">Data rozliczenia</th>
+              <th className="p-3 text-left w-40">Przekazane księgowej</th>
               <th className="p-3 w-16"></th>
             </tr>
           </thead>
           <tbody>
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-muted">
+                <td colSpan={9} className="p-6 text-center text-muted">
                   Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
                 </td>
               </tr>
@@ -186,26 +229,87 @@ export default function RozrachunkiPage() {
                   </td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
                   <td className="p-3">{inv.sellerName}</td>
-                  <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
+                  <td className="p-3 text-right">
+                    {editingAmountId === inv.id ? (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editingAmountValue}
+                          onChange={(e) => setEditingAmountValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingAmountId === inv.id) saveAmount(inv.id, editingAmountValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.currentTarget.blur();
+                            }
+                            if (e.key === "Escape") {
+                              setEditingAmountId(null);
+                              setEditingAmountValue("");
+                            }
+                          }}
+                          disabled={savingAmountId === inv.id}
+                          autoFocus
+                          className="w-24 rounded border border-border bg-bg px-2 py-1 text-right text-sm"
+                        />
+                        <span className="text-muted text-sm">{inv.currency}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAmountId(inv.id);
+                          setEditingAmountValue(inv.grossAmount.toFixed(2));
+                        }}
+                        title="Kliknij, aby szybko edytować kwotę (np. ZUS, US)"
+                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {inv.grossAmount.toFixed(2)} {inv.currency}
+                      </button>
+                    )}
+                  </td>
                   <td className="p-3">
-                    <input
-                      type="date"
-                      value={
-                        inv.paymentDueDate
-                          ? new Date(inv.paymentDueDate).toISOString().slice(0, 10)
-                          : ""
-                      }
-                      disabled={updatingDueId === inv.id}
-                      onChange={(e) =>
-                        updatePaymentDueDate(inv.id, e.target.value || null)
-                      }
-                      className="rounded border border-border bg-bg px-2 py-1 text-sm w-36"
-                    />
+                    {inv.payment ? (
+                      inv.paymentDueDate
+                        ? new Date(inv.paymentDueDate).toLocaleDateString("pl-PL")
+                        : "–"
+                    ) : (
+                      <input
+                        type="date"
+                        value={
+                          inv.paymentDueDate
+                            ? new Date(inv.paymentDueDate).toISOString().slice(0, 10)
+                            : ""
+                        }
+                        disabled={updatingDueId === inv.id}
+                        onChange={(e) =>
+                          updatePaymentDueDate(inv.id, e.target.value || null)
+                        }
+                        className="rounded border border-border bg-bg px-2 py-1 text-sm w-36"
+                      />
+                    )}
                   </td>
                   <td className="p-3 text-muted">
                     {inv.payment
                       ? new Date(inv.payment.paidAt).toLocaleString("pl-PL")
                       : "–"}
+                  </td>
+                  <td className="p-3">
+                    {inv.source === "ksef" ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={!!inv.handedOverToAccountant}
+                        disabled={updatingAccountantId === inv.id}
+                        onChange={() =>
+                          toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)
+                        }
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                        title="Przekazane księgowej"
+                      />
+                    )}
                   </td>
                   <td className="p-3">
                     <button

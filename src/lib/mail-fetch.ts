@@ -407,9 +407,8 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
           const issueDate = new Date(parsed.invoice.issueDate);
           const prefix = "FK";
           const year = issueDate.getFullYear();
-          let number = parsed.invoice.number;
-          const isPlaceholder = !number || number.startsWith("MAIL-");
-          if (isPlaceholder) {
+
+          async function nextMailInvoiceNumber(): Promise<string> {
             const key = `invoice_counter_cost_${year}`;
             const row = await prisma.setting.findUnique({ where: { key } });
             const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
@@ -418,52 +417,64 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
               create: { key, value: String(nextSeq) },
               update: { value: String(nextSeq) },
             });
-            number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
-          } else {
-            const existing = await prisma.invoice.findUnique({ where: { number } });
-            if (existing) {
-              const key = `invoice_counter_cost_${year}`;
-              const row = await prisma.setting.findUnique({ where: { key } });
-              const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
-              await prisma.setting.upsert({
-                where: { key },
-                create: { key, value: String(nextSeq) },
-                update: { value: String(nextSeq) },
-              });
-              number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
-            }
+            return `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
           }
 
-          const inv = await prisma.invoice.create({
-            data: {
-              type: "cost",
-              number,
-              issueDate,
-              saleDate: parsed.invoice.saleDate ? new Date(parsed.invoice.saleDate) : null,
-              sellerName: parsed.invoice.sellerName,
-              sellerNip: parsed.invoice.sellerNip,
-              buyerName: parsed.invoice.buyerName,
-              buyerNip: parsed.invoice.buyerNip,
-              netAmount: parsed.invoice.netAmount,
-              vatAmount: parsed.invoice.vatAmount,
-              grossAmount: parsed.invoice.grossAmount,
-              currency: parsed.invoice.currency,
-              ksefId: parsed.invoice.ksefId || null,
-              ksefStatus: parsed.invoice.ksefId ? "received" : null,
-              source: "mail",
-              emailSubject: parsed.emailSubject,
-              emailBody: parsed.emailBody,
-              emailFrom: parsed.emailFrom,
-              emailReceivedAt: parsed.emailReceivedAt,
-              emailMessageId: parsed.emailMessageId,
-            },
-          });
+          let number = parsed.invoice.number;
+          const isPlaceholder = !number || number.startsWith("MAIL-");
+          if (isPlaceholder) {
+            number = await nextMailInvoiceNumber();
+          } else {
+            const existing = await prisma.invoice.findUnique({ where: { number } });
+            if (existing) number = await nextMailInvoiceNumber();
+          }
+
+          let inv: Awaited<ReturnType<PrismaClient["invoice"]["create"]>>;
+          const maxRetries = 3;
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              inv = await prisma.invoice.create({
+                data: {
+                  type: "cost",
+                  number,
+                  issueDate,
+                  saleDate: parsed.invoice.saleDate ? new Date(parsed.invoice.saleDate) : null,
+                  sellerName: parsed.invoice.sellerName,
+                  sellerNip: parsed.invoice.sellerNip,
+                  buyerName: parsed.invoice.buyerName,
+                  buyerNip: parsed.invoice.buyerNip,
+                  netAmount: parsed.invoice.netAmount,
+                  vatAmount: parsed.invoice.vatAmount,
+                  grossAmount: parsed.invoice.grossAmount,
+                  currency: parsed.invoice.currency,
+                  ksefId: parsed.invoice.ksefId || null,
+                  ksefStatus: parsed.invoice.ksefId ? "received" : null,
+                  source: "mail",
+                  emailSubject: parsed.emailSubject,
+                  emailBody: parsed.emailBody,
+                  emailFrom: parsed.emailFrom,
+                  emailReceivedAt: parsed.emailReceivedAt,
+                  emailMessageId: parsed.emailMessageId,
+                },
+              });
+              break;
+            } catch (createErr: unknown) {
+              const isUniqueError =
+                createErr && typeof createErr === "object" && "code" in createErr && (createErr as { code: string }).code === "P2002";
+              if (isUniqueError && attempt < maxRetries - 1) {
+                number = await nextMailInvoiceNumber();
+                continue;
+              }
+              throw createErr;
+            }
+          }
+          const created = inv!;
 
           if (parsed.invoice.items && parsed.invoice.items.length > 0) {
             for (const row of parsed.invoice.items) {
               await prisma.invoiceItem.create({
                 data: {
-                  invoiceId: inv.id,
+                  invoiceId: created.id,
                   name: row.name,
                   quantity: row.quantity,
                   unit: row.unit || "szt.",
@@ -476,14 +487,14 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
             }
           }
 
-          await fs.mkdir(path.join(UPLOAD_BASE, inv.id), { recursive: true });
+          await fs.mkdir(path.join(UPLOAD_BASE, created.id), { recursive: true });
           for (const att of parsed.attachments) {
             const safeName = (att.filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
-            const storedPath = path.join(UPLOAD_BASE, inv.id, safeName);
+            const storedPath = path.join(UPLOAD_BASE, created.id, safeName);
             await fs.writeFile(storedPath, att.content);
             await prisma.invoiceEmailAttachment.create({
               data: {
-                invoiceId: inv.id,
+                invoiceId: created.id,
                 filename: att.filename || safeName,
                 contentType: att.contentType,
                 size: att.content.length,

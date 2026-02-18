@@ -52,6 +52,7 @@ model Invoice {
   ksefId           String?
   ksefStatus       String?
   source           String        @default("manual") // manual | ksef | mail | recurring
+  handedOverToAccountant Boolean @default(false) // przekazane księgowej (tylko dla rozrachunków nie z KSeF)
   emailSubject     String?       // temat maila (dla source=mail)
   emailBody        String?       @db.Text // treść wiadomości
   emailFrom        String?       // nadawca
