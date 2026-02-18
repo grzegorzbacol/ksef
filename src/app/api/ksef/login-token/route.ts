@@ -42,13 +42,20 @@ export async function POST(req: NextRequest) {
         detail: t?.slice(0, 200),
       });
     }
-    const keyList = (await keyRes.json()) as Array<{ certificate?: string; usage?: string }>;
-    const certItem = keyList?.find((c) => c.usage === "KsefTokenEncryption");
-    const certB64 = certItem?.certificate;
+    const keyRaw = await keyRes.json();
+    const keyList = Array.isArray(keyRaw) ? keyRaw : keyRaw?.items ?? keyRaw?.certificates ?? (keyRaw ? [keyRaw] : []);
+    type CertEntry = { certificate?: string; usage?: string | string[] };
+    const certItem = (keyList as CertEntry[]).find((c) => {
+      const u = c.usage;
+      if (Array.isArray(u)) return u.includes("KsefTokenEncryption");
+      return u === "KsefTokenEncryption";
+    });
+    const certB64 = certItem?.certificate ?? (keyList as CertEntry[])[0]?.certificate;
     if (!certB64) {
       return NextResponse.json({
         ok: false,
         error: "Brak certyfikatu KsefTokenEncryption w odpowiedzi KSEF.",
+        detail: `Otrzymano ${keyList.length} element(ów). Pierwszy: ${JSON.stringify((keyList as CertEntry[])[0]).slice(0, 200)}`,
       });
     }
 
