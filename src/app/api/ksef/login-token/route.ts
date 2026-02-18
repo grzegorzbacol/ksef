@@ -79,17 +79,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Odpowiedź challenge nie zawiera challenge lub timestamp." });
     }
 
-    // Token z MCU: "ref|nip-XXX|secret" lub "ref | nip-XXX | secret" – do szyfrowania używamy tylko ostatniego segmentu (secret)
-    const tokenToEncrypt = token.includes("|")
-      ? (token.split("|").map((s) => s.trim()).pop() ?? "").trim() || token
-      : token;
+    // Zgodnie z dokumentacją KSEF: zaszyfrowany ma być ciąg "token|timestampMs" (timestamp w milisekundach).
+    // Używamy całego tokena wklejanego z MCU (np. ref|nip-XXX|secret) – tak jak w oficjalnym kliencie C# (tokenResponse.Token).
+    const tokenToEncrypt = token.trim();
     if (!tokenToEncrypt) {
-      return NextResponse.json({ ok: false, error: "Nie udało się odczytać tokenu (format: referencja|nip-XXX|secret)." });
+      return NextResponse.json({ ok: false, error: "Wpisz token z MCU." });
     }
 
-    // 3. Zaszyfruj token|timestamp (RSA-OAEP SHA-256). KSEF często oczekuje timestampu w sekundach (Unix), nie w ms.
-    const timestampForPayload = Math.floor(timestampMs / 1000);
-    const payload = `${tokenToEncrypt}|${timestampForPayload}`;
+    // 3. Zaszyfruj token|timestampMs (RSA-OAEP SHA-256) – specyfikacja: timestamp w milisekundach (Unix)
+    const payload = `${tokenToEncrypt}|${timestampMs}`;
     const payloadBuf = Buffer.from(payload, "utf8");
     const certBuf = Buffer.from(certB64, "base64");
     let encryptedBuf: Buffer;
