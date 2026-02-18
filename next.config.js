@@ -2,6 +2,7 @@
 const path = require('path');
 
 const nextConfig = {
+  basePath: "/dashboard",
   reactStrictMode: true,
   webpack: (config) => {
     config.resolve.alias['@'] = path.resolve(__dirname, 'src');
