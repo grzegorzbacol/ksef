@@ -289,7 +289,7 @@ export default function SettingsPage() {
               placeholder="/v2/invoices/ksef/{referenceNumber}"
               className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
             />
-            <p className="text-muted text-xs mt-1">Użyj {"{referenceNumber}"} jako placeholder numeru KSEF. Domyślnie API 2.0 zwraca XML (nie PDF) – wtedy aplikacja generuje PDF lokalnie. Wpisz własną ścieżkę do usługi zwracającej PDF, jeśli masz.</p>
+            <p className="text-muted text-xs mt-1">Użyj {"{referenceNumber}"} jako placeholder numeru KSEF. Domyślnie API 2.0 zwraca XML – aplikacja konwertuje go na PDF. Możesz podać własną ścieżkę do usługi zwracającej gotowy PDF.</p>
           </div>
         </div>
 

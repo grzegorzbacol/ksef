@@ -453,10 +453,15 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
     }
 
     if (contentType.includes("xml")) {
+      const { faXmlToPdf } = await import("./fa-xml-to-pdf");
+      const xmlString = new TextDecoder("utf-8").decode(body);
+      const pdf = faXmlToPdf(xmlString);
+      if (pdf && pdf.byteLength > 0) {
+        return { success: true, pdf };
+      }
       return {
         success: false,
-        error:
-          "KSEF zwraca fakturę w formacie XML (API 2.0 nie udostępnia PDF). W Ustawieniach możesz podać własną ścieżkę do usługi zwracającej PDF.",
+        error: "Nie udało się przekonwertować faktury XML z KSEF na PDF.",
       };
     }
 
