@@ -32,12 +32,15 @@ export async function POST(req: NextRequest) {
     try {
       const sellerNip = normNip(inv.sellerNip);
       const buyerNip = normNip(inv.buyerNip);
+      // KSEF 2.0 metadata: Subject1/Subject2 mogą mapować seller/buyer odwrotnie niż FA (P_13/P_15).
+      // Faktury pobrane z KSEF to głównie zakup (otrzymane). Gdy nasz NIP w polu "seller" metadanych
+      // = faktura otrzymana (zakup). Gdy w "buyer" = faktura wystawiona (sprzedaż).
       const type =
-        companyNip && buyerNip === companyNip
-          ? "cost"
-          : companyNip && sellerNip === companyNip
-            ? "sales"
-            : "cost";
+        companyNip && sellerNip === companyNip
+          ? "cost"   // nasz NIP w seller (metadata) → faktura zakupu (otrzymana)
+          : companyNip && buyerNip === companyNip
+            ? "sales" // nasz NIP w buyer (metadata) → faktura sprzedaży (wystawiona)
+            : "cost"; // brak dopasowania → domyślnie zakup
       await prisma.invoice.upsert({
         where: { number: inv.number },
         create: {
@@ -56,7 +59,17 @@ export async function POST(req: NextRequest) {
           source: "ksef",
           ksefStatus: "received",
         },
-        update: {},
+        update: {
+          type,
+          sellerName: inv.sellerName ?? "",
+          sellerNip: inv.sellerNip ?? "",
+          buyerName: inv.buyerName ?? "",
+          buyerNip: inv.buyerNip ?? "",
+          netAmount: inv.netAmount ?? 0,
+          vatAmount: inv.vatAmount ?? 0,
+          grossAmount: inv.grossAmount ?? 0,
+          ksefStatus: "received",
+        },
       });
     } catch {
       // duplicate number - skip
