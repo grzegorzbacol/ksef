@@ -101,8 +101,20 @@ export async function POST(req: NextRequest) {
 
     const segments = rawToken.split("|").map((s) => s.trim());
     const secretOnly = segments.length >= 3 ? segments[segments.length - 1]! : rawToken;
-    const variants: { tokenPart: string }[] = [{ tokenPart: rawToken }, { tokenPart: secretOnly }];
-    if (secretOnly === rawToken) variants.pop();
+    
+    // Warianty do sprawdzenia w pętli (automatyczny fallback)
+    const variants: { tokenPart: string; useIsoTimestamp?: boolean }[] = [
+      { tokenPart: rawToken, useIsoTimestamp: false },   // 1. Pełny token + timestampMs (liczba)
+      { tokenPart: secretOnly, useIsoTimestamp: false }, // 2. Secret + timestampMs (liczba)
+      { tokenPart: rawToken, useIsoTimestamp: true },    // 3. Pełny token + timestamp (string ISO)
+      { tokenPart: secretOnly, useIsoTimestamp: true },  // 4. Secret + timestamp (string ISO)
+    ];
+    // Usuń duplikaty wariantów secret/full jeśli są takie same
+    if (secretOnly === rawToken) {
+      // Zostaw tylko warianty z rawToken (indeksy 0 i 2)
+      variants.splice(3, 1);
+      variants.splice(1, 1);
+    }
 
     let authToken: string | undefined;
     let referenceNumber: string | undefined;
@@ -112,6 +124,8 @@ export async function POST(req: NextRequest) {
     for (let attempt = 0; attempt < variants.length; attempt++) {
       let curChallenge = challenge;
       let curTimestampMs = timestampMs;
+      let curTimestampIso = ch.timestamp;
+      
       if (attempt > 0) {
         const chRes = await fetch(`${base}/auth/challenge`, { method: "POST", headers: { "Content-Type": "application/json" } });
         if (!chRes.ok) break;
@@ -123,9 +137,14 @@ export async function POST(req: NextRequest) {
         if (!nextCh || Number.isNaN(nextTs)) break;
         curChallenge = nextCh;
         curTimestampMs = nextTs;
+        curTimestampIso = ch2.timestamp;
       }
 
-      const payload = `${variants[attempt]!.tokenPart}|${curTimestampMs}`;
+      const useIso = variants[attempt]!.useIsoTimestamp;
+      if (useIso && !curTimestampIso) continue;
+
+      const tsValue = useIso ? curTimestampIso : curTimestampMs;
+      const payload = `${variants[attempt]!.tokenPart}|${tsValue}`;
       const encryptedTokenB64 = doEncrypt(payload);
 
       const initRes = await fetch(`${base}/auth/ksef-token`, {
