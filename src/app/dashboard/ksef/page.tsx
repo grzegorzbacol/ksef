@@ -62,12 +62,11 @@ export default function KsefPage() {
         {configured === null ? (
           <p className="text-muted text-sm">Sprawdzanie…</p>
         ) : configured ? (
-          <p className="text-success text-sm">KSEF skonfigurowany (KSEF_API_URL, KSEF_TOKEN)</p>
+          <p className="text-success text-sm">KSEF skonfigurowany</p>
         ) : (
           <p className="text-warning text-sm">
-            KSEF nie jest skonfigurowany. Ustaw w zmiennych środowiskowych (np. w Coolify):{" "}
-            <code className="bg-bg px-1 rounded">KSEF_API_URL</code> i{" "}
-            <code className="bg-bg px-1 rounded">KSEF_TOKEN</code>.
+            KSEF nie jest skonfigurowany. Uzupełnij dane w{" "}
+            <Link href="/dashboard/settings" className="text-accent hover:underline">Ustawieniach → Integracja KSEF</Link> (URL API i token).
           </p>
         )}
       </div>

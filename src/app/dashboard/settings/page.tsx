@@ -78,7 +78,7 @@ export default function SettingsPage() {
       <form onSubmit={handleSubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <h2 className="font-medium mb-4">Integracja KSEF</h2>
         <p className="text-muted text-sm mb-4">
-          Wszystkie pola są opcjonalne – możesz też ustawiać zmienne środowiskowe (KSEF_API_URL, KSEF_TOKEN). Wartości z formularza mają pierwszeństwo.
+          Uzupełnij dane, aby aplikacja mogła łączyć się z KSEF. Wymagane minimum: URL API i token.
         </p>
 
         <div className="space-y-4">

@@ -132,7 +132,7 @@ export async function fetchInvoicesFromKsef(
   if (!token) {
     return {
       success: false,
-      error: "Brak tokenu KSEF. Uzupełnij w Ustawieniach → Integracja KSEF lub zmienną KSEF_TOKEN.",
+      error: "Brak tokenu KSEF. Uzupełnij w Ustawieniach → Integracja KSEF.",
     };
   }
 
