@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { MonthYearFilter } from "@/components/MonthYearFilter";
 
 type Invoice = {
   id: string;
@@ -73,6 +74,10 @@ export default function InvoicesPage() {
   const [addQty, setAddQty] = useState("1");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  const now = new Date();
+  const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
+  const [year, setYear] = useState<number | null>(now.getFullYear());
+
   const invoiceType = "sales" as const;
 
   function sourceLabel(source: string): string {
@@ -90,7 +95,10 @@ export default function InvoicesPage() {
 
   function loadInvoices() {
     setLoading(true);
-    fetch(`/api/invoices?type=${invoiceType}&payment=true`)
+    const params = new URLSearchParams({ type: invoiceType, payment: "true" });
+    if (month != null) params.set("month", String(month));
+    if (year != null) params.set("year", String(year));
+    fetch(`/api/invoices?${params}`)
       .then((r) => r.json())
       .then((data) => setInvoices(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
@@ -98,7 +106,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices();
-  }, []);
+  }, [month, year]);
 
   useEffect(() => {
     if (showForm) {
@@ -493,6 +501,10 @@ export default function InvoicesPage() {
           </button>
         </form>
       )}
+
+      <div className="mb-4">
+        <MonthYearFilter month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
+      </div>
 
       {loading ? (
         <p className="text-muted">Ładowanie…</p>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
+import { MonthYearFilter } from "@/components/MonthYearFilter";
 
 type Car = {
   id: string;
@@ -112,6 +113,9 @@ export default function InvoicesSalesPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
+  const now = new Date();
+  const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
+  const [year, setYear] = useState<number | null>(now.getFullYear());
 
   const invoiceType = "cost" as const;
   const taxConfig = companyTax ?? { pitRate: 0.12, healthRate: 0.09, isVatPayer: true };
@@ -194,7 +198,10 @@ function InvoiceNumberCell({
 
   function loadInvoices() {
     setLoading(true);
-    fetch(`/api/invoices?type=${invoiceType}&payment=true`)
+    const params = new URLSearchParams({ type: invoiceType, payment: "true" });
+    if (month != null) params.set("month", String(month));
+    if (year != null) params.set("year", String(year));
+    fetch(`/api/invoices?${params}`)
       .then((r) => r.json())
       .then((data) => setInvoices(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
@@ -202,7 +209,7 @@ function InvoiceNumberCell({
 
   useEffect(() => {
     loadInvoices();
-  }, []);
+  }, [month, year]);
 
   useEffect(() => {
     fetch("/api/settings/company")
@@ -931,6 +938,10 @@ function InvoiceNumberCell({
           </button>
         </form>
       )}
+
+      <div className="mb-4">
+        <MonthYearFilter month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
+      </div>
 
       {loading ? (
         <p className="text-muted">Ładowanie…</p>

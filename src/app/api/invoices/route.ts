@@ -39,8 +39,33 @@ export async function GET(req: NextRequest) {
   const includePayment = searchParams.get("payment") === "true";
   const typeFilter = searchParams.get("type"); // "cost" | "sales"
 
+  const monthParam = searchParams.get("month");
+  const yearParam = searchParams.get("year");
+  const month = monthParam ? parseInt(monthParam, 10) : null;
+  const year = yearParam ? parseInt(yearParam, 10) : null;
+
+  const dateFilter =
+    month != null &&
+    year != null &&
+    month >= 1 &&
+    month <= 12 &&
+    year >= 2020 &&
+    year <= 2030
+      ? {
+          issueDate: {
+            gte: new Date(year, month - 1, 1),
+            lte: new Date(year, month, 0, 23, 59, 59, 999),
+          },
+        }
+      : undefined;
+
+  const whereClause = {
+    ...(typeFilter === "cost" || typeFilter === "sales" ? { type: typeFilter } : {}),
+    ...(dateFilter ?? {}),
+  };
+
   const invoices = await prisma.invoice.findMany({
-    where: typeFilter === "cost" || typeFilter === "sales" ? { type: typeFilter } : undefined,
+    where: Object.keys(whereClause).length > 0 ? whereClause : undefined,
     orderBy: { issueDate: "desc" },
     include: {
       ...(includePayment ? { payment: true } : {}),
