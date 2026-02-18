@@ -519,7 +519,7 @@ export default function InvoiceDetailPage() {
           <div className="mt-6 pt-6 border-t border-border">
             <h2 className="font-medium mb-3">Uzupełnij kwotę (rozrachunek cykliczny)</h2>
             <p className="text-muted text-sm mb-3">
-              Wpisz kwoty i zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
+              Uzupełnij kwotę netto, VAT i brutto oraz zapisz – np. dla ZUS, PIT-5, VAT-7 uzupełniane co miesiąc.
             </p>
             <div className="flex flex-wrap items-end gap-4">
               <div>
@@ -727,8 +727,8 @@ export default function InvoiceDetailPage() {
             </label>
             <p className="text-muted text-xs mb-2">
               {invoice.includedInCosts
-                ? "Faktura ujęta w kosztach – nie generuje korzyści podatkowej."
-                : null}
+                ? "Faktura ujęta w kosztach – generuje korzyść podatkową."
+                : "Faktura nieujęta w kosztach – nie generuje korzyści podatkowej."}
             </p>
             <p className="text-muted text-sm mb-3">
               Obliczenia dla tej faktury zakupowej na podstawie ustawień firmy (

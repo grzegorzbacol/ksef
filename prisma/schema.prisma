@@ -62,7 +62,7 @@ model Invoice {
   costDeductionPercent Float?    // udział kosztu do odliczenia (1.0 = 100%, 0.75 = 75%)
   expenseType         String    @default("standard") // "standard" | "car" – typ wydatku (faktury zakupu)
   carId               String?   // powiązany samochód gdy expenseType = "car"
-  includedInCosts     Boolean   @default(false) // ujęta w kosztach – korzyść podatkowa 0
+  includedInCosts     Boolean   @default(false) // ujęta w kosztach – liczy korzyść; nieujęta – korzyść 0
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   payment          Payment?

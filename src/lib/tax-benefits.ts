@@ -39,7 +39,7 @@ export type PurchaseInvoiceTaxInput = {
   costDeductionPercent?: number | null;
   /** Gdy ustawione – wydatek samochodowy: używane VAT % i limit kosztu (progi 100/150/200 tys.) */
   car?: CarTaxContext | null;
-  /** Faktura ujęta w kosztach – brak korzyści podatkowej */
+  /** Faktura ujęta w kosztach – liczy korzyść podatkową; nieujęta – brak korzyści */
   includedInCosts?: boolean;
 };
 
@@ -82,7 +82,7 @@ export function computePurchaseInvoiceTaxBenefit(
   input: PurchaseInvoiceTaxInput,
   config: CompanyTaxConfig
 ): PurchaseInvoiceTaxResult {
-  if (input.includedInCosts === true) {
+  if (input.includedInCosts !== true) {
     return {
       vatRecovered: 0,
       costBase: 0,
