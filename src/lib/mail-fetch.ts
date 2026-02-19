@@ -387,6 +387,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
   });
 
   let imported = 0;
+  let totalMails = 0;
   let skippedAlreadyImported = 0;
   let skippedDeleted = 0;
   let failed = 0;
@@ -396,7 +397,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
     try {
       const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
       const uids = await client.search({ since }, { uid: true });
-      const totalMails = Array.isArray(uids) ? uids.length : 0;
+      totalMails = Array.isArray(uids) ? uids.length : 0;
       if (!Array.isArray(uids) || uids.length === 0) {
         return { success: true, imported: 0, totalMails: 0 };
       }
