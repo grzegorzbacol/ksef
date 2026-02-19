@@ -996,7 +996,6 @@ function InvoiceNumberCell({
                 <th className="p-3 text-left">Dostawca</th>
                 <th className="p-3 text-left">Typ wydatku</th>
                 <th className="p-3 text-right">Brutto</th>
-                <th className="p-3 text-right">Korzyść podatkowa</th>
                 <th className="p-3 text-right">Realny koszt</th>
                 <th className="p-3">Źródło</th>
                 <th className="p-3">Rozliczono</th>
@@ -1194,9 +1193,6 @@ function InvoiceNumberCell({
                         {inv.grossAmount.toFixed(2)} {inv.currency}
                       </button>
                     )}
-                  </td>
-                  <td className="p-3 text-right text-success">
-                    {taxResult.totalTaxBenefit.toFixed(2)} {inv.currency}
                   </td>
                   <td className="p-3 text-right">
                     {taxResult.realCost.toFixed(2)} {inv.currency}

@@ -41,6 +41,7 @@ export default function TaxBenefitsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [company, setCompany] = useState<CompanyTax | null>(null);
   const [loading, setLoading] = useState(true);
+  const [savingIncludedInCosts, setSavingIncludedInCosts] = useState<string | null>(null);
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
   const [year, setYear] = useState<number | null>(now.getFullYear());
@@ -141,7 +142,7 @@ export default function TaxBenefitsPage() {
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
                 <th className="p-3 text-left">Typ wydatku</th>
-                <th className="p-3 text-center">Ujęta</th>
+                <th className="p-3 text-center">Ujęty w kosztach</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3 text-right">Korzyść podatkowa</th>
                 <th className="p-3 text-right">Realny koszt</th>
@@ -179,7 +180,36 @@ export default function TaxBenefitsPage() {
                       {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
                     </td>
                     <td className="p-3 text-center">
-                      {inv.includedInCosts ? "Tak" : "—"}
+                      <input
+                        type="checkbox"
+                        checked={inv.includedInCosts ?? false}
+                        disabled={savingIncludedInCosts === inv.id}
+                        onChange={async () => {
+                          const next = !(inv.includedInCosts ?? false);
+                          setSavingIncludedInCosts(inv.id);
+                          try {
+                            const res = await fetch(`/api/invoices/${inv.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ includedInCosts: next }),
+                            });
+                            if (!res.ok) {
+                              const d = await res.json().catch(() => ({}));
+                              alert(d.error || "Błąd zapisu");
+                              return;
+                            }
+                            setInvoices((prev) =>
+                              prev.map((i) =>
+                                i.id === inv.id ? { ...i, includedInCosts: next } : i
+                              )
+                            );
+                          } finally {
+                            setSavingIncludedInCosts(null);
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent cursor-pointer"
+                        title="Ujęty w kosztach – zmienia wartość korzyści podatkowej"
+                      />
                     </td>
                     <td className="p-3 text-right">
                       {inv.grossAmount.toFixed(2)} {inv.currency}
