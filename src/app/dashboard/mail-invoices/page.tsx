@@ -27,6 +27,7 @@ export default function MailInvoicesPage() {
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [mailConfigured, setMailConfigured] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings/mail")
@@ -41,6 +42,7 @@ export default function MailInvoicesPage() {
           imapFolder: d.imapFolder ?? "INBOX",
           emailAddress: d.emailAddress ?? "",
         });
+        setMailConfigured(d.mailConfigured === true);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -61,6 +63,9 @@ export default function MailInvoicesPage() {
         return;
       }
       setMessage({ type: "ok", text: "Ustawienia zapisane." });
+      // Po zapisie odśwież status – serwer ma pełną konfigurację
+      const refreshed = await fetch("/api/settings/mail").then((r) => r.json()).catch(() => ({}));
+      setMailConfigured(refreshed.mailConfigured === true);
     } finally {
       setSaving(false);
     }
@@ -198,11 +203,15 @@ export default function MailInvoicesPage() {
           <button
             type="button"
             onClick={handleFetch}
-            disabled={fetching || !settings.imapHost || !settings.imapUser || !settings.imapPassword}
-            className="rounded-lg border border-border bg-bg px-4 py-2 text-text hover:border-accent disabled:opacity-50"
+            disabled={fetching || !mailConfigured}
+            title={!mailConfigured ? "Uzupełnij serwer, użytkownika i hasło IMAP, zapisz ustawienia" : undefined}
+            className="rounded-lg border border-border bg-bg px-4 py-2 text-text hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {fetching ? "Pobieranie…" : "Pobierz maile"}
           </button>
+          {!mailConfigured && (
+            <span className="text-sm text-muted">Uzupełnij serwer, użytkownika i hasło, zapisz ustawienia.</span>
+          )}
         </div>
       </form>
 

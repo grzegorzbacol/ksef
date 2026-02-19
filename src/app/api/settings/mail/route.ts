@@ -7,11 +7,13 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const s = await getMailSettings();
+  const mailConfigured = !!(s.imapHost?.trim() && s.imapUser?.trim() && s.imapPassword?.trim());
   return NextResponse.json({
     imapHost: s.imapHost,
     imapPort: s.imapPort,
     imapUser: s.imapUser,
     imapPassword: s.imapPassword ? "********" : "",
+    mailConfigured,
     imapSecure: s.imapSecure,
     imapFolder: s.imapFolder,
     emailAddress: s.emailAddress,
