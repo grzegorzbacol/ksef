@@ -266,7 +266,9 @@ async function parseEmailToInvoice(
 
   for (const att of attachments) {
     const ct = att.contentType.toLowerCase();
-    if (ct.includes("xml")) {
+    const fn = (att.filename || "").toLowerCase();
+    const isXml = ct.includes("xml") || fn.endsWith(".xml");
+    if (isXml) {
       try {
         const xml = att.content.toString("utf-8");
         const fa = parseFaXmlToInvoiceData(xml);
@@ -300,7 +302,8 @@ async function parseEmailToInvoice(
         /* ignore */
       }
     }
-    if (ct.includes("pdf")) {
+    const isPdf = ct.includes("pdf") || fn.endsWith(".pdf");
+    if (isPdf) {
       try {
         const pdfParse = (await import("pdf-parse")).default;
         const data = await pdfParse(att.content);
@@ -356,6 +359,11 @@ export type FetchMailResult = {
   success: boolean;
   imported?: number;
   error?: string;
+  /** Diagnostyka – dlaczego 0 zaimportowanych */
+  totalMails?: number;
+  skippedAlreadyImported?: number;
+  skippedDeleted?: number;
+  failed?: number;
 };
 
 export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<FetchMailResult> {
@@ -379,13 +387,19 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
   });
 
   let imported = 0;
+  let skippedAlreadyImported = 0;
+  let skippedDeleted = 0;
+  let failed = 0;
   try {
     await client.connect();
     const lock = await client.getMailboxLock(settings.imapFolder || "INBOX");
     try {
       const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
       const uids = await client.search({ since }, { uid: true });
-      if (!Array.isArray(uids) || uids.length === 0) return { success: true, imported: 0 };
+      const totalMails = Array.isArray(uids) ? uids.length : 0;
+      if (!Array.isArray(uids) || uids.length === 0) {
+        return { success: true, imported: 0, totalMails: 0 };
+      }
       const range = `${Math.min(...uids)}:${Math.max(...uids)}`;
       const list = client.fetch(range, { source: true, uid: true }, { uid: true });
       for await (const msg of list) {
@@ -400,11 +414,17 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
             const existing = await prisma.invoice.findFirst({
               where: { emailMessageId: parsed.emailMessageId },
             });
-            if (existing) continue;
+            if (existing) {
+              skippedAlreadyImported++;
+              continue;
+            }
             const wasDeleted = await prisma.deletedMailInvoiceMessageId.findUnique({
               where: { emailMessageId: parsed.emailMessageId },
             });
-            if (wasDeleted) continue;
+            if (wasDeleted) {
+              skippedDeleted++;
+              continue;
+            }
           }
 
           const issueDate = new Date(parsed.invoice.issueDate);
@@ -506,6 +526,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
           }
           imported++;
         } catch (err) {
+          failed++;
           console.error("mail-fetch: błąd przetwarzania wiadomości:", err);
         }
       }
@@ -524,5 +545,12 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
     }
   }
 
-  return { success: true, imported };
+  return {
+    success: true,
+    imported,
+    totalMails,
+    skippedAlreadyImported,
+    skippedDeleted,
+    failed,
+  };
 }

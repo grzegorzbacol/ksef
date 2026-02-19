@@ -78,10 +78,18 @@ export default function MailInvoicesPage() {
       const res = await fetch("/api/mail/fetch", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (data.ok) {
-        setMessage({
-          type: "ok",
-          text: `Zaimportowano ${data.imported ?? 0} faktur z maila.`,
-        });
+        const imported = data.imported ?? 0;
+        let text = `Zaimportowano ${imported} faktur z maila.`;
+        if (imported === 0 && (data.totalMails ?? 0) > 0) {
+          const parts: string[] = [];
+          if (data.skippedAlreadyImported > 0) parts.push(`${data.skippedAlreadyImported} już zaimportowanych`);
+          if (data.skippedDeleted > 0) parts.push(`${data.skippedDeleted} usuniętych`);
+          if (data.failed > 0) parts.push(`${data.failed} błędów parsowania`);
+          text += " Maile znalezione: " + (data.totalMails ?? 0) + ". " + (parts.length ? parts.join(", ") + "." : "Wszystkie pominięte lub błąd parsowania – sprawdź załączniki (XML FA lub PDF).");
+        } else if (imported === 0 && (data.totalMails ?? 0) === 0) {
+          text += " Brak maili z fakturami w ostatnich 90 dniach w tym folderze.";
+        }
+        setMessage({ type: "ok", text });
       } else {
         setMessage({
           type: "error",

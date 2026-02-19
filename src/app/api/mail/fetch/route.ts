@@ -11,5 +11,12 @@ export async function POST() {
   if (!result.success) {
     return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z maila" }, { status: 200 });
   }
-  return NextResponse.json({ ok: true, imported: result.imported ?? 0 });
+  return NextResponse.json({
+    ok: true,
+    imported: result.imported ?? 0,
+    totalMails: result.totalMails,
+    skippedAlreadyImported: result.skippedAlreadyImported,
+    skippedDeleted: result.skippedDeleted,
+    failed: result.failed,
+  });
 }
