@@ -64,12 +64,23 @@ model Invoice {
   carId               String?   // powiązany samochód gdy expenseType = "car"
   includedInCosts     Boolean   @default(false) // ujęta w kosztach – liczy korzyść; nieujęta – korzyść 0
   remarks             String?   @db.Text // uwagi – opis dokumentu (faktury zakupu, rozrachunki)
+  expenseCategoryId   String?   // kategoria kosztu (tylko faktury zakupu)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   payment          Payment?
   car               Car?         @relation(fields: [carId], references: [id], onDelete: SetNull)
+  expenseCategory   ExpenseCategory? @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
   items            InvoiceItem[]
   emailAttachments InvoiceEmailAttachment[]
+}
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  name      String    // np. "Biuro", "Marketing", "Usługi IT"
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  invoices  Invoice[]
 }
 
 model Car {

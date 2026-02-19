@@ -123,6 +123,8 @@ type Invoice = {
   carId?: string | null;
   remarks?: string | null;
   includedInCosts?: boolean;
+  expenseCategoryId?: string | null;
+  expenseCategory?: { id: string; name: string } | null;
   car?: {
     id: string;
     name: string;
@@ -150,11 +152,17 @@ type Contractor = {
   nip: string;
 };
 
+type ExpenseCategory = {
+  id: string;
+  name: string;
+};
+
 export default function InvoiceDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingAmount, setSavingAmount] = useState(false);
   const [savingContractor, setSavingContractor] = useState(false);
@@ -181,6 +189,7 @@ export default function InvoiceDetailPage() {
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
   const [savingIncludedInCosts, setSavingIncludedInCosts] = useState(false);
+  const [savingCategory, setSavingCategory] = useState(false);
   const [editingRemarks, setEditingRemarks] = useState(false);
   const [editRemarks, setEditRemarks] = useState("");
   const [savingRemarks, setSavingRemarks] = useState(false);
@@ -242,6 +251,10 @@ export default function InvoiceDetailPage() {
         .then((r) => r.json())
         .then((data) => setCars(Array.isArray(data) ? data : []))
         .catch(() => setCars([]));
+      fetch("/api/expense-categories")
+        .then((r) => r.json())
+        .then((data) => setExpenseCategories(Array.isArray(data) ? data : []))
+        .catch(() => setExpenseCategories([]));
     }
   }, [invoice?.type]);
 
@@ -439,6 +452,12 @@ export default function InvoiceDetailPage() {
               ? new Date(invoice.paymentDueDate).toLocaleDateString("pl-PL")
               : "–"}
           </dd>
+          {isCost && invoice.expenseCategory && (
+            <>
+              <dt className="text-muted">Kategoria</dt>
+              <dd>{invoice.expenseCategory.name}</dd>
+            </>
+          )}
           {isCost && (
             <>
               <dt className="text-muted">Uwagi</dt>
@@ -609,6 +628,47 @@ export default function InvoiceDetailPage() {
                 {contractors.length === 0 && (
                   <Link href="/dashboard/contractors" className="text-sm text-accent hover:underline">
                     Dodaj kontrahentów
+                  </Link>
+                )}
+              </div>
+            </div>
+            <div>
+              <h2 className="font-medium mb-2">Kategoria kosztu</h2>
+              <p className="text-muted text-sm mb-2">
+                Przypisz fakturę do kategorii kosztów (np. Biuro, Marketing). Kategorie definiujesz w ustawieniach.
+              </p>
+              <div className="flex flex-wrap gap-2 items-end">
+                <select
+                  value={invoice.expenseCategoryId ?? ""}
+                  onChange={async (e) => {
+                    const categoryId = e.target.value || null;
+                    setSavingCategory(true);
+                    try {
+                      const res = await fetch(`/api/invoices/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ expenseCategoryId: categoryId }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (res.ok) setInvoice(data);
+                      else alert(data.error || "Błąd zapisu");
+                    } finally {
+                      setSavingCategory(false);
+                    }
+                  }}
+                  disabled={savingCategory}
+                  className="rounded border border-border bg-bg px-3 py-2 min-w-[220px] disabled:opacity-50"
+                >
+                  <option value="">— brak kategorii —</option>
+                  {expenseCategories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                {expenseCategories.length === 0 && (
+                  <Link href="/dashboard/settings" className="text-sm text-accent hover:underline">
+                    Dodaj kategorie w ustawieniach
                   </Link>
                 )}
               </div>

@@ -1,6 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 type StatsBlock = {
   totalInvoices: number;
@@ -261,7 +271,40 @@ export default function StatisticsPage() {
       </section>
 
       <section className="rounded-xl border border-border bg-card p-5">
-        <SectionTitle title="Trend miesięczny (ostatnie miesiące)" subtitle="Porównanie sprzedaży i kosztów w czasie." />
+        <SectionTitle title="Przychody i koszty według miesiąca" subtitle="Wykres słupkowy – zestawienie przychodów i kosztów w czasie." />
+        {monthSeries.length === 0 ? (
+          <p className="text-sm text-muted">Brak danych miesięcznych do wyświetlenia wykresu.</p>
+        ) : (
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={monthSeries.map((m) => ({
+                  month: formatMonthLabel(m.monthKey),
+                  monthKey: m.monthKey,
+                  przychody: m.salesGross,
+                  koszty: m.costGross,
+                }))}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" className="text-xs" tick={{ fill: "var(--text-muted)" }} />
+                <YAxis className="text-xs" tick={{ fill: "var(--text-muted)" }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "var(--card)", border: "1px solid var(--border)", borderRadius: "8px" }}
+                  formatter={(value: number | undefined) => [value != null ? formatCurrency(value) : "", ""]}
+                  labelFormatter={(label) => `Miesiąc: ${label}`}
+                />
+                <Legend />
+                <Bar dataKey="przychody" name="Przychody" fill="var(--success, #22c55e)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="koszty" name="Koszty" fill="var(--warning, #f59e0b)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-border bg-card p-5">
+        <SectionTitle title="Trend miesięczny (szczegóły)" subtitle="Porównanie sprzedaży i kosztów w czasie." />
         {monthSeries.length === 0 ? (
           <p className="text-sm text-muted">Brak danych miesięcznych do wyświetlenia trendu.</p>
         ) : (

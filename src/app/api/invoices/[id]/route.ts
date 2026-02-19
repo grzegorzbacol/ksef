@@ -12,7 +12,7 @@ export async function GET(
   const { id } = await params;
   const invoice = await prisma.invoice.findUnique({
     where: { id },
-    include: { payment: true, items: true, emailAttachments: true, car: true },
+    include: { payment: true, items: true, emailAttachments: true, car: true, expenseCategory: true },
   });
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(invoice);
@@ -42,6 +42,7 @@ export async function PATCH(
     carId?: string | null;
     includedInCosts?: boolean;
     remarks?: string | null;
+    expenseCategoryId?: string | null;
   } = {};
   if (body.paymentDueDate !== undefined) {
     update.paymentDueDate =
@@ -78,6 +79,9 @@ export async function PATCH(
   }
   if (typeof body.includedInCosts === "boolean") update.includedInCosts = body.includedInCosts;
   if (body.remarks !== undefined) update.remarks = body.remarks == null || body.remarks === "" ? null : String(body.remarks).trim();
+  if (body.expenseCategoryId !== undefined) {
+    update.expenseCategoryId = body.expenseCategoryId && String(body.expenseCategoryId).trim() ? String(body.expenseCategoryId).trim() : null;
+  }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Brak pól do aktualizacji" }, { status: 400 });
   }
@@ -85,7 +89,7 @@ export async function PATCH(
     const invoice = await prisma.invoice.update({
       where: { id },
       data: update,
-      include: { payment: true, items: true, emailAttachments: true, car: true },
+      include: { payment: true, items: true, emailAttachments: true, car: true, expenseCategory: true },
     });
     return NextResponse.json(invoice);
   } catch (e: unknown) {

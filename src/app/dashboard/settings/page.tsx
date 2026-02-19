@@ -80,6 +80,12 @@ type Car = {
   sortOrder: number;
 };
 
+type ExpenseCategory = {
+  id: string;
+  name: string;
+  sortOrder: number;
+};
+
 export default function SettingsPage() {
   const [ksef, setKsef] = useState<KsefSettings>(emptyKsef);
   const [company, setCompany] = useState<CompanySettings>(emptyCompany);
@@ -110,6 +116,11 @@ export default function SettingsPage() {
   const [savingCar, setSavingCar] = useState(false);
   const [editingCarId, setEditingCarId] = useState<string | null>(null);
   const [deletingCarId, setDeletingCarId] = useState<string | null>(null);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  const [categoryFormName, setCategoryFormName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -117,6 +128,7 @@ export default function SettingsPage() {
       fetch("/api/settings/company").then((r) => r.json()),
       fetch("/api/settings/payment-reminders").then((r) => r.json()),
       fetch("/api/cars").then((r) => r.json()).then((data) => setCars(Array.isArray(data) ? data : [])).catch(() => setCars([])),
+      fetch("/api/expense-categories").then((r) => r.json()).then((data) => setExpenseCategories(Array.isArray(data) ? data : [])).catch(() => setExpenseCategories([])),
     ])
       .then(([ksefData, companyData, reminderData]) => {
         setKsef({
@@ -719,6 +731,130 @@ export default function SettingsPage() {
                           else alert("Błąd usuwania");
                         } finally {
                           setDeletingCarId(null);
+                        }
+                      }}
+                      className="text-red-400 hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-6 max-w-3xl mb-8">
+        <h2 className="font-medium mb-2">Kategorie kosztów (faktury zakupu)</h2>
+        <p className="text-muted text-sm mb-4">
+          Definiuj kategorie, do których można przypisywać faktury zakupu (np. Biuro, Marketing, Usługi IT).
+        </p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const name = categoryFormName.trim();
+            if (!name) {
+              alert("Podaj nazwę kategorii.");
+              return;
+            }
+            setSavingCategory(true);
+            try {
+              if (editingCategoryId) {
+                const res = await fetch(`/api/expense-categories/${editingCategoryId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name }),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const updated = await res.json();
+                setExpenseCategories((prev) => prev.map((c) => (c.id === editingCategoryId ? updated : c)));
+              } else {
+                const res = await fetch("/api/expense-categories", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ name }),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const created = await res.json();
+                setExpenseCategories((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+              }
+              setEditingCategoryId(null);
+              setCategoryFormName("");
+            } finally {
+              setSavingCategory(false);
+            }
+          }}
+          className="flex flex-wrap gap-2 mb-4"
+        >
+          <input
+            type="text"
+            value={categoryFormName}
+            onChange={(e) => setCategoryFormName(e.target.value)}
+            placeholder="Nazwa kategorii (np. Biuro)"
+            className="rounded border border-border bg-bg px-3 py-2 text-sm min-w-[200px]"
+          />
+          <button
+            type="submit"
+            disabled={savingCategory || !categoryFormName.trim()}
+            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 text-sm"
+          >
+            {savingCategory ? "Zapisywanie…" : editingCategoryId ? "Zapisz" : "Dodaj kategorię"}
+          </button>
+          {editingCategoryId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingCategoryId(null);
+                setCategoryFormName("");
+              }}
+              className="rounded border border-border px-4 py-2 text-sm"
+            >
+              Anuluj
+            </button>
+          )}
+        </form>
+        {expenseCategories.length > 0 && (
+          <div className="border-t border-border pt-4">
+            <h3 className="font-medium mb-2">Lista kategorii</h3>
+            <ul className="space-y-2">
+              {expenseCategories.map((cat) => (
+                <li
+                  key={cat.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-bg/50 px-3 py-2 text-sm"
+                >
+                  <span className="font-medium">{cat.name}</span>
+                  <span className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingCategoryId(cat.id);
+                        setCategoryFormName(cat.name);
+                      }}
+                      className="text-accent hover:underline"
+                    >
+                      Edytuj
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingCategoryId === cat.id}
+                      onClick={async () => {
+                        if (!confirm(`Usunąć kategorię „${cat.name}"? Faktury z tą kategorią zostaną od niej odłączone.`)) return;
+                        setDeletingCategoryId(cat.id);
+                        try {
+                          const res = await fetch(`/api/expense-categories/${cat.id}`, { method: "DELETE" });
+                          if (res.ok) setExpenseCategories((prev) => prev.filter((c) => c.id !== cat.id));
+                          else alert("Błąd usuwania");
+                        } finally {
+                          setDeletingCategoryId(null);
                         }
                       }}
                       className="text-red-400 hover:underline disabled:opacity-50"

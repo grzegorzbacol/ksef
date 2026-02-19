@@ -38,6 +38,7 @@ type Invoice = {
   expenseType?: string;
   carId?: string | null;
   car?: Car | null;
+  expenseCategory?: { id: string; name: string } | null;
 };
 
 type Product = {
@@ -115,6 +116,8 @@ export default function InvoicesSalesPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
+  const [expenseCategories, setExpenseCategories] = useState<{ id: string; name: string }[]>([]);
+  const [expenseCategoryId, setExpenseCategoryId] = useState("");
   const [customVatRowIndex, setCustomVatRowIndex] = useState<number | null>(null);
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
@@ -228,10 +231,10 @@ function InvoiceNumberCell({
   }, []);
 
   useEffect(() => {
-    fetch("/api/cars")
-      .then((r) => r.json())
-      .then((data) => setCars(Array.isArray(data) ? data : []))
-      .catch(() => setCars([]));
+    Promise.all([
+      fetch("/api/cars").then((r) => r.json()).then((data) => setCars(Array.isArray(data) ? data : [])).catch(() => setCars([])),
+      fetch("/api/expense-categories").then((r) => r.json()).then((data) => setExpenseCategories(Array.isArray(data) ? data : [])).catch(() => setExpenseCategories([])),
+    ]);
   }, []);
 
   useEffect(() => {
@@ -349,6 +352,7 @@ function InvoiceNumberCell({
       currency: form.currency,
       expenseType: expenseType === "car" && expenseCarId ? "car" : "standard",
       carId: expenseType === "car" && expenseCarId ? expenseCarId : null,
+      expenseCategoryId: expenseCategoryId || null,
       remarks: form.remarks.trim() || undefined,
     };
     if (lines.length > 0) payload.items = lines;
@@ -395,6 +399,7 @@ function InvoiceNumberCell({
     });
     setExpenseType("standard");
     setExpenseCarId("");
+    setExpenseCategoryId("");
     loadInvoices();
   }
 
@@ -709,6 +714,25 @@ function InvoiceNumberCell({
             )}
           </div>
           <div className="border-t border-border pt-4 mt-4">
+            <h3 className="font-medium mb-2">Kategoria kosztu</h3>
+            <p className="text-muted text-sm mb-2">Przypisz fakturę do kategorii kosztów (np. Biuro, Marketing).</p>
+            <select
+              value={expenseCategoryId}
+              onChange={(e) => setExpenseCategoryId(e.target.value)}
+              className="rounded border border-border bg-bg px-3 py-2 min-w-[200px]"
+            >
+              <option value="">— brak kategorii —</option>
+              {expenseCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {expenseCategories.length === 0 && (
+              <p className="text-muted text-xs mt-1">
+                <Link href="/dashboard/settings" className="text-accent hover:underline">Dodaj kategorie w Ustawieniach</Link>.
+              </p>
+            )}
+          </div>
+          <div className="border-t border-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
             <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
             <div className="flex flex-wrap gap-3 items-end mb-4">
@@ -1008,6 +1032,7 @@ function InvoiceNumberCell({
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Dostawca</th>
                 <th className="p-3 text-left">Typ wydatku</th>
+                <th className="p-3 text-left">Kategoria</th>
                 <th className="p-3 text-right">Brutto</th>
                 <th className="p-3 text-right">Realny koszt</th>
                 <th className="p-3">Źródło</th>
@@ -1148,6 +1173,9 @@ function InvoiceNumberCell({
                   </td>
                   <td className="p-3 text-muted text-sm">
                     {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
+                  </td>
+                  <td className="p-3 text-muted text-sm">
+                    {inv.expenseCategory?.name ?? "—"}
                   </td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (

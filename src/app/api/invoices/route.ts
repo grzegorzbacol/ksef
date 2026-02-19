@@ -28,6 +28,7 @@ const createSchema = z.object({
   items: z.array(itemSchema).optional(),
   expenseType: z.enum(["standard", "car"]).optional(),
   carId: z.string().optional().nullable(),
+  expenseCategoryId: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
 });
 
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest) {
     include: {
       ...(includePayment ? { payment: true } : {}),
       car: true,
+      expenseCategory: true,
     },
   });
 
@@ -171,6 +173,7 @@ export async function POST(req: NextRequest) {
         currency: data.currency,
         expenseType,
         carId,
+        expenseCategoryId: invoiceType === "cost" && data.expenseCategoryId ? data.expenseCategoryId : null,
         remarks: data.remarks?.trim() || null,
       },
     });
