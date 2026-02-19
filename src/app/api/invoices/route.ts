@@ -28,6 +28,7 @@ const createSchema = z.object({
   items: z.array(itemSchema).optional(),
   expenseType: z.enum(["standard", "car"]).optional(),
   carId: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 export async function GET(req: NextRequest) {
@@ -168,6 +169,7 @@ export async function POST(req: NextRequest) {
         currency: data.currency,
         expenseType,
         carId,
+        remarks: data.remarks?.trim() || null,
       },
     });
   });

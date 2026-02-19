@@ -63,6 +63,7 @@ model Invoice {
   expenseType         String    @default("standard") // "standard" | "car" – typ wydatku (faktury zakupu)
   carId               String?   // powiązany samochód gdy expenseType = "car"
   includedInCosts     Boolean   @default(false) // ujęta w kosztach – liczy korzyść; nieujęta – korzyść 0
+  remarks             String?   @db.Text // uwagi – opis dokumentu (faktury zakupu, rozrachunki)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   payment          Payment?

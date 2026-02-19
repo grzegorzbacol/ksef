@@ -41,6 +41,7 @@ export async function PATCH(
     expenseType?: string;
     carId?: string | null;
     includedInCosts?: boolean;
+    remarks?: string | null;
   } = {};
   if (body.paymentDueDate !== undefined) {
     update.paymentDueDate =
@@ -76,6 +77,7 @@ export async function PATCH(
     update.carId = body.carId && body.expenseType !== "standard" ? String(body.carId).trim() : null;
   }
   if (typeof body.includedInCosts === "boolean") update.includedInCosts = body.includedInCosts;
+  if (body.remarks !== undefined) update.remarks = body.remarks == null || body.remarks === "" ? null : String(body.remarks).trim();
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Brak pól do aktualizacji" }, { status: 400 });
   }

@@ -121,6 +121,7 @@ type Invoice = {
   costDeductionPercent?: number | null;
   expenseType?: string;
   carId?: string | null;
+  remarks?: string | null;
   includedInCosts?: boolean;
   car?: {
     id: string;
@@ -180,6 +181,9 @@ export default function InvoiceDetailPage() {
   const [expenseType, setExpenseType] = useState<"standard" | "car">("standard");
   const [expenseCarId, setExpenseCarId] = useState("");
   const [savingIncludedInCosts, setSavingIncludedInCosts] = useState(false);
+  const [editingRemarks, setEditingRemarks] = useState(false);
+  const [editRemarks, setEditRemarks] = useState("");
+  const [savingRemarks, setSavingRemarks] = useState(false);
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -209,6 +213,7 @@ export default function InvoiceDetailPage() {
           );
           setExpenseType(inv.expenseType === "car" ? "car" : "standard");
           setExpenseCarId(inv.carId ?? "");
+          setEditRemarks(inv.remarks ?? "");
         }
       });
   }
@@ -434,6 +439,80 @@ export default function InvoiceDetailPage() {
               ? new Date(invoice.paymentDueDate).toLocaleDateString("pl-PL")
               : "–"}
           </dd>
+          {isCost && (
+            <>
+              <dt className="text-muted">Uwagi</dt>
+              <dd className="col-span-2">
+                {editingRemarks ? (
+                  <div className="flex flex-col gap-2">
+                    <textarea
+                      value={editRemarks}
+                      onChange={(e) => setEditRemarks(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") {
+                          setEditRemarks(invoice.remarks ?? "");
+                          setEditingRemarks(false);
+                        }
+                      }}
+                      disabled={savingRemarks}
+                      autoFocus
+                      rows={3}
+                      className="rounded border border-border bg-bg px-2 py-1 text-sm w-full resize-y"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setSavingRemarks(true);
+                          try {
+                            const res = await fetch(`/api/invoices/${id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ remarks: editRemarks.trim() || null }),
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (res.ok) {
+                              setInvoice(data);
+                              setEditingRemarks(false);
+                            } else alert(data.error || "Błąd zapisu");
+                          } finally {
+                            setSavingRemarks(false);
+                          }
+                        }}
+                        disabled={savingRemarks}
+                        className="rounded bg-accent px-3 py-1 text-white text-sm hover:opacity-90 disabled:opacity-50"
+                      >
+                        {savingRemarks ? "Zapisywanie…" : "Zapisz"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditRemarks(invoice.remarks ?? "");
+                          setEditingRemarks(false);
+                        }}
+                        disabled={savingRemarks}
+                        className="rounded border border-border px-3 py-1 text-sm hover:bg-bg/80"
+                      >
+                        Anuluj
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditRemarks(invoice.remarks ?? "");
+                      setEditingRemarks(true);
+                    }}
+                    title="Kliknij, aby edytować uwagi"
+                    className="text-left w-full rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent whitespace-pre-wrap min-h-[1.5em]"
+                  >
+                    {(invoice.remarks ?? "").trim() || "— dodaj opis dokumentu —"}
+                  </button>
+                )}
+              </dd>
+            </>
+          )}
           <dt className="text-muted">Źródło</dt>
           <dd>
             {invoice.source === "recurring"

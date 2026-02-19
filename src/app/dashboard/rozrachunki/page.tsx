@@ -14,6 +14,7 @@ type Invoice = {
   payment?: { paidAt: string } | null;
   source: string;
   handedOverToAccountant?: boolean;
+  remarks?: string | null;
 };
 
 type RecurringSettlement = {
@@ -34,6 +35,9 @@ export default function RozrachunkiPage() {
   const [editingAmountId, setEditingAmountId] = useState<string | null>(null);
   const [editingAmountValue, setEditingAmountValue] = useState("");
   const [savingAmountId, setSavingAmountId] = useState<string | null>(null);
+  const [editingRemarksId, setEditingRemarksId] = useState<string | null>(null);
+  const [editingRemarksValue, setEditingRemarksValue] = useState("");
+  const [savingRemarksId, setSavingRemarksId] = useState<string | null>(null);
 
   function load() {
     setLoading(true);
@@ -152,6 +156,22 @@ export default function RozrachunkiPage() {
     }
   }
 
+  async function saveRemarks(invoiceId: string, value: string) {
+    setSavingRemarksId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ remarks: value.trim() || null }),
+      });
+      if (!res.ok) alert("Błąd zapisu uwag");
+      else load();
+    } finally {
+      setSavingRemarksId(null);
+      setEditingRemarksId(null);
+    }
+  }
+
   if (loading) return <p className="text-muted">Ładowanie…</p>;
 
   const paidCount = invoices.filter((i) => i.payment).length;
@@ -225,6 +245,7 @@ export default function RozrachunkiPage() {
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Termin płatności</th>
               <th className="p-3 text-left">Data rozliczenia</th>
+              <th className="p-3 text-left min-w-[140px]">Uwagi</th>
               <th className="p-3 text-left w-40">Przekazane księgowej</th>
               <th className="p-3 w-16"></th>
             </tr>
@@ -232,7 +253,7 @@ export default function RozrachunkiPage() {
           <tbody>
             {invoices.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-6 text-center text-muted">
+                <td colSpan={10} className="p-6 text-center text-muted">
                   Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
                 </td>
               </tr>
@@ -320,6 +341,45 @@ export default function RozrachunkiPage() {
                     {inv.payment
                       ? new Date(inv.payment.paidAt).toLocaleString("pl-PL")
                       : "–"}
+                  </td>
+                  <td className="p-3">
+                    {editingRemarksId === inv.id ? (
+                      <span className="inline-flex items-center gap-1 w-full max-w-[200px]">
+                        <input
+                          type="text"
+                          value={editingRemarksValue}
+                          onChange={(e) => setEditingRemarksValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingRemarksId === inv.id) saveRemarks(inv.id, editingRemarksValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.currentTarget.blur();
+                            }
+                            if (e.key === "Escape") {
+                              setEditingRemarksId(null);
+                              setEditingRemarksValue("");
+                            }
+                          }}
+                          disabled={savingRemarksId === inv.id}
+                          autoFocus
+                          placeholder="Opis dokumentu"
+                          className="flex-1 min-w-0 rounded border border-border bg-bg px-2 py-1 text-sm"
+                        />
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRemarksId(inv.id);
+                          setEditingRemarksValue(inv.remarks ?? "");
+                        }}
+                        title="Kliknij, aby edytować uwagi"
+                        className="text-left w-full rounded px-1 py-0.5 hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent truncate block max-w-[200px]"
+                      >
+                        {(inv.remarks ?? "").trim() || "—"}
+                      </button>
+                    )}
                   </td>
                   <td className="p-3">
                     {inv.source === "ksef" ? (

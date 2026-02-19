@@ -87,6 +87,7 @@ export default function InvoicesSalesPage() {
     vatAmount: "",
     grossAmount: "",
     currency: "PLN",
+    remarks: "",
   });
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
@@ -348,6 +349,7 @@ function InvoiceNumberCell({
       currency: form.currency,
       expenseType: expenseType === "car" && expenseCarId ? "car" : "standard",
       carId: expenseType === "car" && expenseCarId ? expenseCarId : null,
+      remarks: form.remarks.trim() || undefined,
     };
     if (lines.length > 0) payload.items = lines;
     const res = await fetch("/api/invoices", {
@@ -389,6 +391,7 @@ function InvoiceNumberCell({
       vatAmount: "",
       grossAmount: "",
       currency: "PLN",
+      remarks: "",
     });
     setExpenseType("standard");
     setExpenseCarId("");
@@ -650,6 +653,16 @@ function InvoiceNumberCell({
                 onChange={(e) => setForm((p) => ({ ...p, buyerNip: e.target.value }))}
                 className="w-full rounded border border-border bg-bg px-3 py-2"
                 required
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm text-muted mb-1">Uwagi (opis dokumentu)</label>
+              <textarea
+                value={form.remarks}
+                onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
+                placeholder="Opcjonalny opis lub uwagi do dokumentu"
+                rows={2}
+                className="w-full rounded border border-border bg-bg px-3 py-2 resize-y"
               />
             </div>
           </div>
@@ -1128,26 +1141,6 @@ function InvoiceNumberCell({
                             </button>
                           ) : (
                             <span>{inv.sellerName}</span>
-                          )}
-                          {inv.source !== "ksef" && contractors.length > 0 && (
-                            <select
-                              value=""
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                if (v) assignContractor(inv, v);
-                                e.target.value = "";
-                              }}
-                              disabled={assigningContractorId === inv.id}
-                              className="block w-full max-w-[200px] rounded border border-border bg-bg px-2 py-1 text-xs text-muted disabled:opacity-50"
-                              title="Przypisz kontrahenta z bazy"
-                            >
-                              <option value="">— przypisz kontrahenta —</option>
-                              {contractors.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} ({c.nip})
-                                </option>
-                              ))}
-                            </select>
                           )}
                         </>
                       )}
