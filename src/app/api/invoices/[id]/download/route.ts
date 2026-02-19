@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getInvoicePdfFromKsef } from "@/lib/ksef";
 import { prisma } from "@/lib/prisma";
-import { readAttachmentFile } from "@/lib/upload-paths";
+import { getAttachmentContent } from "@/lib/upload-paths";
 
 /**
  * GET /api/invoices/[id]/download
@@ -59,11 +59,7 @@ export async function GET(
   const chosenAttachment = pdfAttachment ?? nonDataAttachment ?? attachments[0];
   if (chosenAttachment) {
     try {
-      const content = await readAttachmentFile(
-        chosenAttachment.storedPath,
-        id,
-        chosenAttachment.filename
-      );
+      const content = await getAttachmentContent(chosenAttachment, id);
       const filename = chosenAttachment.filename || `${baseFilename}.pdf`;
       return new NextResponse(new Uint8Array(content), {
         headers: {

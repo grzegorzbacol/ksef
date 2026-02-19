@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import path from "path";
-import fs from "fs/promises";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { UPLOAD_BASE, safeFilename } from "@/lib/upload-paths";
@@ -33,11 +32,8 @@ export async function POST(
     return NextResponse.json({ error: "Nieprawidłowa nazwa pliku" }, { status: 400 });
   }
 
-  const dir = path.join(UPLOAD_BASE, id);
-  await fs.mkdir(dir, { recursive: true });
-  const storedPath = path.join(dir, safeName);
+  const storedPath = path.join(UPLOAD_BASE, id, safeName);
   const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.writeFile(storedPath, buffer);
 
   await prisma.invoiceEmailAttachment.create({
     data: {
@@ -46,6 +42,7 @@ export async function POST(
       contentType: file.type || "application/octet-stream",
       size: buffer.length,
       storedPath,
+      content: buffer,
     },
   });
 

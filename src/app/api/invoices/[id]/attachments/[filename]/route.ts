@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { readAttachmentFile } from "@/lib/upload-paths";
+import { getAttachmentContent } from "@/lib/upload-paths";
 
 export async function GET(
   _req: NextRequest,
@@ -22,11 +22,7 @@ export async function GET(
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
-    const content = await readAttachmentFile(
-      attachment.storedPath,
-      id,
-      attachment.filename
-    );
+    const content = await getAttachmentContent(attachment, id);
     return new NextResponse(new Uint8Array(content), {
       headers: {
         "Content-Type": attachment.contentType || "application/octet-stream",

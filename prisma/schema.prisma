@@ -98,14 +98,15 @@ model RecurringSettlement {
 }
 
 model InvoiceEmailAttachment {
-  id         String   @id @default(cuid())
-  invoiceId  String
-  invoice    Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  filename   String
-  contentType String  @default("application/octet-stream")
-  size       Int      @default(0)
-  storedPath String   // ścieżka do pliku na dysku
-  createdAt  DateTime @default(now())
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  filename    String
+  contentType String   @default("application/octet-stream")
+  size        Int      @default(0)
+  storedPath  String   // ścieżka do pliku na dysku (używana przy self-hosting); na Vercel ignorowana
+  content     Bytes?   // treść pliku w DB – działa na hostingu bez trwałego dysku (np. Vercel)
+  createdAt   DateTime @default(now())
 }
 
 model InvoiceItem {

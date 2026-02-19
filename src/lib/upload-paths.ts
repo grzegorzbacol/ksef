@@ -13,7 +13,31 @@ export function safeFilename(filename: string): string {
 }
 
 /**
- * Odczytuje plik załącznika. Próbuje storedPath, potem ścieżkę względną UPLOAD_BASE
+ * Pobiera treść załącznika. Preferuje content z bazy (działa na Vercel),
+ * w przeciwnym razie czyta z dysku (self-hosting).
+ */
+export async function getAttachmentContent(
+  attachment: {
+    content?: Buffer | null;
+    storedPath: string;
+    filename: string;
+  },
+  invoiceId: string
+): Promise<Buffer> {
+  if (attachment.content && attachment.content.length > 0) {
+    return Buffer.isBuffer(attachment.content)
+      ? attachment.content
+      : Buffer.from(attachment.content);
+  }
+  return readAttachmentFile(
+    attachment.storedPath,
+    invoiceId,
+    attachment.filename
+  );
+}
+
+/**
+ * Odczytuje plik załącznika z dysku. Próbuje storedPath, potem ścieżkę względną UPLOAD_BASE
  * (gdy storedPath zapisano z innym process.cwd(), np. przy deployu).
  */
 export async function readAttachmentFile(

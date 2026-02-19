@@ -9,9 +9,16 @@ function lastDayOfMonth(year: number, month: number): Date {
   return new Date(year, month, 0, 23, 59, 59, 999);
 }
 
+/** Mapowanie kodu na nazwę typu opłaty (identyfikowalna) */
+const CODE_TO_LABEL: Record<string, string> = {
+  zus: "ZUS",
+  pit5: "PIT-5",
+  vat7: "VAT-7",
+};
+
 /**
- * Generuje rozrachunki cykliczne (ZUS, PIT-5, VAT-7) na podany miesiąc.
- * Dla każdego typu tworzy jedną fakturę kosztową z kwotą 0 do ręcznego uzupełnienia, jeśli jeszcze nie istnieje.
+ * Generuje opłaty cykliczne (ZUS, PIT-5, VAT-7) na podany miesiąc.
+ * To NIE są faktury – to opłaty identyfikowalne według typu. Numer: OPŁ/VAT-7/YYYY/MM.
  */
 export async function generateRecurringSettlementsForMonth(
   year: number,
@@ -35,35 +42,26 @@ export async function generateRecurringSettlementsForMonth(
     if (existing) continue;
 
     const issueDate = firstDayOfMonth(year, month);
-    const invoice = await prisma.$transaction(async (tx) => {
-      const key = `invoice_counter_cost_${year}`;
-      const row = await tx.setting.findUnique({ where: { key } });
-      const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
-      await tx.setting.upsert({
-        where: { key },
-        create: { key, value: String(nextSeq) },
-        update: { value: String(nextSeq) },
-      });
-      const number = `FK/${year}/${String(nextSeq).padStart(4, "0")}`;
+    const label = CODE_TO_LABEL[r.code] ?? r.name;
+    const number = `OPŁ/${label}/${year}/${String(month).padStart(2, "0")}`;
 
-      return tx.invoice.create({
-        data: {
-          type: "cost",
-          number,
-          issueDate,
-          saleDate: null,
-          sellerName: r.sellerName || r.name,
-          sellerNip: r.sellerNip || "0000000000",
-          buyerName: company.name || "Firma",
-          buyerNip: company.nip || "0000000000",
-          netAmount: 0,
-          vatAmount: 0,
-          grossAmount: 0,
-          currency: "PLN",
-          source: "recurring",
-          recurringCode: r.code,
-        },
-      });
+    const invoice = await prisma.invoice.create({
+      data: {
+        type: "cost",
+        number,
+        issueDate,
+        saleDate: null,
+        sellerName: r.sellerName || r.name,
+        sellerNip: r.sellerNip || "0000000000",
+        buyerName: company.name || "Firma",
+        buyerNip: company.nip || "0000000000",
+        netAmount: 0,
+        vatAmount: 0,
+        grossAmount: 0,
+        currency: "PLN",
+        source: "recurring",
+        recurringCode: r.code,
+      },
     });
     created.push(invoice.id);
   }

@@ -18,8 +18,8 @@ const cards = [
   },
   {
     href: "/dashboard/rozrachunki",
-    title: "Rozrachunki",
-    description: "Rozliczenia faktur z datą",
+    title: "Opłaty (VAT-7, PIT-5, ZUS)",
+    description: "Opłaty miesięczne – ZUS, urząd skarbowy. Identyfikowalne według typu.",
   },
 ];
 

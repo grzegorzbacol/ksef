@@ -490,11 +490,9 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
             }
           }
 
-          await fs.mkdir(path.join(UPLOAD_BASE, created.id), { recursive: true });
           for (const att of parsed.attachments) {
             const safeName = safeFilename(att.filename || "file");
             const storedPath = path.join(UPLOAD_BASE, created.id, safeName);
-            await fs.writeFile(storedPath, att.content);
             await prisma.invoiceEmailAttachment.create({
               data: {
                 invoiceId: created.id,
@@ -502,6 +500,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
                 contentType: att.contentType,
                 size: att.content.length,
                 storedPath,
+                content: att.content,
               },
             });
           }

@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
   const groupBy = searchParams.get("groupBy"); // month | buyer | null
   const includePayment = searchParams.get("payment") === "true";
   const typeFilter = searchParams.get("type"); // "cost" | "sales"
+  const sourceFilter = searchParams.get("source"); // "recurring" = tylko opłaty VAT-7, PIT-5, ZUS
 
   const monthParam = searchParams.get("month");
   const yearParam = searchParams.get("year");
@@ -62,6 +63,7 @@ export async function GET(req: NextRequest) {
 
   const whereClause = {
     ...(typeFilter === "cost" || typeFilter === "sales" ? { type: typeFilter } : {}),
+    ...(sourceFilter === "recurring" ? { source: "recurring" } : {}),
     ...(dateFilter ?? {}),
   };
 

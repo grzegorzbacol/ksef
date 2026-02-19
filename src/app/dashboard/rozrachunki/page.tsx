@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-type Invoice = {
+type Oplata = {
   id: string;
   number: string;
   issueDate: string;
+  recurringCode: string | null;
   sellerName: string;
   grossAmount: number;
   currency: string;
@@ -17,6 +18,12 @@ type Invoice = {
   remarks?: string | null;
 };
 
+const RECURRING_LABEL: Record<string, string> = {
+  zus: "ZUS",
+  pit5: "PIT-5",
+  vat7: "VAT-7",
+};
+
 type RecurringSettlement = {
   code: string;
   name: string;
@@ -25,7 +32,7 @@ type RecurringSettlement = {
 };
 
 export default function RozrachunkiPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [oplaty, setOplaty] = useState<Oplata[]>([]);
   const [recurring, setRecurring] = useState<RecurringSettlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -41,9 +48,9 @@ export default function RozrachunkiPage() {
 
   function load() {
     setLoading(true);
-    fetch("/api/invoices?type=cost&payment=true")
+    fetch("/api/invoices?type=cost&source=recurring&payment=true")
       .then((r) => r.json())
-      .then((data) => setInvoices(Array.isArray(data) ? data : []))
+      .then((data) => setOplaty(Array.isArray(data) ? data : []))
       .finally(() => setLoading(false));
   }
 
@@ -92,7 +99,7 @@ export default function RozrachunkiPage() {
   }
 
   async function handleDelete(invoiceId: string, number: string) {
-    if (!confirm(`Usunąć fakturę ${number} z rozrachunków?`)) return;
+    if (!confirm(`Usunąć opłatę ${number}?`)) return;
     setDeletingId(invoiceId);
     try {
       const res = await fetch(`/api/invoices/${invoiceId}`, { method: "DELETE" });
@@ -174,8 +181,8 @@ export default function RozrachunkiPage() {
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
 
-  const paidCount = invoices.filter((i) => i.payment).length;
-  const unpaidCount = invoices.length - paidCount;
+  const paidCount = oplaty.filter((o) => o.payment).length;
+  const unpaidCount = oplaty.length - paidCount;
 
   async function generateRecurring() {
     try {
@@ -199,13 +206,13 @@ export default function RozrachunkiPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-2">Rozrachunki</h1>
+      <h1 className="text-2xl font-semibold mb-2">Opłaty cykliczne</h1>
       <p className="text-muted text-sm mb-6">
-        Zaznacz checkbox, aby zarejestrować rozliczenie faktury (zapisujemy datę).
+        ZUS, PIT-5, VAT-7 – to nie są faktury, to opłaty. Każdy miesiąc ma trzy wpisy. Zaznacz checkbox, aby zarejestrować opłacenie.
       </p>
 
       <div className="mb-6 rounded-xl border border-border bg-card p-4 max-w-2xl">
-        <h2 className="font-medium mb-2">Rozrachunki cykliczne (ZUS, PIT-5, VAT-7)</h2>
+        <h2 className="font-medium mb-2">Opłaty miesięczne: VAT-7, PIT-5, ZUS</h2>
         {recurring.length > 0 && (
           <p className="text-muted text-sm mb-2">
             Nazewnictwo z formularzem:{" "}
@@ -218,7 +225,7 @@ export default function RozrachunkiPage() {
           </p>
         )}
         <p className="text-muted text-sm mb-3">
-          Pozycje na bieżący miesiąc są generowane automatycznie przy wejściu na tę stronę (kwota 0 – uzupełnisz ręcznie w tabeli poniżej).
+          Pozycje na bieżący miesiąc są generowane automatycznie przy wejściu na tę stronę. Płatności identyfikowalne według typu (VAT-7, PIT-5, ZUS).
         </p>
         <button
           type="button"
@@ -230,35 +237,38 @@ export default function RozrachunkiPage() {
       </div>
 
       <div className="mb-6 flex gap-4 text-sm">
-        <span className="text-success">Rozliczone: {paidCount}</span>
-        <span className="text-warning">Nierozliczone: {unpaidCount}</span>
+        <span className="text-success">Opłacone: {paidCount}</span>
+        <span className="text-warning">Nieopłacone: {unpaidCount}</span>
       </div>
 
       <div className="rounded-xl border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-bg/50">
-              <th className="p-3 text-left w-12">Rozliczono</th>
+              <th className="p-3 text-left w-12">Opłacono</th>
+              <th className="p-3 text-left">Typ</th>
               <th className="p-3 text-left">Numer</th>
-              <th className="p-3 text-left">Data</th>
-              <th className="p-3 text-left">Wystawca</th>
+              <th className="p-3 text-left">Miesiąc</th>
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Termin płatności</th>
-              <th className="p-3 text-left">Data rozliczenia</th>
+              <th className="p-3 text-left">Data opłacenia</th>
               <th className="p-3 text-left min-w-[140px]">Uwagi</th>
               <th className="p-3 text-left w-40">Przekazane księgowej</th>
               <th className="p-3 w-16"></th>
             </tr>
           </thead>
           <tbody>
-            {invoices.length === 0 ? (
+            {oplaty.length === 0 ? (
               <tr>
                 <td colSpan={10} className="p-6 text-center text-muted">
-                  Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
+                  Brak opłat. Kliknij „Wygeneruj ponownie na ten miesiąc” lub odśwież stronę – opłaty VAT-7, PIT-5, ZUS są generowane automatycznie.
                 </td>
               </tr>
             ) : (
-              invoices.map((inv) => (
+              oplaty.map((inv) => {
+                const typLabel = inv.recurringCode ? (RECURRING_LABEL[inv.recurringCode] ?? inv.recurringCode) : "—";
+                const miesiac = new Date(inv.issueDate).toLocaleDateString("pl-PL", { year: "numeric", month: "short" });
+                return (
                 <tr key={inv.id} className="border-b border-border">
                   <td className="p-3">
                     <input
@@ -269,13 +279,9 @@ export default function RozrachunkiPage() {
                       className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
                     />
                   </td>
-                  <td className="p-3 font-medium">
-                    <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
-                      {inv.number}
-                    </Link>
-                  </td>
-                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.sellerName}</td>
+                  <td className="p-3 font-semibold">{typLabel}</td>
+                  <td className="p-3 font-mono text-sm">{inv.number}</td>
+                  <td className="p-3">{miesiac}</td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (
                       <span className="inline-flex items-center gap-1">
@@ -408,7 +414,8 @@ export default function RozrachunkiPage() {
                     </button>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>
