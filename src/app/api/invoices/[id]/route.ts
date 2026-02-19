@@ -111,14 +111,7 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({ where: { id } });
-  if (invoice?.source === "mail" && invoice.emailMessageId?.trim()) {
-    await prisma.deletedMailInvoiceMessageId.upsert({
-      where: { emailMessageId: invoice.emailMessageId.trim() },
-      create: { emailMessageId: invoice.emailMessageId.trim() },
-      update: {},
-    });
-  }
+  // Deduplikacja jest tylko po Message-ID (konkretna wiadomość). Usunięcie faktury nie blokuje ponownego importu tej samej wiadomości.
   await prisma.invoice.delete({ where: { id } }).catch(() => null);
   return NextResponse.json({ ok: true });
 }

@@ -411,21 +411,14 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
           const parsed = await parseEmailToInvoice(buffer, msg.envelope?.from?.[0]?.address || "");
           if (!parsed) continue;
 
-          if (parsed.emailMessageId) {
-            const existing = await prisma.invoice.findFirst({
-              where: { emailMessageId: parsed.emailMessageId },
-            });
-            if (existing) {
-              skippedAlreadyImported++;
-              continue;
-            }
-            const wasDeleted = await prisma.deletedMailInvoiceMessageId.findUnique({
-              where: { emailMessageId: parsed.emailMessageId },
-            });
-            if (wasDeleted) {
-              skippedDeleted++;
-              continue;
-            }
+          // Deduplikacja TYLKO po tożsamości wiadomości (Message-ID lub IMAP UID). Nowy mail = nowa wiadomość = import.
+          const messageId = parsed.emailMessageId || `imap:${(settings.imapFolder || "INBOX").replace(/[/\\]/g, "_")}:${msg.uid}`;
+          const existing = await prisma.invoice.findFirst({
+            where: { emailMessageId: messageId },
+          });
+          if (existing) {
+            skippedAlreadyImported++;
+            continue;
           }
 
           const issueDate = new Date(parsed.invoice.issueDate);
@@ -478,7 +471,7 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
                   emailBody: parsed.emailBody,
                   emailFrom: parsed.emailFrom,
                   emailReceivedAt: parsed.emailReceivedAt,
-                  emailMessageId: parsed.emailMessageId,
+                  emailMessageId: messageId,
                 },
               });
               break;
