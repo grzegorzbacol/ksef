@@ -111,10 +111,10 @@ export default function PersonalBudgetListPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {budgets.map((b) => {
-            const totalBalance = b.accounts
+            const totalBalance = (b.accounts ?? [])
               .filter((a) => a.isOnBudget)
               .reduce((s, a) => s + a.balance, 0);
-            const privateGroup = b.categoryGroups.find((g) => g.isPrivateExpenses);
+            const privateGroup = (b.categoryGroups ?? []).find((g) => g.isPrivateExpenses);
             return (
               <Link
                 key={b.id}
@@ -123,7 +123,7 @@ export default function PersonalBudgetListPage() {
               >
                 <h2 className="font-semibold text-lg">{b.name}</h2>
                 <p className="text-sm text-muted mt-1">
-                  {b.accounts.length} kont, {b.categoryGroups.length} grup kategorii
+                  {(b.accounts ?? []).length} kont, {(b.categoryGroups ?? []).length} grup kategorii
                 </p>
                 <p className="mt-3 text-xl font-semibold">
                   {formatCurrency(totalBalance)}

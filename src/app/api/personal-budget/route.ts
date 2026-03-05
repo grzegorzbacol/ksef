@@ -31,6 +31,20 @@ export async function POST(req: NextRequest) {
   const name = String(body.name ?? "Budżet osobisty").trim();
   if (!name) return NextResponse.json({ error: "Nazwa budżetu jest wymagana" }, { status: 400 });
 
-  const budget = await createPersonalBudgetWithDefaults(session.userId, name);
+  const { id } = await createPersonalBudgetWithDefaults(session.userId, name);
+
+  const budget = await prisma.personalBudget.findFirst({
+    where: { id, userId: session.userId },
+    include: {
+      accounts: { orderBy: { sortOrder: "asc" } },
+      categoryGroups: {
+        orderBy: { sortOrder: "asc" },
+        include: {
+          categories: { orderBy: [{ sortOrder: "asc" }, { name: "asc" }] },
+        },
+      },
+    },
+  });
+  if (!budget) return NextResponse.json({ error: "Błąd tworzenia budżetu" }, { status: 500 });
   return NextResponse.json(budget);
 }
