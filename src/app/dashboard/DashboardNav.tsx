@@ -12,6 +12,7 @@ const navItems = [
   { href: "/dashboard/ksef", label: "KSEF" },
   { href: "/dashboard/warehouse", label: "Magazyn" },
   { href: "/dashboard/statistics", label: "Statystyki" },
+  { href: "/dashboard/budget", label: "Budżet" },
   { href: "/dashboard/rozrachunki", label: "Rozrachunki" },
   { href: "/dashboard/settings", label: "Ustawienia" },
 ];

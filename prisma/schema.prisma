@@ -159,3 +159,34 @@ model DeletedMailInvoiceMessageId {
   emailMessageId String   @unique
   createdAt      DateTime @default(now())
 }
+
+// Moduł budżetu wzorowany na YNAB
+model BudgetCategory {
+  id          String   @id @default(cuid())
+  name        String   // np. "Transport", "Jedzenie", "Rachunki"
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  allocations BudgetAllocation[]
+  transactions BudgetTransaction[]
+}
+
+model BudgetAllocation {
+  id            String         @id @default(cuid())
+  month         Int            // 1-12
+  year          Int
+  categoryId    String
+  plannedAmount Float          @default(0) // planowana kwota na kategorię (PLN)
+  category      BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  @@unique([month, year, categoryId])
+}
+
+model BudgetTransaction {
+  id         String         @id @default(cuid())
+  date       DateTime       // data transakcji
+  amount     Float          // dodatnia = przychód, ujemna = wydatek
+  categoryId String
+  memo       String?        @db.Text
+  createdAt  DateTime       @default(now())
+  category   BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
