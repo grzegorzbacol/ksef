@@ -8,11 +8,12 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  login     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  login           String   @unique
+  password        String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  personalBudgets PersonalBudget[]
 }
 
 model Setting {
@@ -189,4 +190,138 @@ model BudgetTransaction {
   memo       String?        @db.Text
   createdAt  DateTime       @default(now())
   category   BudgetCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+// =============================================================================
+// MODUŁ BUDŻETU OSOBISTEGO (YNAB-style) – osobny od budżetu firmowego
+// Obsługuje m.in. wydatki prywatne, konta, cele, harmonogramy
+// =============================================================================
+
+model PersonalBudget {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   // np. "Osobisty", "Rodzinny", "Firma"
+  currency  String   @default("PLN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts  PersonalAccount[]
+  categoryGroups PersonalCategoryGroup[]
+  transactions PersonalTransaction[]
+  payees    PersonalPayee[]
+  scheduledTransactions PersonalScheduledTransaction[]
+}
+
+model PersonalAccount {
+  id          String   @id @default(cuid())
+  budgetId    String
+  name        String   // np. "Konto główne", "Gotówka", "Lokata"
+  type        String   // ON_BUDGET: checking, savings, cash, debit | OFF_BUDGET: loan, investment, mortgage
+  isOnBudget  Boolean  @default(true) // true = ON_BUDGET, false = OFF_BUDGET (tracking)
+  balance     Float    @default(0)    // aktualne saldo (cache)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  budget      PersonalBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  transactions PersonalTransaction[]
+  scheduledTransactions PersonalScheduledTransaction[]
+}
+
+model PersonalCategoryGroup {
+  id          String   @id @default(cuid())
+  budgetId    String
+  name        String   // np. "Mieszkanie", "Jedzenie", "Wydatki prywatne"
+  isPrivateExpenses Boolean @default(false) // true = grupa na wydatki prywatne (flaga do filtrów/raportów)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  budget      PersonalBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  categories  PersonalCategory[]
+}
+
+model PersonalCategory {
+  id            String   @id @default(cuid())
+  groupId       String
+  name          String   // np. "Czynsz", "Zakupy", "Restauracje"
+  sortOrder     Int      @default(0)
+  isSystem      Boolean  @default(false) // true = "Do przydzielenia" (To Be Budgeted) – nie usuwać
+  targetType    String?  // null | monthly_spending | savings | target_by_date
+  targetAmount  Float?   // np. 1000 miesięcznie
+  targetDate    DateTime? // dla target_by_date
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  group         PersonalCategoryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  transactions  PersonalTransaction[]
+  allocations   PersonalAllocation[]
+  payeeCategory PersonalPayeeCategory[] @relation("PayeeCategory")
+  scheduledTransactions PersonalScheduledTransaction[]
+}
+
+model PersonalAllocation {
+  id         String   @id @default(cuid())
+  categoryId String
+  month      Int      // 1-12
+  year       Int
+  amount     Float    @default(0) // przydzielona kwota (budżet)
+  createdAt  DateTime @default(now())
+  category   PersonalCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  @@unique([categoryId, month, year])
+}
+
+model PersonalTransaction {
+  id          String   @id @default(cuid())
+  budgetId    String
+  accountId   String
+  date        DateTime
+  payeeId     String?
+  categoryId  String?
+  amount      Float    // ujemna = wydatek, dodatnia = przychód/transfer
+  memo        String?  @db.Text
+  cleared     Boolean  @default(false) // zrekoncyliowane
+  isPrivate   Boolean  @default(false) // wydatek prywatny (do raportów)
+  scheduledTransactionId String?
+  createdAt   DateTime @default(now())
+  budget      PersonalBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  scheduledTransaction PersonalScheduledTransaction? @relation(fields: [scheduledTransactionId], references: [id], onDelete: SetNull)
+  account     PersonalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  payee       PersonalPayee?  @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  category    PersonalCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+}
+
+model PersonalPayee {
+  id        String   @id @default(cuid())
+  budgetId  String
+  name      String   // np. "Lidl", "PGE", "Netflix"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  budget    PersonalBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  transactions PersonalTransaction[]
+  defaultCategory PersonalPayeeCategory[] @relation("PayeeCategory")
+  scheduledTransactions PersonalScheduledTransaction[]
+}
+
+model PersonalPayeeCategory {
+  id         String   @id @default(cuid())
+  payeeId    String   @unique
+  categoryId String
+  payee      PersonalPayee   @relation("PayeeCategory", fields: [payeeId], references: [id], onDelete: Cascade)
+  category   PersonalCategory @relation("PayeeCategory", fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model PersonalScheduledTransaction {
+  id          String   @id @default(cuid())
+  budgetId    String
+  accountId   String
+  payeeId     String?
+  categoryId  String?
+  amount      Float
+  memo        String?  @db.Text
+  frequency   String   // monthly | yearly | weekly
+  nextDate    DateTime // następna data wystąpienia
+  createdAt   DateTime @default(now())
+  budget      PersonalBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account     PersonalAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  payee       PersonalPayee?  @relation(fields: [payeeId], references: [id], onDelete: SetNull)
+  category    PersonalCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions PersonalTransaction[]
 }
