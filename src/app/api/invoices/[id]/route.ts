@@ -28,6 +28,8 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json().catch(() => ({}));
   const update: {
+    issueDate?: Date;
+    saleDate?: Date | null;
     paymentDueDate?: Date | null;
     netAmount?: number;
     vatAmount?: number;
@@ -44,6 +46,16 @@ export async function PATCH(
     remarks?: string | null;
     expenseCategoryId?: string | null;
   } = {};
+  if (body.issueDate !== undefined) {
+    const d = body.issueDate === null || body.issueDate === "" ? null : new Date(body.issueDate);
+    if (d && !Number.isNaN(d.getTime())) update.issueDate = d;
+  }
+  if (body.saleDate !== undefined) {
+    update.saleDate =
+      body.saleDate === null || body.saleDate === ""
+        ? null
+        : new Date(body.saleDate);
+  }
   if (body.paymentDueDate !== undefined) {
     update.paymentDueDate =
       body.paymentDueDate === null || body.paymentDueDate === ""

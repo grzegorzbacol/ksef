@@ -105,6 +105,9 @@ export default function InvoicesSalesPage() {
   const [editingNumberId, setEditingNumberId] = useState<string | null>(null);
   const [editingNumberValue, setEditingNumberValue] = useState("");
   const [savingNumberId, setSavingNumberId] = useState<string | null>(null);
+  const [editingDateId, setEditingDateId] = useState<string | null>(null);
+  const [editingDateValue, setEditingDateValue] = useState("");
+  const [savingDateId, setSavingDateId] = useState<string | null>(null);
   const [editingSellerId, setEditingSellerId] = useState<string | null>(null);
   const [editingSellerName, setEditingSellerName] = useState("");
   const [editingSellerNip, setEditingSellerNip] = useState("");
@@ -495,6 +498,36 @@ function InvoiceNumberCell({
     } finally {
       setSavingNumberId(null);
       setEditingNumberId(null);
+    }
+  }
+
+  async function saveDate(invoiceId: string, valueStr: string) {
+    const d = valueStr.trim();
+    if (!d) {
+      setEditingDateId(null);
+      return;
+    }
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) {
+      setEditingDateId(null);
+      return;
+    }
+    setSavingDateId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueDate: d }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd zapisu daty");
+        return;
+      }
+      loadInvoices();
+    } finally {
+      setSavingDateId(null);
+      setEditingDateId(null);
     }
   }
 
@@ -1131,7 +1164,42 @@ function InvoiceNumberCell({
                       />
                     )}
                   </td>
-                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
+                  <td className="p-3">
+                    {inv.source === "mail" && editingDateId === inv.id ? (
+                      <input
+                        type="date"
+                        value={editingDateValue}
+                        onChange={(e) => setEditingDateValue(e.target.value)}
+                        onBlur={() => {
+                          if (editingDateId === inv.id) saveDate(inv.id, editingDateValue);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") e.currentTarget.blur();
+                          if (e.key === "Escape") {
+                            setEditingDateId(null);
+                            setEditingDateValue("");
+                          }
+                        }}
+                        disabled={savingDateId === inv.id}
+                        autoFocus
+                        className="rounded border border-border bg-bg px-2 py-1 text-sm"
+                      />
+                    ) : inv.source === "mail" ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingDateId(inv.id);
+                          setEditingDateValue(new Date(inv.issueDate).toISOString().slice(0, 10));
+                        }}
+                        title="Kliknij, aby edytować datę"
+                        className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {new Date(inv.issueDate).toLocaleDateString("pl-PL")}
+                      </button>
+                    ) : (
+                      new Date(inv.issueDate).toLocaleDateString("pl-PL")
+                    )}
+                  </td>
                   <td className="p-3">
                     <div className="space-y-1">
                       {inv.source !== "ksef" && editingSellerId === inv.id ? (

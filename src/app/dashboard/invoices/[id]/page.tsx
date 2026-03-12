@@ -175,6 +175,9 @@ export default function InvoiceDetailPage() {
   const [editSellerNip, setEditSellerNip] = useState("");
   const [savingSeller, setSavingSeller] = useState(false);
   const [editingNumberInline, setEditingNumberInline] = useState(false);
+  const [editingDateInline, setEditingDateInline] = useState(false);
+  const [editDate, setEditDate] = useState("");
+  const [savingDate, setSavingDate] = useState(false);
   const [editingSellerInline, setEditingSellerInline] = useState(false);
   const [companyTax, setCompanyTax] = useState<{
     pitRate: number;
@@ -223,6 +226,7 @@ export default function InvoiceDetailPage() {
           setExpenseType(inv.expenseType === "car" ? "car" : "standard");
           setExpenseCarId(inv.carId ?? "");
           setEditRemarks(inv.remarks ?? "");
+          setEditDate(inv.issueDate ? new Date(inv.issueDate).toISOString().slice(0, 10) : "");
         }
       });
   }
@@ -267,6 +271,10 @@ export default function InvoiceDetailPage() {
     if (invoice?.sellerNip != null) setEditSellerNip(invoice.sellerNip);
   }, [invoice?.sellerName, invoice?.sellerNip]);
 
+  useEffect(() => {
+    if (invoice?.issueDate) setEditDate(new Date(invoice.issueDate).toISOString().slice(0, 10));
+  }, [invoice?.issueDate]);
+
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
 
@@ -298,6 +306,38 @@ export default function InvoiceDetailPage() {
     } finally {
       setSavingSeller(false);
       setEditingSellerInline(false);
+    }
+  };
+
+  const saveDateInline = async () => {
+    const d = editDate.trim();
+    if (!d) {
+      setEditingDateInline(false);
+      return;
+    }
+    const parsed = new Date(d);
+    if (Number.isNaN(parsed.getTime())) {
+      setEditingDateInline(false);
+      return;
+    }
+    const currentStr = new Date(invoice.issueDate).toISOString().slice(0, 10);
+    if (d === currentStr) {
+      setEditingDateInline(false);
+      return;
+    }
+    setSavingDate(true);
+    try {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issueDate: d }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setInvoice(data);
+      else alert(data.error || "Błąd zapisu daty");
+    } finally {
+      setSavingDate(false);
+      setEditingDateInline(false);
     }
   };
 
@@ -362,7 +402,40 @@ export default function InvoiceDetailPage() {
         </h1>
         <dl className="grid gap-2 sm:grid-cols-2">
           <dt className="text-muted">Data wystawienia</dt>
-          <dd>{new Date(invoice.issueDate).toLocaleDateString("pl-PL")}</dd>
+          <dd>
+            {invoice.source === "mail" && editingDateInline ? (
+              <input
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                onBlur={() => saveDateInline()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveDateInline();
+                  if (e.key === "Escape") {
+                    setEditDate(new Date(invoice.issueDate).toISOString().slice(0, 10));
+                    setEditingDateInline(false);
+                  }
+                }}
+                disabled={savingDate}
+                autoFocus
+                className="rounded border border-border bg-bg px-2 py-1 text-sm"
+              />
+            ) : invoice.source === "mail" ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditDate(new Date(invoice.issueDate).toISOString().slice(0, 10));
+                  setEditingDateInline(true);
+                }}
+                title="Kliknij, aby edytować datę"
+                className="rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {new Date(invoice.issueDate).toLocaleDateString("pl-PL")}
+              </button>
+            ) : (
+              new Date(invoice.issueDate).toLocaleDateString("pl-PL")
+            )}
+          </dd>
           <dt className="text-muted">Data sprzedaży</dt>
           <dd>{invoice.saleDate ? new Date(invoice.saleDate).toLocaleDateString("pl-PL") : "–"}</dd>
           <dt className="text-muted">Sprzedawca</dt>
