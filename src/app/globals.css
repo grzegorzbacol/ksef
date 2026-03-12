@@ -69,3 +69,29 @@ button:focus-visible {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
+
+/* Drukowanie – ukryj nawigację, dostosuj layout */
+@media print {
+  aside,
+  header[class*="sticky"] {
+    display: none !important;
+  }
+  main {
+    padding-left: 0 !important;
+  }
+  /* Lepsza czytelność na druku – ciemny motyw może słabo wychodzić */
+  body {
+    background: white;
+    color: black;
+  }
+  .rounded-xl {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  table {
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #ccc;
+  }
+}

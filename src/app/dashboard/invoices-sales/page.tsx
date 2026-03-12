@@ -593,7 +593,7 @@ function InvoiceNumberCell({
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">Faktury zakupu</h1>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 print:hidden">
           <div className="flex gap-2 items-center text-sm">
             <input
               type="date"
@@ -623,11 +623,23 @@ function InvoiceNumberCell({
           >
             {showForm ? "Anuluj" : "Nowa faktura zakupu"}
           </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            disabled={invoices.length === 0}
+            className="rounded-lg border border-border bg-bg px-4 py-2 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title="Drukuj listę faktur zakupu"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Drukuj
+          </button>
         </div>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
+        <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4 print:hidden">
           <h2 className="font-medium">Nowa faktura zakupu</h2>
           <p className="text-muted text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie. Faktury trafiają od razu do rozrachunków. Możesz wpisać dane ręcznie, dodać pozycje z magazynu lub ręcznie (nazwa, ilość, cena, VAT) oraz załączyć plik (np. skan faktury).</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1088,7 +1100,7 @@ function InvoiceNumberCell({
                 <th className="p-3">Źródło</th>
                 <th className="p-3">Rozliczono</th>
                 <th className="p-3 text-left w-40">Przekazane księgowej</th>
-                <th className="p-3 w-20"></th>
+                <th className="p-3 w-20 print:hidden"></th>
               </tr>
             </thead>
             <tbody>
@@ -1144,16 +1156,18 @@ function InvoiceNumberCell({
                               setEditingNumberValue(inv.number);
                             }}
                             title="Kliknij, aby edytować numer faktury"
-                            className="font-medium text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+                            className="font-medium text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                           >
                             {inv.number}
                           </button>
-                          <InvoiceNumberCell
-                            invoiceId={inv.id}
-                            invoiceNumber={inv.number}
-                            onError={(msg) => alert(msg)}
-                            label="Pobierz"
-                          />
+                          <span className="print:hidden">
+                            <InvoiceNumberCell
+                              invoiceId={inv.id}
+                              invoiceNumber={inv.number}
+                              onError={(msg) => alert(msg)}
+                              label="Pobierz"
+                            />
+                          </span>
                         </span>
                       )
                     ) : (
@@ -1192,7 +1206,7 @@ function InvoiceNumberCell({
                           setEditingDateValue(new Date(inv.issueDate).toISOString().slice(0, 10));
                         }}
                         title="Kliknij, aby edytować datę"
-                        className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+                        className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                       >
                         {new Date(inv.issueDate).toLocaleDateString("pl-PL")}
                       </button>
@@ -1245,8 +1259,8 @@ function InvoiceNumberCell({
                                 setEditingSellerName(inv.sellerName);
                                 setEditingSellerNip(inv.sellerNip ?? "");
                               }}
-                              title="Kliknij, aby edytować dostawcę"
-                              className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent block"
+                title="Kliknij, aby edytować dostawcę"
+                className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent block print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                             >
                               {inv.sellerName}
                             </button>
@@ -1295,7 +1309,7 @@ function InvoiceNumberCell({
                           setEditingAmountValue(inv.grossAmount.toFixed(2));
                         }}
                         title="Kliknij, aby szybko edytować kwotę (np. ZUS, US)"
-                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent"
+                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0"
                       >
                         {inv.grossAmount.toFixed(2)} {inv.currency}
                       </button>
@@ -1312,7 +1326,7 @@ function InvoiceNumberCell({
                         checked={!!inv.payment}
                         disabled={togglingPaidId === inv.id}
                         onChange={() => togglePaid(inv)}
-                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent print:hidden"
                         title="Oznacz jako opłaconą"
                       />
                       {inv.payment ? (
@@ -1335,12 +1349,12 @@ function InvoiceNumberCell({
                         onChange={() =>
                           toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)
                         }
-                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent print:hidden"
                         title="Przekazane księgowej"
                       />
                     )}
                   </td>
-                  <td className="p-3 flex gap-2">
+                  <td className="p-3 flex gap-2 print:hidden">
                     <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
                       Szczegóły
                     </Link>
