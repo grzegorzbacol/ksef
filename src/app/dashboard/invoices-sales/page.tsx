@@ -39,6 +39,7 @@ type Invoice = {
   carId?: string | null;
   car?: Car | null;
   expenseCategory?: { id: string; name: string } | null;
+  handedOverToAccountant?: boolean;
 };
 
 type Product = {
@@ -122,6 +123,7 @@ export default function InvoicesSalesPage() {
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
   const [year, setYear] = useState<number | null>(now.getFullYear());
+  const [updatingAccountantId, setUpdatingAccountantId] = useState<string | null>(null);
 
   const invoiceType = "cost" as const;
   const taxConfig = companyTax ?? { pitRate: 0.12, healthRate: 0.09, isVatPayer: true };
@@ -536,6 +538,21 @@ function InvoiceNumberCell({
       loadInvoices();
     } finally {
       setAssigningContractorId(null);
+    }
+  }
+
+  async function toggleHandedOverToAccountant(invoiceId: string, current: boolean) {
+    setUpdatingAccountantId(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handedOverToAccountant: !current }),
+      });
+      if (!res.ok) alert("Błąd zapisu");
+      else loadInvoices();
+    } finally {
+      setUpdatingAccountantId(null);
     }
   }
 
@@ -1037,6 +1054,7 @@ function InvoiceNumberCell({
                 <th className="p-3 text-right">Realny koszt</th>
                 <th className="p-3">Źródło</th>
                 <th className="p-3">Rozliczono</th>
+                <th className="p-3 text-left w-40">Przekazane księgowej</th>
                 <th className="p-3 w-20"></th>
               </tr>
             </thead>
@@ -1237,6 +1255,22 @@ function InvoiceNumberCell({
                         <span className="text-muted text-sm">Nie</span>
                       )}
                     </label>
+                  </td>
+                  <td className="p-3">
+                    {inv.source === "ksef" ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      <input
+                        type="checkbox"
+                        checked={!!inv.handedOverToAccountant}
+                        disabled={updatingAccountantId === inv.id}
+                        onChange={() =>
+                          toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)
+                        }
+                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                        title="Przekazane księgowej"
+                      />
+                    )}
                   </td>
                   <td className="p-3 flex gap-2">
                     <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
