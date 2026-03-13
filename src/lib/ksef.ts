@@ -192,7 +192,7 @@ export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
   const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || "").trim() ||
     (targetEnv === "prod" ? DEFAULT_API_URL : "");
-  const token = (s.token || process.env.KSEF_TOKEN ?? "").trim();
+  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   return !!apiUrl && !!token;
 }
 
