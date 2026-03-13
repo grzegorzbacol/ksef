@@ -316,6 +316,7 @@ export default function InvoiceDetailPage() {
   const [savingRemarks, setSavingRemarks] = useState(false);
   const [editingPaymentDueDate, setEditingPaymentDueDate] = useState(false);
   const [editPaymentDueDate, setEditPaymentDueDate] = useState("");
+  const [editPaymentDueDays, setEditPaymentDueDays] = useState("");
   const [savingPaymentDueDate, setSavingPaymentDueDate] = useState(false);
   const [creatingCorrection, setCreatingCorrection] = useState(false);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
@@ -653,18 +654,58 @@ export default function InvoiceDetailPage() {
             </>
           )}
           <dt className="text-muted">KSEF</dt>
-          <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
+          <dd className="flex flex-col gap-1">
+            <span>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</span>
+            {!isCost && invoice.paymentDueDate && (
+              <a
+                href={`/api/invoices/${id}/ksef-xml`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-accent hover:underline"
+              >
+                Pobierz XML (do walidacji XSD)
+              </a>
+            )}
+          </dd>
           <dt className="text-muted">Termin płatności</dt>
           <dd>
             {editingPaymentDueDate ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  value={editPaymentDueDate}
-                  onChange={(e) => setEditPaymentDueDate(e.target.value)}
-                  disabled={savingPaymentDueDate}
-                  className="rounded border border-border bg-bg px-2 py-1 text-sm"
-                />
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm text-muted">Liczba dni:</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="np. 14"
+                    value={editPaymentDueDays}
+                    onChange={(e) => setEditPaymentDueDays(e.target.value)}
+                    disabled={savingPaymentDueDate}
+                    className="w-20 rounded border border-border bg-bg px-2 py-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = parseInt(editPaymentDueDays, 10);
+                      if (!Number.isNaN(d) && d >= 0 && invoice?.issueDate) {
+                        const from = new Date(invoice.issueDate);
+                        from.setDate(from.getDate() + d);
+                        setEditPaymentDueDate(from.toISOString().slice(0, 10));
+                      }
+                    }}
+                    disabled={savingPaymentDueDate}
+                    className="rounded border border-border px-2 py-1 text-sm hover:bg-bg/80"
+                  >
+                    Oblicz
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={editPaymentDueDate}
+                    onChange={(e) => setEditPaymentDueDate(e.target.value)}
+                    disabled={savingPaymentDueDate}
+                    className="rounded border border-border bg-bg px-2 py-1 text-sm"
+                  />
                 <button
                   type="button"
                   onClick={async () => {
@@ -693,6 +734,7 @@ export default function InvoiceDetailPage() {
                   type="button"
                   onClick={() => {
                     setEditPaymentDueDate(invoice.paymentDueDate ? new Date(invoice.paymentDueDate).toISOString().slice(0, 10) : "");
+                    setEditPaymentDueDays("");
                     setEditingPaymentDueDate(false);
                   }}
                   disabled={savingPaymentDueDate}
@@ -700,12 +742,14 @@ export default function InvoiceDetailPage() {
                 >
                   Anuluj
                 </button>
+                </div>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => {
                   setEditPaymentDueDate(invoice.paymentDueDate ? new Date(invoice.paymentDueDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+                  setEditPaymentDueDays("");
                   setEditingPaymentDueDate(true);
                 }}
                 title="Kliknij, aby edytować termin płatności (wymagany przy wysyłce do KSeF)"

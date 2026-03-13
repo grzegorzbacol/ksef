@@ -142,9 +142,10 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   </Podmiot2>
   <Fa>
     <KodWaluty>${escXml(curr)}</KodWaluty>
+    <P_6_1>${saleDate}</P_6_1>
+    <P_6>${escXml(sellerCity)}</P_6>
     <P_1>${escXml(inv.number || `FA/${Date.now()}`)}</P_1>
     <P_2_1>${issueDate}</P_2_1>
-    <P_6_1>${saleDate}</P_6_1>
     <P_13_1>${escXml(nipS)}</P_13_1>
     <P_14_1>${escXml(inv.sellerName || "Sprzedawca")}</P_14_1>
     <P_15_1>${escXml(nipB)}</P_15_1>
@@ -155,10 +156,10 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       <P_7_C>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_7_C>
     </P_7>
     <RodzajFaktury>V</RodzajFaktury>
+    ${rows.length > 0 ? rows.join("\n") : ""}
     <Platnosc>
       <Termin>${paymentDue}</Termin>
     </Platnosc>
-    ${rows.length > 0 ? rows.join("\n") : ""}
   </Fa>
 </FA>`;
 }

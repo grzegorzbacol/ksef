@@ -71,6 +71,7 @@ export default function InvoicesPage() {
   const [form, setForm] = useState({
     issueDate: new Date().toISOString().slice(0, 10),
     saleDate: "",
+    paymentDueDays: "",
     paymentDueDate: "",
     sellerName: "",
     sellerNip: "",
@@ -221,6 +222,7 @@ export default function InvoicesPage() {
     setForm({
       issueDate: new Date().toISOString().slice(0, 10),
       saleDate: "",
+      paymentDueDays: "",
       paymentDueDate: "",
       sellerName: "",
       sellerNip: "",
@@ -301,16 +303,52 @@ export default function InvoicesPage() {
               <input
                 type="date"
                 value={form.issueDate}
-                onChange={(e) => setForm((p) => ({ ...p, issueDate: e.target.value }))}
+                onChange={(e) => {
+                  const issueDate = e.target.value;
+                  setForm((p) => {
+                    const d = parseInt(p.paymentDueDays, 10);
+                    let date = p.paymentDueDate;
+                    if (!Number.isNaN(d) && d >= 0) {
+                      const from = new Date(issueDate);
+                      from.setDate(from.getDate() + d);
+                      date = from.toISOString().slice(0, 10);
+                    }
+                    return { ...p, issueDate, paymentDueDate: date };
+                  });
+                }}
                 className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
+            </div>
+            <div>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Liczba dni (od daty wystawienia)</label>
+              <input
+                type="number"
+                min="0"
+                placeholder="np. 14"
+                value={form.paymentDueDays}
+                onChange={(e) => {
+                  const days = e.target.value;
+                  setForm((p) => {
+                    const d = parseInt(days, 10);
+                    let date = "";
+                    if (!Number.isNaN(d) && d >= 0) {
+                      const from = new Date(p.issueDate);
+                      from.setDate(from.getDate() + d);
+                      date = from.toISOString().slice(0, 10);
+                    }
+                    return { ...p, paymentDueDays: days, paymentDueDate: date };
+                  });
+                }}
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
+              />
+              <p className="text-xs mt-0.5" style={{ color: "var(--content-text-secondary)" }}>Lub podaj datę poniżej</p>
             </div>
             <div>
               <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Termin płatności</label>
               <input
                 type="date"
                 value={form.paymentDueDate}
-                onChange={(e) => setForm((p) => ({ ...p, paymentDueDate: e.target.value }))}
+                onChange={(e) => setForm((p) => ({ ...p, paymentDueDate: e.target.value, paymentDueDays: "" }))}
                 className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
               <p className="text-xs mt-0.5" style={{ color: "var(--content-text-secondary)" }}>Wymagany przy wysyłce do KSeF</p>
