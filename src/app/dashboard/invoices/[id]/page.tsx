@@ -486,7 +486,7 @@ export default function InvoiceDetailPage() {
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h1 className="text-xl font-semibold flex flex-wrap items-center gap-2">
           {typeLabel}{" "}
-          {invoice.source === "mail" && editingNumberInline ? (
+          {editingNumberInline ? (
             <input
               type="text"
               value={editNumber}
@@ -521,7 +521,7 @@ export default function InvoiceDetailPage() {
               autoFocus
               className="rounded border border-border bg-bg px-2 py-1 text-lg font-semibold min-w-[140px]"
             />
-          ) : invoice.source === "mail" ? (
+          ) : (
             <button
               type="button"
               onClick={() => {
@@ -533,14 +533,12 @@ export default function InvoiceDetailPage() {
             >
               {invoice.number}
             </button>
-          ) : (
-            invoice.number
           )}
         </h1>
         <dl className="grid gap-2 sm:grid-cols-2">
           <dt className="text-muted">Data wystawienia</dt>
           <dd>
-            {invoice.source === "mail" && editingDateInline ? (
+            {editingDateInline ? (
               <input
                 type="date"
                 value={editDate}
@@ -557,7 +555,7 @@ export default function InvoiceDetailPage() {
                 autoFocus
                 className="rounded border border-border bg-bg px-2 py-1 text-sm"
               />
-            ) : invoice.source === "mail" ? (
+            ) : (
               <button
                 type="button"
                 onClick={() => {
@@ -569,8 +567,6 @@ export default function InvoiceDetailPage() {
               >
                 {new Date(invoice.issueDate).toLocaleDateString("pl-PL")}
               </button>
-            ) : (
-              new Date(invoice.issueDate).toLocaleDateString("pl-PL")
             )}
           </dd>
           <dt className="text-muted">Data sprzedaży</dt>
