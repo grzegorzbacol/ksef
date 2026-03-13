@@ -5,11 +5,13 @@ import { useEffect, useState } from "react";
 
 type Invoice = {
   id: string;
+  type: "cost" | "sales";
   number: string;
   issueDate: string;
   saleDate: string | null;
   recurringCode: string | null;
   sellerName: string;
+  buyerName: string;
   grossAmount: number;
   currency: string;
   paymentDueDate: string | null;
@@ -38,7 +40,8 @@ type RecurringSettlement = {
 };
 
 export default function RozrachunkiPage() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [naleznosci, setNaleznosci] = useState<Invoice[]>([]);   // faktury sprzedaży – co mają mi zapłacić
+  const [zobowiazania, setZobowiazania] = useState<Invoice[]>([]); // faktury zakupu – co mam zapłacić
   const [recurring, setRecurring] = useState<RecurringSettlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
@@ -51,12 +54,31 @@ export default function RozrachunkiPage() {
   const [editingRemarksId, setEditingRemarksId] = useState<string | null>(null);
   const [editingRemarksValue, setEditingRemarksValue] = useState("");
   const [savingRemarksId, setSavingRemarksId] = useState<string | null>(null);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    type: "cost" as "cost" | "sales",
+    number: "",
+    issueDate: new Date().toISOString().slice(0, 10),
+    paymentDueDate: "",
+    sellerName: "",
+    sellerNip: "",
+    buyerName: "",
+    buyerNip: "",
+    grossAmount: "",
+    remarks: "",
+  });
 
   function load() {
     setLoading(true);
-    fetch("/api/invoices?type=cost&payment=true")
-      .then((r) => r.json())
-      .then((data) => setInvoices(Array.isArray(data) ? data : []))
+    Promise.all([
+      fetch("/api/invoices?type=sales&payment=true").then((r) => r.json()),
+      fetch("/api/invoices?type=cost&payment=true").then((r) => r.json()),
+    ])
+      .then(([salesData, costData]) => {
+        setNaleznosci(Array.isArray(salesData) ? salesData : []);
+        setZobowiazania(Array.isArray(costData) ? costData : []);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -187,9 +209,6 @@ export default function RozrachunkiPage() {
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
 
-  const paidCount = invoices.filter((i) => i.payment).length;
-  const unpaidCount = invoices.length - paidCount;
-
   async function generateRecurring() {
     try {
       const res = await fetch("/api/recurring-settlements", {
@@ -210,11 +229,73 @@ export default function RozrachunkiPage() {
     }
   }
 
+  async function handleManualSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const gross = parseFloat(manualForm.grossAmount.replace(",", "."));
+    if (Number.isNaN(gross) || gross < 0) {
+      alert("Podaj poprawną kwotę brutto");
+      return;
+    }
+    const sellerNip = manualForm.sellerNip.trim() || "-";
+    const buyerNip = manualForm.buyerNip.trim() || "-";
+    if (!manualForm.sellerName.trim() || !manualForm.buyerName.trim()) {
+      alert("Uzupełnij nazwę sprzedawcy i nabywcy");
+      return;
+    }
+    setManualSubmitting(true);
+    try {
+      const res = await fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: manualForm.type,
+          number: manualForm.number.trim() || undefined,
+          issueDate: manualForm.issueDate,
+          paymentDueDate: manualForm.paymentDueDate || null,
+          sellerName: manualForm.sellerName.trim(),
+          sellerNip,
+          buyerName: manualForm.buyerName.trim(),
+          buyerNip,
+          netAmount: gross,
+          vatAmount: 0,
+          grossAmount: gross,
+          remarks: manualForm.remarks.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd dodawania faktury");
+        return;
+      }
+      setShowManualForm(false);
+      setManualForm({
+        type: "cost",
+        number: "",
+        issueDate: new Date().toISOString().slice(0, 10),
+        paymentDueDate: "",
+        sellerName: "",
+        sellerNip: "",
+        buyerName: "",
+        buyerNip: "",
+        grossAmount: "",
+        remarks: "",
+      });
+      load();
+    } finally {
+      setManualSubmitting(false);
+    }
+  }
+
+  const naleznosciUnpaid = naleznosci.filter((i) => !i.payment).length;
+  const naleznosciPaid = naleznosci.length - naleznosciUnpaid;
+  const zobowiazaniaUnpaid = zobowiazania.filter((i) => !i.payment).length;
+  const zobowiazaniaPaid = zobowiazania.length - zobowiazaniaUnpaid;
+
   return (
     <div>
       <h1 className="text-2xl font-semibold mb-2">Rozrachunki</h1>
       <p className="text-muted text-sm mb-6">
-        Wszystkie faktury zakupu i opłaty (ZUS, PIT-5, VAT-7). Zaznacz checkbox, aby zarejestrować rozliczenie.
+        Należności – co mają ci zapłacić. Zobowiązania – co masz zapłacić. Zaznacz checkbox, aby zarejestrować rozliczenie.
       </p>
 
       <div className="mb-6 rounded-xl border border-border bg-card p-4 max-w-2xl">
@@ -240,14 +321,35 @@ export default function RozrachunkiPage() {
         >
           Wygeneruj ponownie na ten miesiąc
         </button>
+        <button
+          type="button"
+          onClick={() => setShowManualForm(true)}
+          className="ml-4 rounded-lg border border-border bg-accent/10 px-4 py-2 hover:bg-accent/20"
+        >
+          Dodaj fakturę ręcznie
+        </button>
       </div>
 
-      <div className="mb-6 flex gap-4 text-sm">
-        <span className="text-success">Rozliczone: {paidCount}</span>
-        <span className="text-warning">Nierozliczone: {unpaidCount}</span>
-      </div>
-
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* NALEŻNOŚCI – co mają mi zapłacić */}
+      <section className="mb-10">
+        <h2 className="text-lg font-semibold mb-2">Należności</h2>
+        <p className="text-muted text-sm mb-2">
+          Faktury sprzedaży – kwoty, które kontrahenci mają ci zapłacić.
+        </p>
+        <div className="mb-3 flex gap-4 text-sm">
+          <span className="text-success">Rozliczone: {naleznosciPaid}</span>
+          <span className="text-warning">Nierozliczone: {naleznosciUnpaid}</span>
+          {naleznosciUnpaid > 0 && (
+            <span className="font-medium">
+              Do odbioru: {naleznosci
+                .filter((i) => !i.payment)
+                .reduce((sum, i) => sum + i.grossAmount, 0)
+                .toFixed(2)}{" "}
+              PLN
+            </span>
+          )}
+        </div>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-bg/50">
@@ -255,24 +357,23 @@ export default function RozrachunkiPage() {
               <th className="p-3 text-left w-16">Typ</th>
               <th className="p-3 text-left">Numer</th>
               <th className="p-3 text-left">Data</th>
-              <th className="p-3 text-left">Wystawca</th>
+              <th className="p-3 text-left">Nabywca (ma zapłacić)</th>
               <th className="p-3 text-right">Brutto</th>
               <th className="p-3 text-left">Termin płatności</th>
               <th className="p-3 text-left">Data rozliczenia</th>
               <th className="p-3 text-left min-w-[140px]">Uwagi</th>
-              <th className="p-3 text-left w-40">Przekazane księgowej</th>
               <th className="p-3 w-16"></th>
             </tr>
           </thead>
           <tbody>
-            {invoices.length === 0 ? (
+            {naleznosci.length === 0 ? (
               <tr>
-                <td colSpan={11} className="p-6 text-center text-muted">
-                  Brak faktur. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
+                <td colSpan={10} className="p-6 text-center text-muted">
+                  Brak należności. Wystaw faktury sprzedaży w module Faktury sprzedaży.
                 </td>
               </tr>
             ) : (
-              invoices.map((inv) => (
+              naleznosci.map((inv) => (
                 <tr key={inv.id} className="border-b border-border">
                   <td className="p-3">
                     <input
@@ -285,12 +386,12 @@ export default function RozrachunkiPage() {
                   </td>
                   <td className="p-3 font-semibold">{typLabel(inv)}</td>
                   <td className="p-3 font-medium">
-                    <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
+                    <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
                       {inv.number}
                     </Link>
                   </td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.sellerName}</td>
+                  <td className="p-3">{inv.buyerName}</td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (
                       <span className="inline-flex items-center gap-1">
@@ -397,6 +498,180 @@ export default function RozrachunkiPage() {
                     )}
                   </td>
                   <td className="p-3">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(inv.id, inv.number)}
+                      disabled={deletingId === inv.id}
+                      className="text-red-400 hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+        </div>
+      </section>
+
+      {/* ZOBOWIĄZANIA – co mam zapłacić */}
+      <section>
+        <h2 className="text-lg font-semibold mb-2">Zobowiązania</h2>
+        <p className="text-muted text-sm mb-2">
+          Faktury zakupu i opłaty (ZUS, PIT-5, VAT-7) – kwoty, które masz zapłacić dostawcom i urzędom.
+        </p>
+        <div className="mb-3 flex gap-4 text-sm">
+          <span className="text-success">Rozliczone: {zobowiazaniaPaid}</span>
+          <span className="text-warning">Nierozliczone: {zobowiazaniaUnpaid}</span>
+          {zobowiazaniaUnpaid > 0 && (
+            <span className="font-medium">
+              Do zapłaty: {zobowiazania
+                .filter((i) => !i.payment)
+                .reduce((sum, i) => sum + i.grossAmount, 0)
+                .toFixed(2)}{" "}
+              PLN
+            </span>
+          )}
+        </div>
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-bg/50">
+              <th className="p-3 text-left w-12">Rozliczono</th>
+              <th className="p-3 text-left w-16">Typ</th>
+              <th className="p-3 text-left">Numer</th>
+              <th className="p-3 text-left">Data</th>
+              <th className="p-3 text-left">Wystawca (do zapłaty)</th>
+              <th className="p-3 text-right">Brutto</th>
+              <th className="p-3 text-left">Termin płatności</th>
+              <th className="p-3 text-left">Data rozliczenia</th>
+              <th className="p-3 text-left min-w-[140px]">Uwagi</th>
+              <th className="p-3 text-left w-40">Przekazane księgowej</th>
+              <th className="p-3 w-16"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {zobowiazania.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="p-6 text-center text-muted">
+                  Brak zobowiązań. Dodaj faktury w module Faktury zakupu lub pobierz z KSEF.
+                </td>
+              </tr>
+            ) : (
+              zobowiazania.map((inv) => (
+                <tr key={inv.id} className="border-b border-border">
+                  <td className="p-3">
+                    <input
+                      type="checkbox"
+                      checked={!!inv.payment}
+                      disabled={toggling === inv.id}
+                      onChange={() => togglePaid(inv.id)}
+                      className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
+                    />
+                  </td>
+                  <td className="p-3 font-semibold">{typLabel(inv)}</td>
+                  <td className="p-3 font-medium">
+                    <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
+                      {inv.number}
+                    </Link>
+                  </td>
+                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
+                  <td className="p-3">{inv.sellerName}</td>
+                  <td className="p-3 text-right">
+                    {editingAmountId === inv.id ? (
+                      <span className="inline-flex items-center gap-1">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={editingAmountValue}
+                          onChange={(e) => setEditingAmountValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingAmountId === inv.id) saveAmount(inv.id, editingAmountValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                            if (e.key === "Escape") {
+                              setEditingAmountId(null);
+                              setEditingAmountValue("");
+                            }
+                          }}
+                          disabled={savingAmountId === inv.id}
+                          autoFocus
+                          className="w-24 rounded border border-border bg-bg px-2 py-1 text-right text-sm"
+                        />
+                        <span className="text-muted text-sm">{inv.currency}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAmountId(inv.id);
+                          setEditingAmountValue(inv.grossAmount.toFixed(2));
+                        }}
+                        title="Kliknij, aby szybko edytować kwotę (np. ZUS, US)"
+                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {inv.grossAmount.toFixed(2)} {inv.currency}
+                      </button>
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {inv.payment ? (
+                      inv.paymentDueDate
+                        ? new Date(inv.paymentDueDate).toLocaleDateString("pl-PL")
+                        : "–"
+                    ) : (
+                      <input
+                        type="date"
+                        value={inv.paymentDueDate ? new Date(inv.paymentDueDate).toISOString().slice(0, 10) : ""}
+                        disabled={updatingDueId === inv.id}
+                        onChange={(e) => updatePaymentDueDate(inv.id, e.target.value || null)}
+                        className="rounded border border-border bg-bg px-2 py-1 text-sm w-36"
+                      />
+                    )}
+                  </td>
+                  <td className="p-3 text-muted">
+                    {inv.payment ? new Date(inv.payment.paidAt).toLocaleString("pl-PL") : "–"}
+                  </td>
+                  <td className="p-3">
+                    {editingRemarksId === inv.id ? (
+                      <span className="inline-flex items-center gap-1 w-full max-w-[200px]">
+                        <input
+                          type="text"
+                          value={editingRemarksValue}
+                          onChange={(e) => setEditingRemarksValue(e.target.value)}
+                          onBlur={() => {
+                            if (editingRemarksId === inv.id) saveRemarks(inv.id, editingRemarksValue);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                            if (e.key === "Escape") {
+                              setEditingRemarksId(null);
+                              setEditingRemarksValue("");
+                            }
+                          }}
+                          disabled={savingRemarksId === inv.id}
+                          autoFocus
+                          placeholder="Opis dokumentu"
+                          className="flex-1 min-w-0 rounded border border-border bg-bg px-2 py-1 text-sm"
+                        />
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingRemarksId(inv.id);
+                          setEditingRemarksValue(inv.remarks ?? "");
+                        }}
+                        title="Kliknij, aby edytować uwagi"
+                        className="text-left w-full rounded px-1 py-0.5 hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent truncate block max-w-[200px]"
+                      >
+                        {(inv.remarks ?? "").trim() || "—"}
+                      </button>
+                    )}
+                  </td>
+                  <td className="p-3">
                     {inv.source === "ksef" ? (
                       <span className="text-muted">—</span>
                     ) : (
@@ -404,9 +679,7 @@ export default function RozrachunkiPage() {
                         type="checkbox"
                         checked={!!inv.handedOverToAccountant}
                         disabled={updatingAccountantId === inv.id}
-                        onChange={() =>
-                          toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)
-                        }
+                        onChange={() => toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)}
                         className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent"
                         title="Przekazane księgowej"
                       />
@@ -427,7 +700,147 @@ export default function RozrachunkiPage() {
             )}
           </tbody>
         </table>
-      </div>
+        </div>
+      </section>
+
+      {/* Modal – dodaj fakturę ręcznie */}
+      {showManualForm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => !manualSubmitting && setShowManualForm(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-lg font-semibold">Dodaj fakturę ręcznie</h3>
+            <form onSubmit={handleManualSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium">Typ</label>
+                <select
+                  value={manualForm.type}
+                  onChange={(e) =>
+                    setManualForm((f) => ({ ...f, type: e.target.value as "cost" | "sales" }))
+                  }
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                >
+                  <option value="cost">Zobowiązanie (faktura zakupu – co mam zapłacić)</option>
+                  <option value="sales">Należność (faktura sprzedaży – co mają mi zapłacić)</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Numer faktury (opcjonalnie)</label>
+                <input
+                  type="text"
+                  value={manualForm.number}
+                  onChange={(e) => setManualForm((f) => ({ ...f, number: e.target.value }))}
+                  placeholder="np. FV/2025/0001"
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Data wystawienia</label>
+                  <input
+                    type="date"
+                    value={manualForm.issueDate}
+                    onChange={(e) => setManualForm((f) => ({ ...f, issueDate: e.target.value }))}
+                    required
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium">Termin płatności (opcjonalnie)</label>
+                  <input
+                    type="date"
+                    value={manualForm.paymentDueDate}
+                    onChange={(e) => setManualForm((f) => ({ ...f, paymentDueDate: e.target.value }))}
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {manualForm.type === "cost" ? "Wystawca (sprzedawca)" : "Sprzedawca (Ty)"}
+                </label>
+                <input
+                  type="text"
+                  value={manualForm.sellerName}
+                  onChange={(e) => setManualForm((f) => ({ ...f, sellerName: e.target.value }))}
+                  placeholder="Nazwa"
+                  required
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  value={manualForm.sellerNip}
+                  onChange={(e) => setManualForm((f) => ({ ...f, sellerNip: e.target.value }))}
+                  placeholder="NIP (wpisz „-” jeśli nieznany)"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">
+                  {manualForm.type === "cost" ? "Nabywca (Ty)" : "Nabywca (kontrahent)"}
+                </label>
+                <input
+                  type="text"
+                  value={manualForm.buyerName}
+                  onChange={(e) => setManualForm((f) => ({ ...f, buyerName: e.target.value }))}
+                  placeholder="Nazwa"
+                  required
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+                <input
+                  type="text"
+                  value={manualForm.buyerNip}
+                  onChange={(e) => setManualForm((f) => ({ ...f, buyerNip: e.target.value }))}
+                  placeholder="NIP (wpisz „-” jeśli nieznany)"
+                  className="mt-1 w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Kwota brutto (PLN)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={manualForm.grossAmount}
+                  onChange={(e) => setManualForm((f) => ({ ...f, grossAmount: e.target.value }))}
+                  placeholder="np. 123.45"
+                  required
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">Uwagi (opcjonalnie)</label>
+                <input
+                  type="text"
+                  value={manualForm.remarks}
+                  onChange={(e) => setManualForm((f) => ({ ...f, remarks: e.target.value }))}
+                  placeholder="Opis dokumentu"
+                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => !manualSubmitting && setShowManualForm(false)}
+                  className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg/80"
+                >
+                  Anuluj
+                </button>
+                <button
+                  type="submit"
+                  disabled={manualSubmitting}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm text-white hover:bg-accent/90 disabled:opacity-50"
+                >
+                  {manualSubmitting ? "Zapisywanie…" : "Dodaj"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
