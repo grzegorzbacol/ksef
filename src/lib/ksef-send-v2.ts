@@ -5,7 +5,7 @@
 
 import * as crypto from "crypto";
 
-const FA3_NS = "http://crd.gov.pl/wzor/2026/02/17/14164/";
+const FA3_NS = "http://crd.gov.pl/wzor/2025/06/25/13775/";
 
 function escXml(s: string): string {
   return String(s)
@@ -319,10 +319,18 @@ export async function sendInvoiceToKsefV2(
     const t = await sendRes.text();
     let err = `Wysłanie faktury: ${sendRes.status}`;
     try {
-      const j = JSON.parse(t);
-      err = (j.message ?? j.exceptionDescription ?? j.details ?? err) as string;
+      const j = JSON.parse(t) as Record<string, unknown>;
+      const parts = [
+        j.message,
+        j.exceptionDescription,
+        j.details,
+        Array.isArray(j.exceptionMessageList)
+          ? (j.exceptionMessageList as string[]).join("; ")
+          : null,
+      ].filter(Boolean) as string[];
+      if (parts.length > 0) err = parts.join(" | ");
     } catch {
-      if (t) err += ` – ${t.slice(0, 200)}`;
+      if (t) err += ` – ${t.slice(0, 300)}`;
     }
     await fetch(`${baseV2}/sessions/online/${encodeURIComponent(sessionRef)}/close`, {
       method: "POST",
