@@ -51,6 +51,7 @@ model Invoice {
   ksefSentAt       DateTime?
   ksefId           String?
   ksefStatus       String?
+  ksefError        String?       @db.Text // komunikat błędu przy nieudanej wysyłce do KSeF
   source           String        @default("manual") // manual | ksef | mail | recurring
   handedOverToAccountant Boolean @default(false) // przekazane księgowej (tylko dla rozrachunków nie z KSeF)
   emailSubject     String?       // temat maila (dla source=mail)

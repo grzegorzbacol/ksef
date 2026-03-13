@@ -28,7 +28,15 @@ export async function POST(
 
   const result = await sendInvoiceToKsef(invoice, env);
   if (!result.success) {
-    return NextResponse.json({ error: result.error || "Błąd KSEF" }, { status: 502 });
+    const errMsg = result.error || "Błąd KSEF";
+    await prisma.invoice.update({
+      where: { id },
+      data: {
+        ksefStatus: "error",
+        ksefError: errMsg,
+      },
+    });
+    return NextResponse.json({ error: errMsg }, { status: 502 });
   }
 
   await prisma.invoice.update({
@@ -37,6 +45,7 @@ export async function POST(
       ksefSentAt: new Date(),
       ksefId: result.ksefId ?? null,
       ksefStatus: "sent",
+      ksefError: null,
     },
   });
 

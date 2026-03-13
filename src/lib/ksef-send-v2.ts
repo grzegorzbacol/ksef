@@ -5,7 +5,7 @@
 
 import * as crypto from "crypto";
 
-const FA2_NS = "http://crd.gov.pl/wzor/2023/06/29/12648/";
+const FA3_NS = "http://crd.gov.pl/wzor/2026/02/17/14164/";
 
 function escXml(s: string): string {
   return String(s)
@@ -53,7 +53,7 @@ type InvoiceWithItems = {
   }>;
 };
 
-/** Generuje minimalny FA(2) XML zgodny ze schematem. Wymaga paymentDueDate. */
+/** Generuje minimalny FA(3) XML zgodny ze schematem (obowiązuje od 1.02.2026). Wymaga paymentDueDate. */
 export function buildFa2Xml(inv: InvoiceWithItems): string {
   const paymentDue = inv.paymentDueDate
     ? typeof inv.paymentDueDate === "string"
@@ -75,20 +75,20 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   if (nipB.length !== 10) throw new Error("NIP nabywcy jest wymagany i musi mieć 10 cyfr. Uzupełnij dane nabywcy w fakturze.");
   const curr = (inv.currency ?? "PLN").trim() || "PLN";
 
-  const addrL1 = (s: string | null | undefined) => (s && s.trim() ? s.trim() : "ul. Nieznana 1");
-  const addrPostal = (s: string | null | undefined) => {
-    const v = (s ?? "").trim();
-    if (v && /^\d{2}-\d{3}$/.test(v)) return v;
-    return "01-001";
+  const fullAddr = (
+    addr: string | null | undefined,
+    postal: string | null | undefined,
+    city: string | null | undefined
+  ) => {
+    const a = (addr ?? "").trim() || "ul. Nieznana 1";
+    const p = (postal ?? "").trim();
+    const c = (city ?? "").trim() || "Warszawa";
+    const post = p && /^\d{2}-\d{3}$/.test(p) ? p : "01-001";
+    return `${a}, ${post} ${c}`;
   };
-  const addrCity = (s: string | null | undefined) => (s && s.trim() ? s.trim() : "Warszawa");
-
-  const sellerL1 = addrL1(inv.sellerAddress);
-  const sellerPostal = addrPostal(inv.sellerPostalCode);
-  const sellerCity = addrCity(inv.sellerCity);
-  const buyerL1 = addrL1(inv.buyerAddress);
-  const buyerPostal = addrPostal(inv.buyerPostalCode);
-  const buyerCity = addrCity(inv.buyerCity);
+  const sellerAddr = fullAddr(inv.sellerAddress, inv.sellerPostalCode, inv.sellerCity);
+  const buyerAddr = fullAddr(inv.buyerAddress, inv.buyerPostalCode, inv.buyerCity);
+  const sellerCity = (inv.sellerCity ?? "").trim() || "Warszawa";
 
   const rows = items.map(
     (it, i) => {
@@ -98,23 +98,23 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       const vatRate = Math.round(Number(it.vatRate) ?? 23);
       return `
     <FaWiersz>
-      <P_7>${i + 1}</P_7>
-      <P_8_5>${escXml(it.name || "Pozycja")}</P_8_5>
-      <P_8_6>${qty}</P_8_6>
-      <P_8_7>${escXml(it.unit || "szt.")}</P_8_7>
-      <P_9>${unitPrice.toFixed(2)}</P_9>
+      <NrWierszaFa>${i + 1}</NrWierszaFa>
+      <P_7>${escXml(it.name || "Pozycja")}</P_7>
+      <P_8A>${escXml(it.unit || "szt.")}</P_8A>
+      <P_8B>${qty}</P_8B>
+      <P_9A>${unitPrice.toFixed(2)}</P_9A>
       <P_11>${(Number(it.amountNet) || 0).toFixed(2)}</P_11>
-      <P_11_V>${(Number(it.amountVat) || 0).toFixed(2)}</P_11_V>
+      <P_11Vat>${(Number(it.amountVat) || 0).toFixed(2)}</P_11Vat>
       <P_12>${vatRate}</P_12>
     </FaWiersz>`;
     }
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<FA xmlns="${FA2_NS}">
+<FA xmlns="${FA3_NS}">
   <Naglowek>
-    <KodFormularza kodSystemowy="FA" wersjaSchemy="1-0E">FA</KodFormularza>
-    <WariantFormularza>2</WariantFormularza>
+    <KodFormularza kodSystemowy="FA (3)" wersjaSchemy="1-0E">FA</KodFormularza>
+    <WariantFormularza>3</WariantFormularza>
     <DataWytworzeniaFa>${now}</DataWytworzeniaFa>
     <SystemInfo>KSEF Connector</SystemInfo>
   </Naglowek>
@@ -125,9 +125,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     </DaneIdentyfikacyjne>
     <Adres>
       <KodKraju>PL</KodKraju>
-      <AdresL1>${escXml(sellerL1)}</AdresL1>
-      <KodPocztowy>${escXml(sellerPostal)}</KodPocztowy>
-      <Miejscowosc>${escXml(sellerCity)}</Miejscowosc>
+      <AdresL1>${escXml(sellerAddr)}</AdresL1>
     </Adres>
   </Podmiot1>
   <Podmiot2>
@@ -137,28 +135,26 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     </DaneIdentyfikacyjne>
     <Adres>
       <KodKraju>PL</KodKraju>
-      <AdresL1>${escXml(buyerL1)}</AdresL1>
-      <KodPocztowy>${escXml(buyerPostal)}</KodPocztowy>
-      <Miejscowosc>${escXml(buyerCity)}</Miejscowosc>
+      <AdresL1>${escXml(buyerAddr)}</AdresL1>
     </Adres>
+    <JST>2</JST>
+    <GV>2</GV>
   </Podmiot2>
   <Fa>
     <KodWaluty>${escXml(curr)}</KodWaluty>
-    <P_6_1>${saleDate}</P_6_1>
-    <P_6>${escXml(sellerCity)}</P_6>
-    <P_1>${escXml(inv.number || `FA/${Date.now()}`)}</P_1>
-    <P_2_1>${issueDate}</P_2_1>
-    <P_13_1>${escXml(nipS)}</P_13_1>
-    <P_14_1>${escXml(inv.sellerName || "Sprzedawca")}</P_14_1>
-    <P_15_1>${escXml(nipB)}</P_15_1>
-    <P_16_1>${escXml(inv.buyerName || "Nabywca")}</P_16_1>
-    <P_7>
-      <P_7_A>${(Number(inv.netAmount) || 0).toFixed(2)}</P_7_A>
-      <P_7_B>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_7_B>
-      <P_7_C>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_7_C>
-    </P_7>
+    <P_1>${issueDate}</P_1>
+    <P_2>${escXml(inv.number || `FA/${Date.now()}`)}</P_2>
+    <P_6>${saleDate}</P_6>
+    <P_13_1>${(Number(inv.netAmount) || 0).toFixed(2)}</P_13_1>
+    <P_14_1>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_14_1>
     <P_15>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_15>
-    <RodzajFaktury>V</RodzajFaktury>
+    <RodzajFaktury>VAT</RodzajFaktury>
+    <Adnotacje>
+      <P_16>2</P_16>
+      <P_17>2</P_17>
+      <P_18>2</P_18>
+      <P_18A>2</P_18A>
+    </Adnotacje>
     ${rows.length > 0 ? rows.join("\n") : ""}
     <Platnosc>
       <Termin>${paymentDue}</Termin>
@@ -272,7 +268,7 @@ export async function sendInvoiceToKsefV2(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      formCode: { systemCode: "FA (2)", schemaVersion: "1-0E", value: "FA" },
+      formCode: { systemCode: "FA (3)", schemaVersion: "1-0E", value: "FA" },
       encryption: {
         encryptedSymmetricKey: encData.encryptedKeyBase64,
         initializationVector: encData.ivBase64,

@@ -29,6 +29,7 @@ type Invoice = {
   ksefSentAt: string | null;
   ksefId: string | null;
   ksefStatus: string | null;
+  ksefError: string | null;
   source: string;
   payment?: { paidAt: string } | null;
   correctionOfId?: string | null;
@@ -667,6 +668,10 @@ export default function InvoicesPage() {
                   <td className="p-3">
                     {inv.ksefSentAt ? (
                       <span className="text-success font-medium">Wysłano</span>
+                    ) : inv.ksefError ? (
+                      <span className="text-red-600 text-xs max-w-[200px] truncate block" title={inv.ksefError}>
+                        Błąd: {inv.ksefError}
+                      </span>
                     ) : (
                       <span className="text-content-text-secondary">—</span>
                     )}

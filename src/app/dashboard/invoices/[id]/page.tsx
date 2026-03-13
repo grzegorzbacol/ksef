@@ -222,6 +222,7 @@ type Invoice = {
   ksefSentAt: string | null;
   ksefId: string | null;
   ksefStatus: string | null;
+  ksefError: string | null;
   source: string;
   paymentDueDate?: string | null;
   recurringCode?: string | null;
@@ -655,7 +656,13 @@ export default function InvoiceDetailPage() {
           )}
           <dt className="text-muted">KSEF</dt>
           <dd className="flex flex-col gap-1">
-            <span>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</span>
+            {invoice.ksefError ? (
+              <span className="text-red-600 text-sm">Błąd wysyłki: {invoice.ksefError}</span>
+            ) : invoice.ksefSentAt ? (
+              <span>{`Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}`}</span>
+            ) : (
+              <span>Nie wysłano</span>
+            )}
             {!isCost && invoice.paymentDueDate && (
               <a
                 href={`/api/invoices/${id}/ksef-xml`}
