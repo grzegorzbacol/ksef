@@ -15,6 +15,40 @@ function tokenSafeForHeader(token: string): string | null {
   return token;
 }
 
+/** Odczytuje czas wygaśnięcia (exp) z JWT. Zwraca sekundy od epoch lub null przy błędzie. */
+function getJwtExpSeconds(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = parts[1];
+    const padded = payload + "=".repeat((4 - (payload.length % 4)) % 4);
+    const json = JSON.parse(Buffer.from(padded.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    const exp = json?.exp;
+    return typeof exp === "number" ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Odświeża token proaktywnie, jeśli wygasa w ciągu 5 minut. Zapobiega częstemu wylogowaniu z KSEF. */
+const PROACTIVE_REFRESH_BUFFER_SEC = 5 * 60;
+
+async function ensureValidKsefToken(): Promise<string | null> {
+  const s = await getKsefSettings();
+  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  if (!token) return null;
+
+  const exp = getJwtExpSeconds(token);
+  if (exp != null) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (exp - nowSec < PROACTIVE_REFRESH_BUFFER_SEC) {
+      const refreshed = await refreshKsefAccessToken();
+      if (refreshed) token = refreshed;
+    }
+  }
+  return token;
+}
+
 export type KsefSendResult = { success: boolean; ksefId?: string; error?: string };
 
 export type KsefInvoiceRaw = {
@@ -207,7 +241,7 @@ export async function fetchInvoicesFromKsef(
 ): Promise<KsefFetchResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/v2/invoices/query/metadata";
 
   if (!token) {
@@ -327,7 +361,7 @@ export async function fetchInvoicesFromKsef(
 export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const sendPath = s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "/api/online/Invoice/Send";
 
   if (!token) {
@@ -406,7 +440,7 @@ export type KsefInvoicePdfResult =
 export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoicePdfResult> {
   const s = await getKsefSettings();
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const pathTemplate =
     s.invoicePdfPath || process.env.KSEF_INVOICE_PDF_PATH?.trim() || DEFAULT_INVOICE_PDF_PATH;
   const path = pathTemplate.replace(/\{referenceNumber\}/g, encodeURIComponent(ksefId));

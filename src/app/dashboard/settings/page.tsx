@@ -881,8 +881,17 @@ export default function SettingsPage() {
         </p>
         <p className="text-muted text-xs mb-4">
           Przy 401: upewnij się, że najpierw wykonałeś krok 3 (Zaloguj tokenem KSeF). W polu musi być JWT, nie surowy token z MCU.
-          Po zapisaniu ustawień aplikacja zapisuje też refresh token – gdy access token wygaśnie, połączenie zostanie automatycznie odświeżone (bez ponownego logowania w portalu).
+          Aplikacja automatycznie odświeża token przed wygaśnięciem (access token ~15 min, refresh token ~7 dni). Po zapisaniu refresh token wylogowywanie powinno być rzadsze.
         </p>
+        <details className="text-muted text-xs mb-4">
+          <summary className="cursor-pointer text-accent hover:underline">Inne sposoby logowania do KSEF</summary>
+          <ul className="mt-2 space-y-1 list-disc list-inside">
+            <li><strong>Token z MCU</strong> (implementowane): portal ksef.mf.gov.pl → token → wklej tutaj → „Zaloguj tokenem KSeF” → zapisz. Refresh token zapewnia automatyczne odświeżanie.</li>
+            <li><strong>Wymiana tokena</strong>: jeśli masz już auth token (Bearer) z innego źródła, wklej go i kliknij „Wymień token” – otrzymasz access + refresh.</li>
+            <li><strong>Certyfikat kwalifikowany</strong>: KSEF API 2.0 obsługuje też logowanie certyfikatem (PKCS#12), wymaga dodatkowej implementacji.</li>
+            <li><strong>Profil zaufany (ePUAP)</strong>: alternatywna metoda dostępna w dokumentacji MF.</li>
+          </ul>
+        </details>
 
         <div className="space-y-4">
           <div>
