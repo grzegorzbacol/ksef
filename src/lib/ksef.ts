@@ -365,16 +365,24 @@ export async function fetchInvoicesFromKsef(
   }
 }
 
+function isOfficialKsefUrl(url: string): boolean {
+  const u = url.toLowerCase().replace(/\/$/, "");
+  return (
+    u.includes("api.ksef.mf.gov.pl") ||
+    u.includes("api-demo.ksef.mf.gov.pl") ||
+    u.includes("api-test.ksef.mf.gov.pl")
+  );
+}
+
 /**
- * Wysyła fakturę do KSEF (struktura FA w XML/JSON).
- * W produkcji: pełna struktura FA(2)/FA(3) i certyfikat.
+ * Wysyła fakturę do KSEF. Dla oficjalnego API używa sesji 2.0 + FA(2) XML. Dla proxy (KSeFAPI.dev) – JSON.
  */
 export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promise<KsefSendResult> {
   const targetEnv = env ?? (await getKsefActiveEnv());
   const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
   let token = (await ensureValidKsefToken(targetEnv)) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
-  const sendPath = s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "/api/online/Invoice/Send";
+  const sendPath = (s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "").trim();
 
   if (!token) {
     return {
@@ -391,10 +399,32 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
     };
   }
 
+  if (isOfficialKsefUrl(apiUrl) && !sendPath) {
+    try {
+      const { sendInvoiceToKsefV2 } = await import("./ksef-send-v2");
+      const inv = invoice as {
+        number: string; issueDate: Date | string; saleDate?: Date | string | null;
+        sellerName: string; sellerNip: string; buyerName: string; buyerNip: string;
+        netAmount: number; vatAmount: number; grossAmount: number; currency: string;
+        items?: Array<{ name: string; quantity: number; unit: string; unitPriceNet: number; amountNet: number; amountVat: number; vatRate: number }>;
+      };
+      let result = await sendInvoiceToKsefV2(apiUrl, tokenForHeader, inv);
+      if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken(targetEnv))) {
+        const s2 = await getKsefSettings(targetEnv);
+        const newToken = (s2.token || "").trim();
+        if (tokenSafeForHeader(newToken)) result = await sendInvoiceToKsefV2(apiUrl, newToken, inv);
+      }
+      return result;
+    } catch (e) {
+      return { success: false, error: `KSeF 2.0: ${e instanceof Error ? e.message : String(e)}` };
+    }
+  }
+
+  const pathToUse = sendPath || "/api/online/Invoice/Send";
   const doSend = async (authToken: string): Promise<KsefSendResult> => {
     const forHeader = tokenSafeForHeader(authToken);
     if (!forHeader) return { success: false, error: "Token zawiera niedozwolone znaki." };
-    const url = `${apiUrl}${sendPath}`;
+    const url = `${apiUrl}${pathToUse.startsWith("/") ? "" : "/"}${pathToUse}`;
     const res = await fetch(url, {
       method: "POST",
       headers: {

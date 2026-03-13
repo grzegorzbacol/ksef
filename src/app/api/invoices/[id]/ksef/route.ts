@@ -12,7 +12,10 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({ where: { id } });
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    include: { items: true },
+  });
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let env: KsefEnv | undefined;
