@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
+import { getKsefActiveEnv } from "@/lib/settings";
 import { LogoutButton } from "./LogoutButton";
 import { DashboardNav } from "./DashboardNav";
 import { DashboardHeader } from "./DashboardHeader";
@@ -12,6 +13,9 @@ export default async function DashboardLayout({
 }) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  const activeEnv = await getKsefActiveEnv();
+  const isDemo = activeEnv === "test";
 
   return (
     <div className="min-h-screen flex">
@@ -56,6 +60,15 @@ export default async function DashboardLayout({
         className="flex-1 pl-56 min-h-screen flex flex-col"
         style={{ backgroundColor: "var(--content-bg)" }}
       >
+        {isDemo && (
+          <div
+            className="py-2 px-4 text-center text-sm font-medium text-white"
+            style={{ backgroundColor: "#ea580c" }}
+            role="status"
+          >
+            Środowisko KSEF: <strong>demo / test</strong> (api-demo.ksef.mf.gov.pl) – dane nie są produkcyjne
+          </div>
+        )}
         <DashboardHeader />
         <div className="flex-1 p-6">{children}</div>
       </main>

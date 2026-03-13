@@ -5,37 +5,37 @@
 @tailwind utilities;
 
 :root {
-  /* Sidebar – dark charcoal (Intaxo-style) */
-  --sidebar-bg: #282c34;
-  --sidebar-text: #e8ecf1;
-  --sidebar-text-muted: #9ca3af;
-  --sidebar-border: #3d4551;
-  --sidebar-active: #00bcd4;
-  --sidebar-active-bg: rgba(0, 188, 212, 0.15);
+  /* Sidebar – jasny, stonowany */
+  --sidebar-bg: #f1f5f9;
+  --sidebar-text: #1e293b;
+  --sidebar-text-muted: #64748b;
+  --sidebar-border: #e2e8f0;
+  --sidebar-active: #0ea5e9;
+  --sidebar-active-bg: rgba(14, 165, 233, 0.12);
 
-  /* Main content – light (Intaxo-style) */
-  --content-bg: #f8f9fa;
+  /* Main content – jasny */
+  --content-bg: #f8fafc;
   --content-card: #ffffff;
-  --content-border: #e9ecef;
-  --content-text: #212529;
-  --content-text-secondary: #6c757d;
-  --content-muted: #adb5bd;
+  --content-border: #e2e8f0;
+  --content-text: #1e293b;
+  --content-text-secondary: #64748b;
+  --content-muted: #94a3b8;
 
-  /* Legacy / fallback */
-  --bg: #0c0f14;
-  --bg-elevated: #12171f;
-  --card: #161c26;
-  --card-hover: #1a212d;
-  --border: #2a3342;
-  --border-focus: #3d4f6b;
-  --text: #e8ecf1;
-  --text-secondary: #9ca3af;
-  --muted: #6b7280;
+  /* Legacy / fallback – jasne tła */
+  --bg: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --card: #ffffff;
+  --card-hover: #f8fafc;
+  --border: #e2e8f0;
+  --border-focus: #0ea5e9;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --muted: #94a3b8;
 
-  /* Accents – teal/cyan primary (Intaxo) */
-  --accent: #00bcd4;
-  --accent-hover: #00acc1;
-  --accent-muted: rgba(0, 188, 212, 0.12);
+  /* Accents – niebieski, czytelny na jasnym */
+  --accent: #0ea5e9;
+  --accent-hover: #0284c7;
+  --accent-muted: rgba(14, 165, 233, 0.12);
   --accent-blue: #337ab7;
   --accent-blue-hover: #286090;
 
@@ -75,23 +75,23 @@ select:focus,
 textarea:focus,
 button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  box-shadow: 0 0 0 2px var(--content-bg), 0 0 0 4px var(--accent);
 }
 
-/* Scrollbar – dyskretny ciemny */
+/* Scrollbar – dyskretny jasny */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: var(--content-bg);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--content-border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
+  background: var(--content-muted);
 }
 
 /* Drukowanie – ukryj nawigację, dostosuj layout */
