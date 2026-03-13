@@ -10,12 +10,19 @@ const SEEN_FILE = path.join(DATA_DIR, "tesla_seen.json");
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "tesla.log");
 
-const DEFAULT_HEADERS = {
+const DEFAULT_HEADERS: Record<string, string> = {
   "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
   Accept: "application/json, text/html, */*",
   "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
   Referer: "https://www.tesla.com/pl_PL/inventory/new/my",
+  Origin: "https://www.tesla.com",
+  "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"macOS"',
+  "sec-fetch-dest": "empty",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-origin",
 };
 
 export type TeslaCar = {
@@ -102,11 +109,18 @@ export function parseCars(json: string): TeslaCar[] {
 }
 
 export async function sendTelegramMessage(text: string): Promise<boolean> {
+  const r = await sendTelegramMessageWithError(text);
+  return r.ok;
+}
+
+async function sendTelegramMessageWithError(
+  text: string
+): Promise<{ ok: boolean; error?: string }> {
   const token = process.env.TESLA_TELEGRAM_TOKEN ?? "";
   const chatId = process.env.TESLA_TELEGRAM_CHAT_ID ?? "";
   if (!token || !chatId) {
     log("Brak konfiguracji Telegram");
-    return false;
+    return { ok: false, error: "Brak TESLA_TELEGRAM_TOKEN lub TESLA_TELEGRAM_CHAT_ID" };
   }
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
   const body = new URLSearchParams({
@@ -120,11 +134,19 @@ export async function sendTelegramMessage(text: string): Promise<boolean> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
+  const responseText = await res.text();
   if (!res.ok) {
-    log("Błąd Telegram: " + (await res.text()));
-    return false;
+    log("Błąd Telegram: " + responseText);
+    let errMsg = `HTTP ${res.status}`;
+    try {
+      const j = JSON.parse(responseText) as { description?: string };
+      if (j.description) errMsg = j.description;
+    } catch {
+      if (responseText) errMsg = responseText.slice(0, 200);
+    }
+    return { ok: false, error: errMsg };
   }
-  return true;
+  return { ok: true };
 }
 
 export async function runTest(): Promise<TestResult> {
@@ -149,13 +171,13 @@ export async function runTest(): Promise<TestResult> {
   if (token && chatId) {
     const testMsg =
       "🧪 <b>Tesla Scanner – test</b>\nJeśli widzisz tę wiadomość, powiadomienia działają.";
-    const sent = await sendTelegramMessage(testMsg);
-    result.telegram = sent
+    const r = await sendTelegramMessageWithError(testMsg);
+    result.telegram = r.ok
       ? { ok: true, message: "OK – wiadomość testowa wysłana" }
-      : { ok: false, message: "Nie udało się wysłać" };
-    result.ok = result.ok && sent;
+      : { ok: false, message: r.error ?? "Nie udało się wysłać" };
+    result.ok = result.ok && r.ok;
   } else {
-    result.telegram = { ok: false, message: "Brak TESLA_TELEGRAM_TOKEN lub TESLA_TELEGRAM_CHAT_ID" };
+    result.telegram = { ok: false, message: "Brak TESLA_TELEGRAM_TOKEN lub TESLA_TELEGRAM_CHAT_ID. Ustaw zmienne w Coolify → Environment." };
   }
 
   try {

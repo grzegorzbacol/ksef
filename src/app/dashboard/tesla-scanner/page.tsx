@@ -94,6 +94,19 @@ export default function TeslaScannerPage() {
               </span>
             </li>
           </ul>
+          {!result.ok && (
+            <div className="mt-4 pt-3 border-t border-border text-xs text-muted space-y-2">
+              <p>
+                <strong>HTTP 403:</strong> Tesla blokuje requesty z serwerów (np. Coolify). Spróbuj
+                uruchomić skrypt lokalnie lub z sieci domowej: <code>npm run tesla-scan</code>
+              </p>
+              <p>
+                <strong>Telegram:</strong> Upewnij się, że zmienne są w Coolify → Environment. "Bad
+                Request: chat not found" = wyślij /start do bota przed testem. "Unauthorized" = zły
+                token.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
