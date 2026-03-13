@@ -86,6 +86,8 @@ export default function InvoicesPage() {
   const [addProductId, setAddProductId] = useState("");
   const [addQty, setAddQty] = useState("1");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [syncKsefLoading, setSyncKsefLoading] = useState(false);
+  const [sendingKsefId, setSendingKsefId] = useState<string | null>(null);
 
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
@@ -120,6 +122,59 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
   }, [month, year]);
+
+  async function syncKsefStatus() {
+    setSyncKsefLoading(true);
+    try {
+      const from =
+        month != null && year != null
+          ? `${year}-${String(month).padStart(2, "0")}-01`
+          : new Date().toISOString().slice(0, 10);
+      const to =
+        month != null && year != null
+          ? new Date(year, month, 0).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+      const res = await fetch("/api/ksef/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dateFrom: from, dateTo: to }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        alert(data.error || "Błąd synchronizacji z KSeF");
+        return;
+      }
+      const msg =
+        data.updated > 0
+          ? `Zaktualizowano: ${data.updated} faktur.${data.notFoundInKsef?.length ? ` Nie znaleziono w KSeF: ${data.notFoundInKsef.join(", ")}` : ""}`
+          : "Synchronizacja zakończona. Brak zmian.";
+      alert(msg);
+      loadInvoices();
+    } catch (e) {
+      alert("Błąd: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setSyncKsefLoading(false);
+    }
+  }
+
+  async function resendToKsef(inv: Invoice) {
+    setSendingKsefId(inv.id);
+    try {
+      const res = await fetch(`/api/invoices/${inv.id}/ksef`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd wysyłki do KSeF");
+        return;
+      }
+      loadInvoices();
+    } finally {
+      setSendingKsefId(null);
+    }
+  }
 
   useEffect(() => {
     if (showForm) {
@@ -274,11 +329,13 @@ export default function InvoicesPage() {
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)" }}
+            onClick={syncKsefStatus}
+            disabled={syncKsefLoading}
+            className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+            style={{ borderColor: "var(--content-border)", color: "var(--content-text)" }}
           >
-            <RefreshCw className="w-4 h-4" />
-            Zmień status
+            <RefreshCw className={`w-4 h-4 ${syncKsefLoading ? "animate-spin" : ""}`} />
+            Sprawdź status w KSeF
           </button>
           <button
             type="button"
@@ -666,11 +723,35 @@ export default function InvoicesPage() {
                   <td className="p-3 text-right text-content-text font-medium">{inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} {inv.currency}</td>
                   <td className="p-3 text-content-text-secondary">{sourceLabel(inv.source)}</td>
                   <td className="p-3">
-                    {inv.ksefSentAt ? (
-                      <span className="text-success font-medium">Wysłano</span>
+                    {inv.ksefId && inv.ksefStatus !== "not_in_ksef" ? (
+                      <span className="text-success font-medium" title={inv.ksefId ?? undefined}>
+                        W KSeF ✓
+                      </span>
+                    ) : inv.ksefStatus === "not_in_ksef" ? (
+                      <span className="flex flex-col gap-1">
+                        <span className="text-amber-600 text-xs font-medium">Nie w KSeF</span>
+                        <button
+                          type="button"
+                          onClick={() => resendToKsef(inv)}
+                          disabled={sendingKsefId === inv.id}
+                          className="text-xs text-accent hover:underline text-left disabled:opacity-50"
+                        >
+                          {sendingKsefId === inv.id ? "Wysyłanie…" : "Wyślij ponownie"}
+                        </button>
+                      </span>
                     ) : inv.ksefError ? (
-                      <span className="text-red-600 text-xs max-w-[200px] truncate block" title={inv.ksefError}>
-                        Błąd: {inv.ksefError}
+                      <span className="flex flex-col gap-1">
+                        <span className="text-red-600 text-xs max-w-[200px] truncate block" title={inv.ksefError}>
+                          Błąd: {inv.ksefError}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => resendToKsef(inv)}
+                          disabled={sendingKsefId === inv.id}
+                          className="text-xs text-accent hover:underline text-left disabled:opacity-50"
+                        >
+                          {sendingKsefId === inv.id ? "Wysyłanie…" : "Wyślij ponownie"}
+                        </button>
                       </span>
                     ) : (
                       <span className="text-content-text-secondary">—</span>
