@@ -592,26 +592,26 @@ function InvoiceNumberCell({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Faktury zakupu</h1>
+        <h1 className="text-2xl font-bold text-content-text">Faktury zakupu</h1>
         <div className="flex flex-wrap gap-3 print:hidden">
           <div className="flex gap-2 items-center text-sm">
             <input
               type="date"
               value={fetchRange.from}
               onChange={(e) => setFetchRange((p) => ({ ...p, from: e.target.value }))}
-              className="rounded border border-border bg-bg px-2 py-1"
+              className="rounded border border-content-border bg-white px-3 py-2 text-content-text placeholder:text-content-text-secondary"
             />
             <input
               type="date"
               value={fetchRange.to}
               onChange={(e) => setFetchRange((p) => ({ ...p, to: e.target.value }))}
-              className="rounded border border-border bg-bg px-2 py-1"
+              className="rounded border border-content-border bg-white px-3 py-2 text-content-text placeholder:text-content-text-secondary"
             />
             <button
               type="button"
               onClick={fetchFromKsef}
               disabled={fetchKsefLoading}
-              className="rounded bg-card border border-border px-3 py-1 hover:border-accent"
+              className="rounded-lg border border-content-border bg-white px-4 py-2 text-content-text font-medium hover:bg-gray-100 disabled:opacity-50"
             >
               Pobierz z KSEF
             </button>
@@ -619,7 +619,8 @@ function InvoiceNumberCell({
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
+            className="rounded-lg px-4 py-2 text-white font-medium hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)" }}
           >
             {showForm ? "Anuluj" : "Nowa faktura zakupu"}
           </button>
@@ -627,7 +628,7 @@ function InvoiceNumberCell({
             type="button"
             onClick={() => window.print()}
             disabled={invoices.length === 0}
-            className="rounded-lg border border-border bg-bg px-4 py-2 hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="rounded-lg border border-content-border bg-white px-4 py-2 text-content-text font-medium hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             title="Drukuj listę faktur zakupu"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -639,32 +640,32 @@ function InvoiceNumberCell({
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4 print:hidden">
-          <h2 className="font-medium">Nowa faktura zakupu</h2>
-          <p className="text-muted text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie. Faktury trafiają od razu do rozrachunków. Możesz wpisać dane ręcznie, dodać pozycje z magazynu lub ręcznie (nazwa, ilość, cena, VAT) oraz załączyć plik (np. skan faktury).</p>
+        <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-content-border bg-white p-6 space-y-4 shadow-sm print:hidden">
+          <h2 className="font-medium text-content-text">Nowa faktura zakupu</h2>
+          <p className="text-content-text-secondary text-sm">Faktura zakupu – Ty jesteś nabywcą (płacisz dostawcy). Numer (FK/rok/numer) nadawany automatycznie. Faktury trafiają od razu do rozrachunków. Możesz wpisać dane ręcznie, dodać pozycje z magazynu lub ręcznie (nazwa, ilość, cena, VAT) oraz załączyć plik (np. skan faktury).</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm text-muted mb-1">Data wystawienia</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Data wystawienia</label>
               <input
                 type="date"
                 value={form.issueDate}
                 onChange={(e) => setForm((p) => ({ ...p, issueDate: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Data sprzedaży (opcjonalnie)</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Data sprzedaży (opcjonalnie)</label>
               <input
                 type="date"
                 value={form.saleDate}
                 onChange={(e) => setForm((p) => ({ ...p, saleDate: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label className="block text-sm text-muted mb-1">Dostawca (sprzedawca)</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Dostawca (sprzedawca)</label>
               <select
                 value=""
                 onChange={(e) => {
@@ -676,7 +677,7 @@ function InvoiceNumberCell({
                   }
                   e.target.value = "";
                 }}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               >
                 <option value="">— wybierz dostawcę z bazy kontrahentów —</option>
                 {contractors.map((c) => (
@@ -687,55 +688,55 @@ function InvoiceNumberCell({
               </select>
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Sprzedawca – nazwa</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Sprzedawca – nazwa</label>
               <input
                 value={form.sellerName}
                 onChange={(e) => setForm((p) => ({ ...p, sellerName: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Sprzedawca – NIP</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Sprzedawca – NIP</label>
               <input
                 value={form.sellerNip}
                 onChange={(e) => setForm((p) => ({ ...p, sellerNip: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Nabywca (nasza firma) – nazwa</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Nabywca (nasza firma) – nazwa</label>
               <input
                 value={form.buyerName}
                 onChange={(e) => setForm((p) => ({ ...p, buyerName: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Nabywca – NIP</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Nabywca – NIP</label>
               <input
                 value={form.buyerNip}
                 onChange={(e) => setForm((p) => ({ ...p, buyerNip: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
                 required
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm text-muted mb-1">Uwagi (opis dokumentu)</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Uwagi (opis dokumentu)</label>
               <textarea
                 value={form.remarks}
                 onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
                 placeholder="Opcjonalny opis lub uwagi do dokumentu"
                 rows={2}
-                className="w-full rounded border border-border bg-bg px-3 py-2 resize-y"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text resize-y"
               />
             </div>
           </div>
-          <div className="border-t border-border pt-4 mt-4">
+          <div className="border-t border-content-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Typ wydatku</h3>
-            <p className="text-muted text-sm mb-2">Oznacz, czy to wydatek standardowy, czy związany z samochodem (korzyści podatkowe będą liczone według limitów i VAT dla pojazdu).</p>
+            <p className="text-content-text-secondary text-sm mb-2">Oznacz, czy to wydatek standardowy, czy związany z samochodem (korzyści podatkowe będą liczone według limitów i VAT dla pojazdu).</p>
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -743,7 +744,7 @@ function InvoiceNumberCell({
                   name="expenseType"
                   checked={expenseType === "standard"}
                   onChange={() => { setExpenseType("standard"); setExpenseCarId(""); }}
-                  className="rounded border-border"
+                  className="rounded border-content-border"
                 />
                 <span>Standardowy</span>
               </label>
@@ -753,7 +754,7 @@ function InvoiceNumberCell({
                   name="expenseType"
                   checked={expenseType === "car"}
                   onChange={() => setExpenseType("car")}
-                  className="rounded border-border"
+                  className="rounded border-content-border"
                 />
                 <span>Samochód:</span>
               </label>
@@ -761,7 +762,7 @@ function InvoiceNumberCell({
                 value={expenseCarId}
                 onChange={(e) => setExpenseCarId(e.target.value)}
                 disabled={expenseType !== "car"}
-                className="rounded border border-border bg-bg px-3 py-2 min-w-[180px] disabled:opacity-50"
+                className="rounded border border-content-border bg-white px-3 py-2 text-content-text min-w-[180px] disabled:opacity-50"
               >
                 <option value="">— wybierz samochód —</option>
                 {cars.map((c) => (
@@ -770,18 +771,18 @@ function InvoiceNumberCell({
               </select>
             </div>
             {cars.length === 0 && expenseType === "car" && (
-              <p className="text-muted text-xs mt-1">
+              <p className="text-content-text-secondary text-xs mt-1">
                 <Link href="/dashboard/settings" className="text-accent hover:underline">Dodaj samochody w Ustawieniach</Link>.
               </p>
             )}
           </div>
-          <div className="border-t border-border pt-4 mt-4">
+          <div className="border-t border-content-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Kategoria kosztu</h3>
-            <p className="text-muted text-sm mb-2">Przypisz fakturę do kategorii kosztów (np. Biuro, Marketing).</p>
+            <p className="text-content-text-secondary text-sm mb-2">Przypisz fakturę do kategorii kosztów (np. Biuro, Marketing).</p>
             <select
               value={expenseCategoryId}
               onChange={(e) => setExpenseCategoryId(e.target.value)}
-              className="rounded border border-border bg-bg px-3 py-2 min-w-[200px]"
+              className="rounded border border-content-border bg-white px-3 py-2 text-content-text min-w-[200px]"
             >
               <option value="">— brak kategorii —</option>
               {expenseCategories.map((c) => (
@@ -789,21 +790,21 @@ function InvoiceNumberCell({
               ))}
             </select>
             {expenseCategories.length === 0 && (
-              <p className="text-muted text-xs mt-1">
+              <p className="text-content-text-secondary text-xs mt-1">
                 <Link href="/dashboard/settings" className="text-accent hover:underline">Dodaj kategorie w Ustawieniach</Link>.
               </p>
             )}
           </div>
-          <div className="border-t border-border pt-4 mt-4">
+          <div className="border-t border-content-border pt-4 mt-4">
             <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
-            <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
+            <p className="text-content-text-secondary text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
             <div className="flex flex-wrap gap-3 items-end mb-4">
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Produkt</label>
+                <label className="block text-xs text-content-text-secondary mb-1">Produkt</label>
                 <select
                   value={addProductId}
                   onChange={(e) => setAddProductId(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px] max-w-[280px]"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text min-w-[200px] max-w-[280px]"
                 >
                   <option value="">— wybierz —</option>
                   {products.map((p) => (
@@ -814,75 +815,75 @@ function InvoiceNumberCell({
                 </select>
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Ilość</label>
+                <label className="block text-xs text-content-text-secondary mb-1">Ilość</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={addQty}
                   onChange={(e) => setAddQty(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text w-24 box-border"
                 />
               </div>
               <button
                 type="button"
                 onClick={addLineFromWarehouse}
                 disabled={!addProductId}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
+                className="rounded-lg border border-content-border px-4 py-2 text-content-text hover:bg-gray-100 disabled:opacity-50 flex-shrink-0"
               >
                 Dodaj do faktury
               </button>
             </div>
             <div className="flex flex-wrap gap-3 items-end mb-4">
-              <span className="text-muted text-sm self-center flex-shrink-0">lub pozycja ręczna:</span>
+              <span className="text-content-text-secondary text-sm self-center flex-shrink-0">lub pozycja ręczna:</span>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Nazwa</label>
+                <label className="block text-xs text-content-text-secondary mb-1">Nazwa</label>
                 <input
                   type="text"
                   value={manualLine.name}
                   onChange={(e) => setManualLine((p) => ({ ...p, name: e.target.value }))}
                   placeholder="Nazwa towaru/usługi"
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[140px] max-w-[200px] box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text min-w-[140px] max-w-[200px] box-border"
                 />
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Ilość</label>
+                <label className="block text-xs text-content-text-secondary mb-1">Ilość</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={manualLine.quantity}
                   onChange={(e) => setManualLine((p) => ({ ...p, quantity: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-20 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text w-20 box-border"
                 />
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">j.m.</label>
+                <label className="block text-xs text-content-text-secondary mb-1">j.m.</label>
                 <input
                   type="text"
                   value={manualLine.unit}
                   onChange={(e) => setManualLine((p) => ({ ...p, unit: e.target.value }))}
                   placeholder="szt."
-                  className="rounded border border-border bg-bg px-3 py-2 w-16 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text w-16 box-border"
                 />
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Cena netto</label>
+                <label className="block text-xs text-content-text-secondary mb-1">Cena netto</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={manualLine.unitPriceNet}
                   onChange={(e) => setManualLine((p) => ({ ...p, unitPriceNet: e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text w-24 box-border"
                 />
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">VAT %</label>
+                <label className="block text-xs text-content-text-secondary mb-1">VAT %</label>
                 <select
                   value={PURCHASE_VAT_RATES.includes(parseFloat(manualLine.vatRate) as 0.8 | 23) ? manualLine.vatRate : "other"}
                   onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value === "other" ? "" : e.target.value }))}
-                  className="rounded border border-border bg-bg px-3 py-2 w-20 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 text-content-text w-20 box-border"
                 >
                   {PURCHASE_VAT_RATES.map((r) => (
                     <option key={r} value={String(r)}>{r}%</option>
@@ -898,7 +899,7 @@ function InvoiceNumberCell({
                     value={manualLine.vatRate}
                     onChange={(e) => setManualLine((p) => ({ ...p, vatRate: e.target.value }))}
                     placeholder="%"
-                    className="rounded border border-border bg-bg px-2 py-1 w-14 mt-1 box-border text-sm"
+                    className="rounded border border-content-border bg-white px-2 py-1 w-14 mt-1 box-border text-sm text-content-text"
                   />
                 ) : null}
               </div>
@@ -906,13 +907,13 @@ function InvoiceNumberCell({
                 type="button"
                 onClick={addManualLine}
                 disabled={!manualLine.name.trim()}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
+                className="rounded-lg border border-content-border px-4 py-2 text-content-text hover:bg-gray-100 disabled:opacity-50 flex-shrink-0"
               >
                 Dodaj pozycję ręcznie
               </button>
             </div>
             {lines.length > 0 && (
-              <div className="overflow-x-auto rounded border border-border mb-4">
+              <div className="overflow-x-auto rounded border border-content-border mb-4">
                 <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: "auto" }} />
@@ -924,7 +925,7 @@ function InvoiceNumberCell({
                     <col style={{ width: "56px" }} />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-border bg-bg/50">
+                    <tr className="border-b border-content-border bg-gray-50">
                       <th className="p-2 text-left">Nazwa</th>
                       <th className="p-2 text-right">Ilość</th>
                       <th className="p-2 text-right">Cena netto</th>
@@ -936,7 +937,7 @@ function InvoiceNumberCell({
                   </thead>
                   <tbody>
                     {lines.map((l, i) => (
-                      <tr key={i} className="border-b border-border">
+                      <tr key={i} className="border-b border-content-border">
                         <td className="p-2 overflow-hidden text-ellipsis align-middle">{l.name}</td>
                         <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
@@ -945,7 +946,7 @@ function InvoiceNumberCell({
                             min="0.01"
                             value={l.quantity}
                             onChange={(e) => updateLine(i, "quantity", e.target.value)}
-                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
+                            className="w-16 rounded border border-content-border bg-white px-2 py-1 text-right text-content-text inline-block max-w-full"
                           />
                           <span className="ml-1">{l.unit}</span>
                         </td>
@@ -956,7 +957,7 @@ function InvoiceNumberCell({
                             min="0"
                             value={l.unitPriceNet}
                             onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
-                            className="w-full max-w-[88px] rounded border border-border bg-bg px-2 py-1 text-right box-border"
+                            className="w-full max-w-[88px] rounded border border-content-border bg-white px-2 py-1 text-right text-content-text box-border"
                             title="Cena netto za jednostkę – edytowalna"
                           />
                         </td>
@@ -975,7 +976,7 @@ function InvoiceNumberCell({
                                 updateLine(i, "vatRate", parseFloat(v));
                               }
                             }}
-                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
+                            className="w-16 rounded border border-content-border bg-white px-2 py-1 text-right text-content-text inline-block max-w-full"
                           >
                             {PURCHASE_VAT_RATES.map((r) => (
                               <option key={r} value={String(r)}>{r}%</option>
@@ -991,7 +992,7 @@ function InvoiceNumberCell({
                               value={l.vatRate}
                               onChange={(e) => updateLine(i, "vatRate", e.target.value)}
                               onBlur={() => setCustomVatRowIndex((prev) => (prev === i ? null : prev))}
-                              className="w-14 rounded border border-border bg-bg px-2 py-1 text-right inline-block mt-1"
+                              className="w-14 rounded border border-content-border bg-white px-2 py-1 text-right text-content-text inline-block mt-1"
                             />
                           )}
                         </td>
@@ -1017,61 +1018,61 @@ function InvoiceNumberCell({
 
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
-              <label className="block text-sm text-muted mb-1">Netto</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Netto</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.net.toFixed(2) : form.netAmount}
                 onChange={(e) => setForm((p) => ({ ...p, netAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">VAT</label>
+              <label className="block text-sm text-content-text-secondary mb-1">VAT</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.vat.toFixed(2) : form.vatAmount}
                 onChange={(e) => setForm((p) => ({ ...p, vatAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Brutto</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Brutto</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.gross.toFixed(2) : form.grossAmount}
                 onChange={(e) => setForm((p) => ({ ...p, grossAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Waluta</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Waluta</label>
               <input
                 value={form.currency}
                 onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
           </div>
-          <div className="border-t border-border pt-4">
-            <label className="block text-sm text-muted mb-1">Załącznik (opcjonalnie)</label>
+          <div className="border-t border-content-border pt-4">
+            <label className="block text-sm text-content-text-secondary mb-1">Załącznik (opcjonalnie)</label>
             <input
               type="file"
               onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
-              className="w-full max-w-md text-sm text-muted file:mr-3 file:rounded file:border-0 file:bg-accent file:px-4 file:py-2 file:text-white file:hover:opacity-90"
+              className="w-full max-w-md text-sm text-content-text file:mr-3 file:rounded file:border-0 file:bg-accent file:px-4 file:py-2 file:text-white file:hover:opacity-90"
             />
             {attachmentFile && (
-              <p className="text-sm text-muted mt-1">
+              <p className="text-sm text-content-text-secondary mt-1">
                 Wybrany plik: {attachmentFile.name}
               </p>
             )}
           </div>
-          <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90">
+          <button type="submit" className="rounded-lg px-4 py-2 text-white hover:opacity-90" style={{ backgroundColor: "var(--accent)" }}>
             Zapisz fakturę zakupu
           </button>
         </form>
@@ -1082,24 +1083,24 @@ function InvoiceNumberCell({
       </div>
 
       {loading ? (
-        <p className="text-muted">Ładowanie…</p>
+        <p className="text-content-text-secondary">Ładowanie…</p>
       ) : invoices.length === 0 ? (
-        <p className="text-muted">Brak faktur zakupu. Pobierz z KSEF lub dodaj ręcznie. Faktury trafiają od razu do rozrachunków.</p>
+        <p className="text-content-text-secondary">Brak faktur zakupu. Pobierz z KSEF lub dodaj ręcznie. Faktury trafiają od razu do rozrachunków.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-xl border border-content-border bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-card">
-                <th className="p-3 text-left">Numer</th>
-                <th className="p-3 text-left">Data</th>
-                <th className="p-3 text-left">Dostawca</th>
-                <th className="p-3 text-left">Typ wydatku</th>
-                <th className="p-3 text-left">Kategoria</th>
-                <th className="p-3 text-right">Brutto</th>
-                <th className="p-3 text-right">Realny koszt</th>
-                <th className="p-3">Źródło</th>
-                <th className="p-3">Rozliczono</th>
-                <th className="p-3 text-left w-40">Przekazane księgowej</th>
+              <tr className="border-b border-content-border bg-gray-100">
+                <th className="p-3 text-left font-medium text-content-text">Numer</th>
+                <th className="p-3 text-left font-medium text-content-text">Data</th>
+                <th className="p-3 text-left font-medium text-content-text">Dostawca</th>
+                <th className="p-3 text-left font-medium text-content-text">Typ wydatku</th>
+                <th className="p-3 text-left font-medium text-content-text">Kategoria</th>
+                <th className="p-3 text-right font-medium text-content-text">Brutto</th>
+                <th className="p-3 text-right font-medium text-content-text">Realny koszt</th>
+                <th className="p-3 font-medium text-content-text">Źródło</th>
+                <th className="p-3 font-medium text-content-text">Rozliczono</th>
+                <th className="p-3 text-left w-40 font-medium text-content-text">Przekazane księgowej</th>
                 <th className="p-3 w-20 print:hidden"></th>
               </tr>
             </thead>
@@ -1125,7 +1126,7 @@ function InvoiceNumberCell({
                   taxConfig
                 );
                 return (
-                <tr key={inv.id} className="border-b border-border">
+                <tr key={inv.id} className="border-b border-content-border hover:bg-gray-50/80">
                   <td className="p-3">
                     {inv.source === "mail" ? (
                       editingNumberId === inv.id ? (
@@ -1145,7 +1146,7 @@ function InvoiceNumberCell({
                           }}
                           disabled={savingNumberId === inv.id}
                           autoFocus
-                          className="w-full max-w-[140px] rounded border border-border bg-bg px-2 py-1 text-sm font-medium"
+                          className="w-full max-w-[140px] rounded border border-content-border bg-white px-2 py-1 text-sm font-medium text-content-text"
                         />
                       ) : (
                         <span className="flex flex-wrap items-center gap-2">
@@ -1156,7 +1157,7 @@ function InvoiceNumberCell({
                               setEditingNumberValue(inv.number);
                             }}
                             title="Kliknij, aby edytować numer faktury"
-                            className="font-medium text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
+                            className="font-medium text-left rounded px-1 py-0.5 text-accent hover:bg-gray-100 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                           >
                             {inv.number}
                           </button>
@@ -1196,7 +1197,7 @@ function InvoiceNumberCell({
                         }}
                         disabled={savingDateId === inv.id}
                         autoFocus
-                        className="rounded border border-border bg-bg px-2 py-1 text-sm"
+                        className="rounded border border-content-border bg-white px-2 py-1 text-sm text-content-text"
                       />
                     ) : inv.source === "mail" ? (
                       <button
@@ -1206,7 +1207,7 @@ function InvoiceNumberCell({
                           setEditingDateValue(new Date(inv.issueDate).toISOString().slice(0, 10));
                         }}
                         title="Kliknij, aby edytować datę"
-                        className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
+                        className="text-left rounded px-1 py-0.5 text-accent hover:bg-gray-100 hover:underline focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                       >
                         {new Date(inv.issueDate).toLocaleDateString("pl-PL")}
                       </button>
@@ -1233,7 +1234,7 @@ function InvoiceNumberCell({
                             placeholder="Nazwa dostawcy"
                             disabled={savingSellerId === inv.id}
                             autoFocus
-                            className="block w-full rounded border border-border bg-bg px-2 py-1 text-xs"
+                            className="block w-full rounded border border-content-border bg-white px-2 py-1 text-xs text-content-text"
                           />
                           <input
                             type="text"
@@ -1246,7 +1247,7 @@ function InvoiceNumberCell({
                             }}
                             placeholder="NIP"
                             disabled={savingSellerId === inv.id}
-                            className="block w-full rounded border border-border bg-bg px-2 py-1 text-xs"
+                            className="block w-full rounded border border-content-border bg-white px-2 py-1 text-xs text-content-text"
                           />
                         </div>
                       ) : (
@@ -1260,7 +1261,7 @@ function InvoiceNumberCell({
                                 setEditingSellerNip(inv.sellerNip ?? "");
                               }}
                 title="Kliknij, aby edytować dostawcę"
-                className="text-left rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent block print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
+                className="text-left rounded px-1 py-0.5 text-accent hover:bg-gray-100 hover:underline focus:outline-none focus:ring-1 focus:ring-accent block print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0 print:underline-offset-0"
                             >
                               {inv.sellerName}
                             </button>
@@ -1271,10 +1272,10 @@ function InvoiceNumberCell({
                       )}
                     </div>
                   </td>
-                  <td className="p-3 text-muted text-sm">
+                  <td className="p-3 text-content-text-secondary text-sm">
                     {inv.expenseType === "car" && inv.car ? inv.car.name : "Standardowy"}
                   </td>
-                  <td className="p-3 text-muted text-sm">
+                  <td className="p-3 text-content-text-secondary text-sm">
                     {inv.expenseCategory?.name ?? "—"}
                   </td>
                   <td className="p-3 text-right">
@@ -1297,9 +1298,9 @@ function InvoiceNumberCell({
                           }}
                           disabled={savingAmountId === inv.id}
                           autoFocus
-                          className="w-24 rounded border border-border bg-bg px-2 py-1 text-right text-sm"
+                          className="w-24 rounded border border-content-border bg-white px-2 py-1 text-right text-sm text-content-text"
                         />
-                        <span className="text-muted text-sm">{inv.currency}</span>
+                        <span className="text-content-text-secondary text-sm">{inv.currency}</span>
                       </span>
                     ) : (
                       <button
@@ -1309,7 +1310,7 @@ function InvoiceNumberCell({
                           setEditingAmountValue(inv.grossAmount.toFixed(2));
                         }}
                         title="Kliknij, aby szybko edytować kwotę (np. ZUS, US)"
-                        className="rounded px-1 py-0.5 text-right hover:bg-bg/80 focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0"
+                        className="rounded px-1 py-0.5 text-right hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-accent print:appearance-none print:font-inherit print:bg-transparent print:border-0 print:p-0"
                       >
                         {inv.grossAmount.toFixed(2)} {inv.currency}
                       </button>
@@ -1326,7 +1327,7 @@ function InvoiceNumberCell({
                         checked={!!inv.payment}
                         disabled={togglingPaidId === inv.id}
                         onChange={() => togglePaid(inv)}
-                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent print:hidden"
+                        className="h-4 w-4 rounded border-content-border bg-white text-accent focus:ring-accent print:hidden"
                         title="Oznacz jako opłaconą"
                       />
                       {inv.payment ? (
@@ -1334,13 +1335,13 @@ function InvoiceNumberCell({
                           Tak, {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
                         </span>
                       ) : (
-                        <span className="text-muted text-sm">Nie</span>
+                        <span className="text-content-text-secondary text-sm">Nie</span>
                       )}
                     </label>
                   </td>
                   <td className="p-3">
                     {inv.source === "ksef" ? (
-                      <span className="text-muted">—</span>
+                      <span className="text-content-text-secondary">—</span>
                     ) : (
                       <input
                         type="checkbox"
@@ -1349,7 +1350,7 @@ function InvoiceNumberCell({
                         onChange={() =>
                           toggleHandedOverToAccountant(inv.id, !!inv.handedOverToAccountant)
                         }
-                        className="h-4 w-4 rounded border-border bg-bg text-accent focus:ring-accent print:hidden"
+                        className="h-4 w-4 rounded border-content-border bg-white text-accent focus:ring-accent print:hidden"
                         title="Przekazane księgowej"
                       />
                     )}

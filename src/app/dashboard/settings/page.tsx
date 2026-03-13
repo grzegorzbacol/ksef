@@ -218,23 +218,24 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) return <p className="text-muted">Ładowanie…</p>;
+  if (loading) return <p className="text-content-text-secondary">Ładowanie…</p>;
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold mb-2">Ustawienia</h1>
-      <p className="text-muted text-sm mb-6">
+      <h1 className="text-2xl font-bold mb-2 text-content-text">Ustawienia</h1>
+      <p className="text-content-text-secondary text-sm mb-6">
         Konfiguracja integracji z KSEF, dane firmy (wystawcy faktur) i inne parametry.
       </p>
 
-      <div className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8">
-        <h2 className="font-medium mb-2">Faktury z maila</h2>
-        <p className="text-muted text-sm mb-4">
+      <div className="rounded-xl border border-content-border bg-white p-6 max-w-2xl mb-8 shadow-sm">
+        <h2 className="font-medium mb-2 text-content-text">Faktury z maila</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
           Ustawienia IMAP i import faktur z poczty e-mail.
         </p>
         <Link
           href="/dashboard/mail-invoices"
-          className="inline-flex items-center rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
+          className="inline-flex items-center rounded-lg px-4 py-2 text-white font-medium hover:opacity-90"
+          style={{ backgroundColor: "var(--accent)" }}
         >
           Otwórz Faktury z maila
         </Link>
@@ -263,15 +264,15 @@ export default function SettingsPage() {
             setSavingReminder(false);
           }
         }}
-        className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8"
+        className="rounded-xl border border-content-border bg-white p-6 max-w-2xl mb-8 shadow-sm"
       >
-        <h2 className="font-medium mb-2">Przypomnienia o terminie płatności</h2>
-        <p className="text-muted text-sm mb-4">
+        <h2 className="font-medium mb-2 text-content-text">Przypomnienia o terminie płatności</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
           W dniu terminu płatności rozrachunku zostanie wysłany e-mail na podany adres. Ustaw SMTP poniżej, aby włączyć wysyłkę.
         </p>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-muted mb-1">Adres e-mail na przypomnienia</label>
+            <label className="block text-sm text-content-text-secondary mb-1">Adres e-mail na przypomnienia</label>
             <input
               type="email"
               value={paymentReminder.paymentReminderEmail}
@@ -279,22 +280,22 @@ export default function SettingsPage() {
                 setPaymentReminder((s) => ({ ...s, paymentReminderEmail: e.target.value }))
               }
               placeholder="grzegorz@bacol.pl"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+              className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
             />
           </div>
           <div>
             <button
               type="button"
               onClick={() => setShowSmtp((v) => !v)}
-              className="text-sm text-accent hover:underline"
+              className="text-sm font-medium text-accent hover:underline"
             >
               {showSmtp ? "Ukryj ustawienia SMTP" : "Pokaż ustawienia SMTP (wysyłka e-mail)"}
             </button>
             {showSmtp && (
-              <div className="mt-3 space-y-3 p-3 rounded-lg border border-border bg-bg/50">
+              <div className="mt-3 space-y-3 p-3 rounded-lg border border-content-border bg-gray-50">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-muted mb-1">Host SMTP</label>
+                    <label className="block text-xs text-content-text-secondary mb-1">Host SMTP</label>
                     <input
                       type="text"
                       value={paymentReminder.smtp.host}
@@ -305,11 +306,11 @@ export default function SettingsPage() {
                         }))
                       }
                       placeholder="smtp.example.com"
-                      className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                      className="w-full rounded border border-content-border bg-white px-2 py-1.5 text-sm text-content-text"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-muted mb-1">Port</label>
+                    <label className="block text-xs text-content-text-secondary mb-1">Port</label>
                     <input
                       type="text"
                       value={paymentReminder.smtp.port}
@@ -320,12 +321,12 @@ export default function SettingsPage() {
                         }))
                       }
                       placeholder="587"
-                      className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                      className="w-full rounded border border-content-border bg-white px-2 py-1.5 text-sm text-content-text"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">Użytkownik SMTP</label>
+                  <label className="block text-xs text-content-text-secondary mb-1">Użytkownik SMTP</label>
                   <input
                     type="text"
                     value={paymentReminder.smtp.user}
@@ -335,11 +336,11 @@ export default function SettingsPage() {
                         smtp: { ...s.smtp, user: e.target.value },
                       }))
                     }
-                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                    className="w-full rounded border border-content-border bg-white px-2 py-1.5 text-sm text-content-text"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">Hasło SMTP</label>
+                  <label className="block text-xs text-content-text-secondary mb-1">Hasło SMTP</label>
                   <input
                     type="password"
                     value={paymentReminder.smtp.password}
@@ -350,11 +351,11 @@ export default function SettingsPage() {
                       }))
                     }
                     placeholder="Pozostaw puste, aby nie zmieniać"
-                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                    className="w-full rounded border border-content-border bg-white px-2 py-1.5 text-sm text-content-text"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">Adres nadawcy (From)</label>
+                  <label className="block text-xs text-content-text-secondary mb-1">Adres nadawcy (From)</label>
                   <input
                     type="text"
                     value={paymentReminder.smtp.from}
@@ -365,7 +366,7 @@ export default function SettingsPage() {
                       }))
                     }
                     placeholder="aplikacja@example.com"
-                    className="w-full rounded border border-border bg-bg px-2 py-1.5 text-sm"
+                    className="w-full rounded border border-content-border bg-white px-2 py-1.5 text-sm text-content-text"
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
@@ -378,7 +379,7 @@ export default function SettingsPage() {
                         smtp: { ...s.smtp, secure: e.target.checked },
                       }))
                     }
-                    className="rounded border-border"
+                    className="rounded border-content-border"
                   />
                   Połączenie SSL/TLS
                 </label>
@@ -398,91 +399,92 @@ export default function SettingsPage() {
         <button
           type="submit"
           disabled={savingReminder}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+          className="mt-4 rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)" }}
         >
           {savingReminder ? "Zapisywanie…" : "Zapisz przypomnienia"}
         </button>
       </form>
 
-      <form onSubmit={handleCompanySubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl mb-8">
-        <h2 className="font-medium mb-4">Dane firmy (sprzedawcy)</h2>
-        <p className="text-muted text-sm mb-4">
+      <form onSubmit={handleCompanySubmit} className="rounded-xl border border-content-border bg-white p-6 max-w-2xl mb-8 shadow-sm">
+        <h2 className="font-medium mb-4 text-content-text">Dane firmy (sprzedawcy)</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
           Dane firmy wystawiającej faktury. Będą używane domyślnie przy tworzeniu nowej faktury.
         </p>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-muted mb-1">Nazwa firmy</label>
+            <label className="block text-sm text-content-text-secondary mb-1">Nazwa firmy</label>
             <input
               type="text"
               value={company.name}
               onChange={(e) => setCompany((s) => ({ ...s, name: e.target.value }))}
               placeholder="Nazwa spółki / działalności"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+              className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
             />
           </div>
           <div>
-            <label className="block text-sm text-muted mb-1">NIP</label>
+            <label className="block text-sm text-content-text-secondary mb-1">NIP</label>
             <input
               type="text"
               value={company.nip}
               onChange={(e) => setCompany((s) => ({ ...s, nip: e.target.value }))}
               placeholder="NIP"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+              className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
             />
           </div>
           <div>
-            <label className="block text-sm text-muted mb-1">Adres</label>
+            <label className="block text-sm text-content-text-secondary mb-1">Adres</label>
             <input
               type="text"
               value={company.address}
               onChange={(e) => setCompany((s) => ({ ...s, address: e.target.value }))}
               placeholder="Ulica, numer"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+              className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-muted mb-1">Kod pocztowy</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Kod pocztowy</label>
               <input
                 type="text"
                 value={company.postalCode}
                 onChange={(e) => setCompany((s) => ({ ...s, postalCode: e.target.value }))}
                 placeholder="00-000"
-                className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Miasto</label>
+              <label className="block text-sm text-content-text-secondary mb-1">Miasto</label>
               <input
                 type="text"
                 value={company.city}
                 onChange={(e) => setCompany((s) => ({ ...s, city: e.target.value }))}
                 placeholder="Miasto"
-                className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
           </div>
-          <div className="border-t border-border pt-4 mt-4">
-            <h3 className="font-medium mb-2">Korzyści podatkowe (faktury zakupu)</h3>
-            <p className="text-muted text-sm mb-3">
+          <div className="border-t border-content-border pt-4 mt-4">
+            <h3 className="font-medium mb-2 text-content-text">Korzyści podatkowe (faktury zakupu)</h3>
+            <p className="text-content-text-secondary text-sm mb-3">
               Stawki używane w module „Korzyści podatkowe” do obliczania VAT do odzyskania, oszczędności PIT i składki zdrowotnej oraz realnego kosztu faktury.
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-muted mb-1">Stawka PIT (skala podatkowa)</label>
+                <label className="block text-sm text-content-text-secondary mb-1">Stawka PIT (skala podatkowa)</label>
                 <select
                   value={company.pitRate === 0.32 ? "0.32" : "0.12"}
                   onChange={(e) =>
                     setCompany((s) => ({ ...s, pitRate: e.target.value === "0.32" ? 0.32 : 0.12 }))
                   }
-                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                  className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                 >
                   <option value="0.12">12%</option>
                   <option value="0.32">32%</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-muted mb-1">Stawka składki zdrowotnej</label>
+                <label className="block text-sm text-content-text-secondary mb-1">Stawka składki zdrowotnej</label>
                 <input
                   type="number"
                   step="0.01"
@@ -493,16 +495,16 @@ export default function SettingsPage() {
                     const v = parseFloat(e.target.value);
                     if (!Number.isNaN(v)) setCompany((s) => ({ ...s, healthRate: Math.max(0, Math.min(1, v)) }));
                   }}
-                  className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text max-w-[120px]"
+                  className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text max-w-[120px]"
                 />
-                <span className="text-muted text-sm ml-2">np. 0.09 = 9%</span>
+                <span className="text-content-text-secondary text-sm ml-2">np. 0.09 = 9%</span>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={company.isVatPayer}
                   onChange={(e) => setCompany((s) => ({ ...s, isVatPayer: e.target.checked }))}
-                  className="rounded border-border"
+                  className="rounded border-content-border"
                 />
                 <span className="text-sm">Jestem płatnikiem VAT (VAT do odzyskania z faktur zakupu)</span>
               </label>
@@ -517,15 +519,16 @@ export default function SettingsPage() {
         <button
           type="submit"
           disabled={savingCompany}
-          className="mt-4 rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+          className="mt-4 rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)" }}
         >
           {savingCompany ? "Zapisywanie…" : "Zapisz dane firmy"}
         </button>
       </form>
 
-      <div className="rounded-xl border border-border bg-card p-6 max-w-3xl mb-8">
-        <h2 className="font-medium mb-2">Samochody (wydatki na pojazd)</h2>
-        <p className="text-muted text-sm mb-4">
+      <div className="rounded-xl border border-content-border bg-white p-6 max-w-3xl mb-8 shadow-sm">
+        <h2 className="font-medium mb-2 text-content-text">Samochody (wydatki na pojazd)</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
           Definicje samochodów do oznaczania faktur zakupu. Wartość pojazdu i limity odliczenia (progi 100 / 150 / 200 tys. PLN) oraz % odliczenia VAT (50% lub 100%). Przepisy się zmieniają – limity można edytować.
         </p>
         <form
@@ -595,69 +598,69 @@ export default function SettingsPage() {
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-muted mb-1">Nazwa (np. Skoda Octavia)</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Nazwa (np. Skoda Octavia)</label>
               <input
                 type="text"
                 value={carForm.name}
                 onChange={(e) => setCarForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Nazwa samochodu"
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">Wartość (PLN)</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Wartość (PLN)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={carForm.value}
                 onChange={(e) => setCarForm((f) => ({ ...f, value: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               />
             </div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-muted mb-1">Limit do 100 tys. (PLN)</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Limit do 100 tys. (PLN)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={carForm.limit100k}
                 onChange={(e) => setCarForm((f) => ({ ...f, limit100k: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">Limit 100–150 tys. (PLN)</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Limit 100–150 tys. (PLN)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={carForm.limit150k}
                 onChange={(e) => setCarForm((f) => ({ ...f, limit150k: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               />
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">Limit pow. 150 tys. (PLN)</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Limit pow. 150 tys. (PLN)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={carForm.limit200k}
                 onChange={(e) => setCarForm((f) => ({ ...f, limit200k: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               />
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <label className="block text-xs text-muted mb-1">Odliczenie VAT</label>
+              <label className="block text-xs text-content-text-secondary mb-1">Odliczenie VAT</label>
               <select
                 value={carForm.vatDeductionPercent}
                 onChange={(e) => setCarForm((f) => ({ ...f, vatDeductionPercent: e.target.value as "0.5" | "1" }))}
-                className="rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text"
               >
                 <option value="0.5">50%</option>
                 <option value="1">100%</option>
@@ -666,7 +669,8 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={savingCar || !carForm.name.trim()}
-              className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 text-sm mt-6"
+              className="rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50 text-sm mt-6"
+              style={{ backgroundColor: "var(--accent)" }}
             >
               {savingCar ? "Zapisywanie…" : editingCarId ? "Zapisz zmiany" : "Dodaj samochód"}
             </button>
@@ -684,7 +688,7 @@ export default function SettingsPage() {
                     vatDeductionPercent: "0.5",
                   });
                 }}
-                className="rounded border border-border px-4 py-2 text-sm mt-6"
+                className="rounded border border-content-border px-4 py-2 text-sm mt-6 text-content-text hover:bg-gray-100"
               >
                 Anuluj
               </button>
@@ -692,16 +696,16 @@ export default function SettingsPage() {
           </div>
         </form>
         {cars.length > 0 && (
-          <div className="border-t border-border pt-4">
-            <h3 className="font-medium mb-2">Lista samochodów</h3>
+          <div className="border-t border-content-border pt-4">
+            <h3 className="font-medium mb-2 text-content-text">Lista samochodów</h3>
             <ul className="space-y-2">
               {cars.map((car) => (
                 <li
                   key={car.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-bg/50 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-content-border bg-gray-50 px-3 py-2 text-sm"
                 >
                   <span className="font-medium">{car.name}</span>
-                  <span className="text-muted">
+                    <span className="text-content-text-secondary">
                     wartość: {car.value.toLocaleString("pl-PL")} PLN, limit: {car.value <= 100000 ? car.limit100k : car.value <= 150000 ? car.limit150k : car.limit200k} PLN, VAT {(car.vatDeductionPercent * 100).toFixed(0)}%
                   </span>
                   <span className="flex gap-2">
@@ -718,7 +722,7 @@ export default function SettingsPage() {
                           vatDeductionPercent: car.vatDeductionPercent === 1 ? "1" : "0.5",
                         });
                       }}
-                      className="text-accent hover:underline"
+                      className="text-accent font-medium text-sm hover:underline"
                     >
                       Edytuj
                     </button>
@@ -736,7 +740,7 @@ export default function SettingsPage() {
                           setDeletingCarId(null);
                         }
                       }}
-                      className="text-red-400 hover:underline disabled:opacity-50"
+                      className="text-red-600 font-medium text-sm hover:underline disabled:opacity-50"
                     >
                       Usuń
                     </button>
@@ -748,9 +752,9 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-6 max-w-3xl mb-8">
-        <h2 className="font-medium mb-2">Kategorie kosztów (faktury zakupu)</h2>
-        <p className="text-muted text-sm mb-4">
+      <div className="rounded-xl border border-content-border bg-white p-6 max-w-3xl mb-8 shadow-sm">
+        <h2 className="font-medium mb-2 text-content-text">Kategorie kosztów (faktury zakupu)</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
           Definiuj kategorie, do których można przypisywać faktury zakupu (np. Biuro, Marketing, Usługi IT).
         </p>
         <form
@@ -803,12 +807,13 @@ export default function SettingsPage() {
             value={categoryFormName}
             onChange={(e) => setCategoryFormName(e.target.value)}
             placeholder="Nazwa kategorii (np. Biuro)"
-            className="rounded border border-border bg-bg px-3 py-2 text-sm min-w-[200px]"
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text min-w-[200px]"
           />
           <button
             type="submit"
             disabled={savingCategory || !categoryFormName.trim()}
-            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 text-sm"
+            className="rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50 text-sm"
+            style={{ backgroundColor: "var(--accent)" }}
           >
             {savingCategory ? "Zapisywanie…" : editingCategoryId ? "Zapisz" : "Dodaj kategorię"}
           </button>
@@ -819,20 +824,20 @@ export default function SettingsPage() {
                 setEditingCategoryId(null);
                 setCategoryFormName("");
               }}
-              className="rounded border border-border px-4 py-2 text-sm"
+              className="rounded border border-content-border px-4 py-2 text-sm text-content-text hover:bg-gray-100"
             >
               Anuluj
             </button>
           )}
         </form>
         {expenseCategories.length > 0 && (
-          <div className="border-t border-border pt-4">
-            <h3 className="font-medium mb-2">Lista kategorii</h3>
+          <div className="border-t border-content-border pt-4">
+            <h3 className="font-medium mb-2 text-content-text">Lista kategorii</h3>
             <ul className="space-y-2">
               {expenseCategories.map((cat) => (
                 <li
                   key={cat.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-bg/50 px-3 py-2 text-sm"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-content-border bg-gray-50 px-3 py-2 text-sm"
                 >
                   <span className="font-medium">{cat.name}</span>
                   <span className="flex gap-2">
@@ -842,7 +847,7 @@ export default function SettingsPage() {
                         setEditingCategoryId(cat.id);
                         setCategoryFormName(cat.name);
                       }}
-                      className="text-accent hover:underline"
+                      className="text-accent font-medium text-sm hover:underline"
                     >
                       Edytuj
                     </button>
@@ -860,7 +865,7 @@ export default function SettingsPage() {
                           setDeletingCategoryId(null);
                         }
                       }}
-                      className="text-red-400 hover:underline disabled:opacity-50"
+                      className="text-red-600 font-medium text-sm hover:underline disabled:opacity-50"
                     >
                       Usuń
                     </button>
@@ -872,13 +877,13 @@ export default function SettingsPage() {
         )}
       </div>
 
-      <form onSubmit={handleKsefSubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
-        <h2 className="font-medium mb-4">Integracja KSEF</h2>
-        <p className="text-muted text-sm mb-2">
+      <form onSubmit={handleKsefSubmit} className="rounded-xl border border-content-border bg-white p-6 max-w-2xl shadow-sm">
+        <h2 className="font-medium mb-4 text-content-text">Integracja KSEF</h2>
+        <p className="text-content-text-secondary text-sm mb-2">
           Możesz skonfigurować dwa połączenia: <strong>produkcyjne</strong> (api.ksef.mf.gov.pl) i <strong>testowe</strong> (api-demo.ksef.mf.gov.pl). Aktywne środowisko jest używane przy pobieraniu faktur i wysyłce.
         </p>
         <div className="flex items-center gap-3 mb-4">
-          <span className="text-sm text-muted">Aktywne środowisko:</span>
+          <span className="text-sm text-content-text-secondary">Aktywne środowisko:</span>
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -900,7 +905,7 @@ export default function SettingsPage() {
             <span>Test</span>
           </label>
         </div>
-        <details className="text-muted text-xs mb-4">
+        <details className="text-content-text-secondary text-xs mb-4">
           <summary className="cursor-pointer text-accent hover:underline">Pomoc: logowanie tokenem z MCU</summary>
           <p className="mt-2">(1) Wklej token z MCU (portal ksef.mf.gov.pl). (2) Wpisz NIP. (3) Kliknij „Zaloguj tokenem KSeF”. (4) Zapisz ustawienia.</p>
           <ul className="mt-2 list-disc list-inside">
@@ -915,72 +920,72 @@ export default function SettingsPage() {
           const defaultUrl = env === "prod" ? "https://api.ksef.mf.gov.pl" : "https://api-demo.ksef.mf.gov.pl";
           const title = env === "prod" ? "KSeF Produkcja" : "KSeF Test";
           return (
-            <details key={env} open={env === "prod"} className="mb-6 border border-border rounded-lg overflow-hidden">
-              <summary className="cursor-pointer bg-bg/50 px-4 py-3 font-medium hover:bg-bg/70">
+            <details key={env} open={env === "prod"} className="mb-6 border border-content-border rounded-lg overflow-hidden">
+              <summary className="cursor-pointer bg-gray-100 px-4 py-3 font-medium text-content-text hover:bg-gray-200">
                 {title}
               </summary>
-              <div className="p-4 pt-2 space-y-4 border-t border-border">
+              <div className="p-4 pt-2 space-y-4 border-t border-content-border bg-white">
                 <div>
-                  <label className="block text-sm text-muted mb-1">URL API KSEF</label>
+                  <label className="block text-sm text-content-text-secondary mb-1">URL API KSEF</label>
                   <input
                     type="url"
                     value={ksef.apiUrl}
                     onChange={(e) => setKsef((s) => ({ ...s, apiUrl: e.target.value }))}
                     placeholder={defaultUrl}
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-muted mb-1">Token (JWT)</label>
+                  <label className="block text-sm text-content-text-secondary mb-1">Token (JWT)</label>
                   <input
                     type="password"
                     value={ksef.token}
                     onChange={(e) => setKsef((s) => ({ ...s, token: e.target.value }))}
                     placeholder="Token z portalu KSEF"
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                     autoComplete="off"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-muted mb-1">NIP</label>
+                  <label className="block text-sm text-content-text-secondary mb-1">NIP</label>
                   <input
                     type="text"
                     value={ksef.nip}
                     onChange={(e) => setKsef((s) => ({ ...s, nip: e.target.value }))}
                     placeholder="10 cyfr NIP"
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-muted mb-1">Ścieżka zapytania (opcjonalnie)</label>
+                    <label className="block text-sm text-content-text-secondary mb-1">Ścieżka zapytania (opcjonalnie)</label>
                     <input
                       type="text"
                       value={ksef.queryPath}
                       onChange={(e) => setKsef((s) => ({ ...s, queryPath: e.target.value }))}
                       placeholder="/v2/invoices/query/metadata"
-                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                      className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-muted mb-1">Ścieżka wysyłki (opcjonalnie)</label>
+                    <label className="block text-sm text-content-text-secondary mb-1">Ścieżka wysyłki (opcjonalnie)</label>
                     <input
                       type="text"
                       value={ksef.sendPath}
                       onChange={(e) => setKsef((s) => ({ ...s, sendPath: e.target.value }))}
                       placeholder="/api/online/Invoice/Send"
-                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                      className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm text-muted mb-1">Ścieżka PDF (opcjonalnie)</label>
+                  <label className="block text-sm text-content-text-secondary mb-1">Ścieżka PDF (opcjonalnie)</label>
                   <input
                     type="text"
                     value={ksef.invoicePdfPath}
                     onChange={(e) => setKsef((s) => ({ ...s, invoicePdfPath: e.target.value }))}
                     placeholder="/v2/invoices/ksef/{referenceNumber}"
-                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
                   />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1030,7 +1035,7 @@ export default function SettingsPage() {
                         setTestingFor(null);
                       }
                     }}
-                    className="rounded-lg border border-border bg-bg px-3 py-1.5 text-sm hover:bg-border disabled:opacity-50"
+                    className="rounded-lg border border-content-border bg-white px-3 py-1.5 text-sm text-content-text font-medium hover:bg-gray-100 disabled:opacity-50"
                   >
                     {testingFor === env ? "Sprawdzanie…" : "Sprawdź połączenie"}
                   </button>
@@ -1056,7 +1061,7 @@ export default function SettingsPage() {
                         setRedeemingFor(null);
                       }
                     }}
-                    className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+                    className="rounded-lg border border-amber-400 bg-amber-50 px-3 py-1.5 text-sm text-amber-800 font-medium hover:bg-amber-100 disabled:opacity-50"
                   >
                     {redeemingFor === env ? "Wymiana…" : "Wymień token"}
                   </button>
@@ -1090,7 +1095,8 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+            className="rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: "var(--accent)" }}
           >
             {saving ? "Zapisywanie…" : "Zapisz ustawienia KSEF"}
           </button>
