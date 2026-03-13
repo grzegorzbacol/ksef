@@ -4,7 +4,7 @@
  * Dokumentacja: https://ksef.mf.gov.pl, API 2.0
  */
 
-import { getKsefSettings, setKsefSettings, getKsefActiveEnv, type KsefEnv } from "./settings";
+import { getKsefSettings, setKsefSettings, getKsefActiveEnv, getCompanySettings, type KsefEnv } from "./settings";
 
 const DEFAULT_API_URL = "https://api.ksef.mf.gov.pl";
 
@@ -400,13 +400,28 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
   }
 
   if (isOfficialKsefUrl(apiUrl) && !sendPath) {
+    const invData = invoice as {
+      number: string; issueDate: Date | string; saleDate?: Date | string | null;
+      paymentDueDate?: Date | string | null;
+      sellerName: string; sellerNip: string; buyerName: string; buyerNip: string;
+      netAmount: number; vatAmount: number; grossAmount: number; currency: string;
+      items?: Array<{ name: string; quantity: number; unit: string; unitPriceNet: number; amountNet: number; amountVat: number; vatRate: number }>;
+    };
+    if (!invData.paymentDueDate) {
+      return {
+        success: false,
+        error: "Termin płatności jest wymagany przy wysyłce do KSeF. Uzupełnij go w fakturze przed wysłaniem.",
+      };
+    }
     try {
       const { sendInvoiceToKsefV2 } = await import("./ksef-send-v2");
-      const inv = invoice as {
-        number: string; issueDate: Date | string; saleDate?: Date | string | null;
-        sellerName: string; sellerNip: string; buyerName: string; buyerNip: string;
-        netAmount: number; vatAmount: number; grossAmount: number; currency: string;
-        items?: Array<{ name: string; quantity: number; unit: string; unitPriceNet: number; amountNet: number; amountVat: number; vatRate: number }>;
+      const company = await getCompanySettings();
+      const inv = {
+        ...invData,
+        paymentDueDate: invData.paymentDueDate,
+        sellerAddress: company.address || null,
+        sellerPostalCode: company.postalCode || null,
+        sellerCity: company.city || null,
       };
       let result = await sendInvoiceToKsefV2(apiUrl, tokenForHeader, inv);
       if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken(targetEnv))) {

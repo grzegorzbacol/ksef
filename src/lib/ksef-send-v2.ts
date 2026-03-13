@@ -32,6 +32,16 @@ type InvoiceWithItems = {
   vatAmount: number;
   grossAmount: number;
   currency: string;
+  /** Adres sprzedawcy – z ustawień firmy */
+  sellerAddress?: string | null;
+  sellerPostalCode?: string | null;
+  sellerCity?: string | null;
+  /** Adres nabywcy – z kontrahenta */
+  buyerAddress?: string | null;
+  buyerPostalCode?: string | null;
+  buyerCity?: string | null;
+  /** Termin płatności – wymagany przy wysyłce do KSeF */
+  paymentDueDate: Date | string | null;
   items?: Array<{
     name: string;
     quantity: number;
@@ -43,8 +53,14 @@ type InvoiceWithItems = {
   }>;
 };
 
-/** Generuje minimalny FA(2) XML zgodny ze schematem. */
+/** Generuje minimalny FA(2) XML zgodny ze schematem. Wymaga paymentDueDate. */
 export function buildFa2Xml(inv: InvoiceWithItems): string {
+  const paymentDue = inv.paymentDueDate
+    ? typeof inv.paymentDueDate === "string"
+      ? inv.paymentDueDate.slice(0, 10)
+      : fmtDate(new Date(inv.paymentDueDate))
+    : null;
+  if (!paymentDue) throw new Error("Termin płatności jest wymagany przy wysyłce do KSeF.");
   const issueDate = typeof inv.issueDate === "string" ? inv.issueDate.slice(0, 10) : fmtDate(new Date(inv.issueDate));
   const saleDate = inv.saleDate
     ? typeof inv.saleDate === "string"
@@ -57,17 +73,39 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   const nipB = (inv.buyerNip ?? "").replace(/\D/g, "");
   const curr = (inv.currency ?? "PLN").trim() || "PLN";
 
+  const addrL1 = (s: string | null | undefined) => (s && s.trim() ? s.trim() : "ul. Nieznana 1");
+  const addrPostal = (s: string | null | undefined) => {
+    const v = (s ?? "").trim();
+    if (v && /^\d{2}-\d{3}$/.test(v)) return v;
+    return "01-001";
+  };
+  const addrCity = (s: string | null | undefined) => (s && s.trim() ? s.trim() : "Warszawa");
+
+  const sellerL1 = addrL1(inv.sellerAddress);
+  const sellerPostal = addrPostal(inv.sellerPostalCode);
+  const sellerCity = addrCity(inv.sellerCity);
+  const buyerL1 = addrL1(inv.buyerAddress);
+  const buyerPostal = addrPostal(inv.buyerPostalCode);
+  const buyerCity = addrCity(inv.buyerCity);
+
   const rows = items.map(
-    (it, i) => `
+    (it, i) => {
+      const qty = Number(it.quantity) || 1;
+      const amt = Number(it.amountNet) || 0;
+      const unitPrice = Number(it.unitPriceNet) || (qty > 0 ? amt / qty : 0);
+      const vatRate = Math.round(Number(it.vatRate) ?? 23);
+      return `
     <FaWiersz>
       <P_7>${i + 1}</P_7>
       <P_8_5>${escXml(it.name || "Pozycja")}</P_8_5>
-      <P_8_6>${Number(it.quantity) || 1}</P_8_6>
+      <P_8_6>${qty}</P_8_6>
       <P_8_7>${escXml(it.unit || "szt.")}</P_8_7>
+      <P_9>${unitPrice.toFixed(2)}</P_9>
       <P_11>${(Number(it.amountNet) || 0).toFixed(2)}</P_11>
       <P_11_V>${(Number(it.amountVat) || 0).toFixed(2)}</P_11_V>
-      <P_12>${Number(it.vatRate) ?? 23}</P_12>
-    </FaWiersz>`
+      <P_12>${vatRate}</P_12>
+    </FaWiersz>`;
+    }
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -76,30 +114,30 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     <KodFormularza kodSystemowy="FA" wersjaSchemy="1-0E">FA</KodFormularza>
     <WariantFormularza>2</WariantFormularza>
     <DataWytworzeniaFa>${now}</DataWytworzeniaFa>
-    <SystemInfo>BONEA KSeF Connector</SystemInfo>
+    <SystemInfo>KSEF Connector</SystemInfo>
   </Naglowek>
   <Podmiot1>
     <DaneIdentyfikacyjne>
       <NIP>${escXml(nipS)}</NIP>
-      <Nazwa>${escXml(inv.sellerName || "—")}</Nazwa>
+      <Nazwa>${escXml(inv.sellerName || "Sprzedawca")}</Nazwa>
     </DaneIdentyfikacyjne>
     <Adres>
       <KodKraju>PL</KodKraju>
-      <AdresL1>—</AdresL1>
-      <KodPocztowy>00-000</KodPocztowy>
-      <Miejscowosc>—</Miejscowosc>
+      <AdresL1>${escXml(sellerL1)}</AdresL1>
+      <KodPocztowy>${escXml(sellerPostal)}</KodPocztowy>
+      <Miejscowosc>${escXml(sellerCity)}</Miejscowosc>
     </Adres>
   </Podmiot1>
   <Podmiot2>
     <DaneIdentyfikacyjne>
       <NIP>${escXml(nipB)}</NIP>
-      <Nazwa>${escXml(inv.buyerName || "—")}</Nazwa>
+      <Nazwa>${escXml(inv.buyerName || "Nabywca")}</Nazwa>
     </DaneIdentyfikacyjne>
     <Adres>
       <KodKraju>PL</KodKraju>
-      <AdresL1>—</AdresL1>
-      <KodPocztowy>00-000</KodPocztowy>
-      <Miejscowosc>—</Miejscowosc>
+      <AdresL1>${escXml(buyerL1)}</AdresL1>
+      <KodPocztowy>${escXml(buyerPostal)}</KodPocztowy>
+      <Miejscowosc>${escXml(buyerCity)}</Miejscowosc>
     </Adres>
   </Podmiot2>
   <Fa>
@@ -108,15 +146,18 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     <P_2_1>${issueDate}</P_2_1>
     <P_6_1>${saleDate}</P_6_1>
     <P_13_1>${escXml(nipS)}</P_13_1>
-    <P_14_1>${escXml(inv.sellerName || "—")}</P_14_1>
+    <P_14_1>${escXml(inv.sellerName || "Sprzedawca")}</P_14_1>
     <P_15_1>${escXml(nipB)}</P_15_1>
-    <P_16_1>${escXml(inv.buyerName || "—")}</P_16_1>
+    <P_16_1>${escXml(inv.buyerName || "Nabywca")}</P_16_1>
     <P_7>
       <P_7_A>${(Number(inv.netAmount) || 0).toFixed(2)}</P_7_A>
       <P_7_B>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_7_B>
       <P_7_C>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_7_C>
     </P_7>
     <RodzajFaktury>V</RodzajFaktury>
+    <Platnosc>
+      <Termin>${paymentDue}</Termin>
+    </Platnosc>
     ${rows.length > 0 ? rows.join("\n") : ""}
   </Fa>
 </FA>`;
@@ -265,6 +306,15 @@ export async function sendInvoiceToKsefV2(
       encryptedInvoiceContent: encryptedContent,
     }),
   });
+  let ksefId = "";
+  if (sendRes.ok) {
+    try {
+      const sendData = (await sendRes.json()) as { referenceNumber?: string; ksefNumber?: string };
+      ksefId = (sendData.ksefNumber ?? sendData.referenceNumber ?? "").trim();
+    } catch {
+      /* ignore */
+    }
+  }
   if (!sendRes.ok) {
     const t = await sendRes.text();
     let err = `Wysłanie faktury: ${sendRes.status}`;
@@ -286,16 +336,21 @@ export async function sendInvoiceToKsefV2(
     headers: { Authorization: `Bearer ${token}` },
   });
 
-  let ksefId = "";
-  const invoicesRes = await fetch(`${baseV2}/sessions/online/${encodeURIComponent(sessionRef)}/invoices`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (invoicesRes.ok) {
-    const invData = (await invoicesRes.json()) as {
-      invoices?: Array<{ ksefNumber?: string; referenceNumber?: string }>;
-    };
-    const first = invData.invoices?.[0];
-    ksefId = (first?.ksefNumber ?? first?.referenceNumber ?? "").trim();
+  if (!ksefId) {
+    const invoicesRes = await fetch(`${baseV2}/sessions/online/${encodeURIComponent(sessionRef)}/invoices`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (invoicesRes.ok) {
+      try {
+        const invData = (await invoicesRes.json()) as {
+          invoices?: Array<{ ksefNumber?: string; referenceNumber?: string }>;
+        };
+        const first = invData.invoices?.[0];
+        ksefId = (first?.ksefNumber ?? first?.referenceNumber ?? "").trim();
+      } catch {
+        /* ignore */
+      }
+    }
   }
   if (!ksefId) {
     ksefId = `KSEF-${Date.now()}`;
