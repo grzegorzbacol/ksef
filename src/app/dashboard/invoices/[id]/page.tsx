@@ -3,7 +3,113 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Send } from "lucide-react";
 import { computePurchaseInvoiceTaxBenefit } from "@/lib/tax-benefits";
+
+function SendKsefButton({
+  invoiceId,
+  invoiceNumber,
+  onSuccess,
+}: {
+  invoiceId: string;
+  invoiceNumber: string;
+  onSuccess: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [ksefStatus, setKsefStatus] = useState<{ configured: boolean; activeEnv: "prod" | "test" } | null>(null);
+
+  async function handleClick() {
+    const s = await fetch("/api/ksef/status").then((r) => r.json()).catch(() => ({}));
+    setKsefStatus({
+      configured: s.configured === true,
+      activeEnv: s.activeEnv === "test" ? "test" : "prod",
+    });
+    if (s.configured !== true) {
+      alert("KSeF nie jest skonfigurowany. Uzupełnij dane w Ustawieniach → Integracja KSeF.");
+      return;
+    }
+    setShowConfirm(true);
+  }
+
+  async function handleConfirm() {
+    const status = ksefStatus ?? (await fetch("/api/ksef/status").then((r) => r.json()).catch(() => ({})));
+    if (status.configured !== true) {
+      alert("KSeF nie jest skonfigurowany. Uzupełnij dane w Ustawieniach.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/ksef`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ env: status.activeEnv ?? "prod" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd wysyłki do KSeF");
+        return;
+      }
+      setShowConfirm(false);
+      onSuccess();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const envLabel = (ksefStatus?.activeEnv ?? "prod") === "prod" ? "Produkcyjne" : "Test";
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={loading || showConfirm}
+        className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-2"
+      >
+        <Send className="w-4 h-4" />
+        {loading ? "Wysyłanie…" : "Wyślij do KSeF"}
+      </button>
+      {showConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => !loading && setShowConfirm(false)}
+        >
+          <div
+            className="rounded-xl border border-border bg-card p-6 shadow-xl max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-3">Wyślij fakturę do KSeF</h3>
+            <p className="text-muted text-sm mb-4">
+              Czy na pewno chcesz wysłać fakturę <strong>{invoiceNumber}</strong> do Krajowego Systemu e-Faktur?
+            </p>
+            <p className="text-sm mb-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+              Faktura zostanie wysłana do środowiska: <strong>{envLabel}</strong>
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={loading}
+                className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {loading ? "Wysyłanie…" : "Tak, wyślij"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                disabled={loading}
+                className="rounded-lg border border-border px-4 py-2 hover:bg-bg/80 disabled:opacity-50"
+              >
+                Anuluj
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function DownloadPdfButton({
   invoiceId,
@@ -1154,6 +1260,13 @@ export default function InvoiceDetailPage() {
             ksefId={invoice.ksefId}
             hasMailAttachments={(invoice.emailAttachments?.length ?? 0) > 0}
           />
+          {!isCost && !invoice.ksefSentAt && (
+            <SendKsefButton
+              invoiceId={id}
+              invoiceNumber={invoice.number}
+              onSuccess={loadInvoice}
+            />
+          )}
           {canIssueCorrection && (
             <>
               <button

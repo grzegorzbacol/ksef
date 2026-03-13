@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { sendInvoiceToKsef } from "@/lib/ksef";
+import type { KsefEnv } from "@/lib/settings";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
@@ -14,7 +15,15 @@ export async function POST(
   const invoice = await prisma.invoice.findUnique({ where: { id } });
   if (!invoice) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const result = await sendInvoiceToKsef(invoice);
+  let env: KsefEnv | undefined;
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (body?.env === "prod" || body?.env === "test") env = body.env;
+  } catch {
+    // brak body – użyj domyślnego środowiska
+  }
+
+  const result = await sendInvoiceToKsef(invoice, env);
   if (!result.success) {
     return NextResponse.json({ error: result.error || "Błąd KSEF" }, { status: 502 });
   }
