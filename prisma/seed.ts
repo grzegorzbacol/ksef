@@ -1,10 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { createPersonalBudgetWithDefaults } from "../src/modules/personal-budget/lib/init-budget";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const user = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { login: "grzegorzbacol" },
     update: {},
     create: {
@@ -13,14 +12,6 @@ async function main() {
     },
   });
   console.log("Seed: user grzegorzbacol created (password empty - set on first login)");
-
-  const existingPersonal = await prisma.personalBudget.findFirst({
-    where: { userId: user.id },
-  });
-  if (!existingPersonal) {
-    await createPersonalBudgetWithDefaults(user.id, "Budżet osobisty");
-    console.log("Seed: domyślny budżet osobisty z grupą 'Wydatki prywatne' utworzony");
-  }
 
   const recurring = [
     { code: "zus", name: "ZUS", formName: "ok", sellerName: "Zakład Ubezpieczeń Społecznych", sellerNip: "" },
