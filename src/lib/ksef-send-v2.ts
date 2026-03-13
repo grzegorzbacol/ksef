@@ -67,10 +67,12 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       ? inv.saleDate.slice(0, 10)
       : fmtDate(new Date(inv.saleDate))
     : issueDate;
-  const now = new Date().toISOString();
+  const now = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
   const items = inv.items ?? [];
   const nipS = (inv.sellerNip ?? "").replace(/\D/g, "");
   const nipB = (inv.buyerNip ?? "").replace(/\D/g, "");
+  if (nipS.length !== 10) throw new Error("NIP sprzedawcy musi mieć 10 cyfr.");
+  if (nipB.length !== 10) throw new Error("NIP nabywcy jest wymagany i musi mieć 10 cyfr. Uzupełnij dane nabywcy w fakturze.");
   const curr = (inv.currency ?? "PLN").trim() || "PLN";
 
   const addrL1 = (s: string | null | undefined) => (s && s.trim() ? s.trim() : "ul. Nieznana 1");
@@ -155,6 +157,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       <P_7_B>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_7_B>
       <P_7_C>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_7_C>
     </P_7>
+    <P_15>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_15>
     <RodzajFaktury>V</RodzajFaktury>
     ${rows.length > 0 ? rows.join("\n") : ""}
     <Platnosc>

@@ -413,6 +413,13 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
         error: "Termin płatności jest wymagany przy wysyłce do KSeF. Uzupełnij go w fakturze przed wysłaniem.",
       };
     }
+    const nipB = (invData.buyerNip ?? "").replace(/\D/g, "");
+    if (nipB.length !== 10) {
+      return {
+        success: false,
+        error: "NIP nabywcy jest wymagany przy wysyłce do KSeF (10 cyfr). Uzupełnij NIP kontrahenta w fakturze.",
+      };
+    }
     try {
       const { sendInvoiceToKsefV2 } = await import("./ksef-send-v2");
       const company = await getCompanySettings();
