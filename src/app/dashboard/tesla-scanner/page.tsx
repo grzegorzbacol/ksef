@@ -97,8 +97,10 @@ export default function TeslaScannerPage() {
           {!result.ok && (
             <div className="mt-4 pt-3 border-t border-border text-xs text-muted space-y-2">
               <p>
-                <strong>HTTP 403:</strong> Tesla blokuje requesty z serwerów (np. Coolify). Spróbuj
-                uruchomić skrypt lokalnie lub z sieci domowej: <code>npm run tesla-scan</code>
+                <strong>HTTP 403:</strong> Tesla blokuje requesty z serwerów. Obejścia: (1) Ustaw{" "}
+                <code>TESLA_PROXY_URL</code> – adres proxy HTTP (np. residential z Bright Data, Oxylabs).
+                Format: <code>http://user:pass@host:port</code>. (2) Uruchom skrypt lokalnie:{" "}
+                <code>npm run tesla-scan</code>
               </p>
               <p>
                 <strong>Telegram:</strong> Upewnij się, że zmienne są w Coolify → Environment. "Bad
@@ -115,8 +117,8 @@ export default function TeslaScannerPage() {
         powiadomienia na Telegram, gdy pojawi się nowe auto. Używa oficjalnego API inventory Tesli.
       </p>
       <p className="text-amber-600 dark:text-amber-500 text-sm mb-4 max-w-2xl">
-        Uwaga: Tesla czasem zwraca HTTP 403 dla zautomatyzowanych zapytań. Przy 403 uruchom skrypt
-        z sieci domowej lub w innej lokalizacji.
+        Uwaga: Tesla czasem zwraca HTTP 403 z serwerów (np. Coolify). Obejścia: proxy (TESLA_PROXY_URL)
+        lub uruchomienie skryptu lokalnie z sieci domowej.
       </p>
 
       <div className="rounded-xl border border-border bg-card p-6 max-w-2xl">
@@ -130,6 +132,10 @@ export default function TeslaScannerPage() {
           </li>
           <li>
             <code className="rounded bg-bg px-1 py-0.5">TESLA_TELEGRAM_CHAT_ID</code> – ID chatu (np. od @userinfobot)
+          </li>
+          <li>
+            <code className="rounded bg-bg px-1 py-0.5">TESLA_PROXY_URL</code> – opcjonalnie: proxy HTTP przy 403 (np.{" "}
+            <code>http://user:pass@host:port</code>)
           </li>
         </ul>
       </div>

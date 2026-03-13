@@ -53,6 +53,32 @@ function log(message: string): void {
   }
 }
 
+const CORS_PROXIES = [
+  { url: (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, unwrap: (t: string) => { try { const p = JSON.parse(t) as { contents?: string }; return p.contents ?? t; } catch { return t; } } },
+  { url: (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`, unwrap: (t: string) => t },
+];
+
+async function fetchWithProxy(apiUrl: string, proxyUrl: string): Promise<string> {
+  const { ProxyAgent, fetch: ufetch } = await import("undici");
+  const agent = new ProxyAgent(proxyUrl);
+  const res = await ufetch(apiUrl, {
+    headers: DEFAULT_HEADERS,
+    dispatcher: agent,
+  } as Record<string, unknown>);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.text();
+}
+
+async function fetchViaCorsProxy(apiUrl: string, proxyIndex: number): Promise<string> {
+  const proxy = CORS_PROXIES[proxyIndex];
+  const res = await fetch(proxy.url(apiUrl), {
+    headers: { "User-Agent": DEFAULT_HEADERS["User-Agent"] ?? "" },
+  });
+  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
+  const text = await res.text();
+  return proxy.unwrap(text);
+}
+
 export async function fetchInventoryPage(): Promise<string> {
   const apiQuery = encodeURIComponent(
     JSON.stringify({
@@ -74,14 +100,39 @@ export async function fetchInventoryPage(): Promise<string> {
     })
   );
   const apiUrl = `https://www.tesla.com/inventory/api/v1/inventory-results?query=${apiQuery}`;
-  const res = await fetch(apiUrl, { headers: DEFAULT_HEADERS });
-  if (!res.ok) {
-    if (res.status === 403) {
-      log("HTTP 403: Tesla może blokować requesty.");
+  const proxyEnv = process.env.TESLA_PROXY_URL?.trim();
+
+  if (proxyEnv) {
+    try {
+      log("Używam TESLA_PROXY_URL...");
+      const text = await fetchWithProxy(apiUrl, proxyEnv);
+      const parsed = JSON.parse(text);
+      if (parsed.results !== undefined) return text;
+    } catch (e) {
+      log(`Proxy nie powiódł się: ${e instanceof Error ? e.message : String(e)}`);
     }
-    throw new Error(`HTTP ${res.status}`);
   }
-  return res.text();
+
+  let res = await fetch(apiUrl, { headers: DEFAULT_HEADERS });
+  if (res.ok) return res.text();
+
+  if (res.status === 403 || res.status === 429) {
+    log("Bezpośredni fetch zablokowany, próba przez CORS proxy...");
+    for (let i = 0; i < CORS_PROXIES.length; i++) {
+      try {
+        const text = await fetchViaCorsProxy(apiUrl, i);
+        const parsed = JSON.parse(text);
+        if (parsed.results !== undefined) {
+          log(`CORS proxy ${i + 1} OK`);
+          return text;
+        }
+      } catch (e) {
+        log(`CORS proxy ${i + 1} nie powiódł się: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
+  throw new Error(`HTTP ${res.status}`);
 }
 
 export function parseCars(json: string): TeslaCar[] {
