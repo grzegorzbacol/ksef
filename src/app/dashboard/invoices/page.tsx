@@ -71,6 +71,7 @@ export default function InvoicesPage() {
   const [form, setForm] = useState({
     issueDate: new Date().toISOString().slice(0, 10),
     saleDate: "",
+    paymentDueDate: "",
     sellerName: "",
     sellerNip: "",
     buyerName: "",
@@ -194,6 +195,7 @@ export default function InvoicesPage() {
       type: invoiceType,
       issueDate: form.issueDate,
       saleDate: form.saleDate || undefined,
+      paymentDueDate: form.paymentDueDate || undefined,
       sellerName: form.sellerName,
       sellerNip: form.sellerNip,
       buyerName: form.buyerName,
@@ -219,6 +221,7 @@ export default function InvoicesPage() {
     setForm({
       issueDate: new Date().toISOString().slice(0, 10),
       saleDate: "",
+      paymentDueDate: "",
       sellerName: "",
       sellerNip: "",
       buyerName: "",
@@ -301,6 +304,16 @@ export default function InvoicesPage() {
                 onChange={(e) => setForm((p) => ({ ...p, issueDate: e.target.value }))}
                 className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
+            </div>
+            <div>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Termin płatności</label>
+              <input
+                type="date"
+                value={form.paymentDueDate}
+                onChange={(e) => setForm((p) => ({ ...p, paymentDueDate: e.target.value }))}
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
+              />
+              <p className="text-xs mt-0.5" style={{ color: "var(--content-text-secondary)" }}>Wymagany przy wysyłce do KSeF</p>
             </div>
             <div>
               <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Data sprzedaży (opcjonalnie)</label>

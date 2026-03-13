@@ -314,6 +314,9 @@ export default function InvoiceDetailPage() {
   const [editingRemarks, setEditingRemarks] = useState(false);
   const [editRemarks, setEditRemarks] = useState("");
   const [savingRemarks, setSavingRemarks] = useState(false);
+  const [editingPaymentDueDate, setEditingPaymentDueDate] = useState(false);
+  const [editPaymentDueDate, setEditPaymentDueDate] = useState("");
+  const [savingPaymentDueDate, setSavingPaymentDueDate] = useState(false);
   const [creatingCorrection, setCreatingCorrection] = useState(false);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [correctionIssueDate, setCorrectionIssueDate] = useState("");
@@ -653,9 +656,66 @@ export default function InvoiceDetailPage() {
           <dd>{invoice.ksefSentAt ? `Wysłano ${new Date(invoice.ksefSentAt).toLocaleString("pl-PL")} ${invoice.ksefId ? `(${invoice.ksefId})` : ""}` : "Nie wysłano"}</dd>
           <dt className="text-muted">Termin płatności</dt>
           <dd>
-            {invoice.paymentDueDate
-              ? new Date(invoice.paymentDueDate).toLocaleDateString("pl-PL")
-              : "–"}
+            {editingPaymentDueDate ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={editPaymentDueDate}
+                  onChange={(e) => setEditPaymentDueDate(e.target.value)}
+                  disabled={savingPaymentDueDate}
+                  className="rounded border border-border bg-bg px-2 py-1 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setSavingPaymentDueDate(true);
+                    try {
+                      const res = await fetch(`/api/invoices/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymentDueDate: editPaymentDueDate || null }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (res.ok) {
+                        setInvoice(data);
+                        setEditingPaymentDueDate(false);
+                      } else alert(data.error || "Błąd zapisu");
+                    } finally {
+                      setSavingPaymentDueDate(false);
+                    }
+                  }}
+                  disabled={savingPaymentDueDate}
+                  className="rounded bg-accent px-3 py-1 text-white text-sm hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingPaymentDueDate ? "Zapisywanie…" : "Zapisz"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditPaymentDueDate(invoice.paymentDueDate ? new Date(invoice.paymentDueDate).toISOString().slice(0, 10) : "");
+                    setEditingPaymentDueDate(false);
+                  }}
+                  disabled={savingPaymentDueDate}
+                  className="rounded border border-border px-3 py-1 text-sm hover:bg-bg/80"
+                >
+                  Anuluj
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditPaymentDueDate(invoice.paymentDueDate ? new Date(invoice.paymentDueDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+                  setEditingPaymentDueDate(true);
+                }}
+                title="Kliknij, aby edytować termin płatności (wymagany przy wysyłce do KSeF)"
+                className="rounded px-1 py-0.5 text-accent hover:bg-bg/80 hover:underline focus:outline-none focus:ring-1 focus:ring-accent"
+              >
+                {invoice.paymentDueDate
+                  ? new Date(invoice.paymentDueDate).toLocaleDateString("pl-PL")
+                  : "— ustaw termin (wymagany dla KSeF)"}
+              </button>
+            )}
           </dd>
           {isCost && invoice.expenseCategory && (
             <>
