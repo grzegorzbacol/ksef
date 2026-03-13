@@ -10,7 +10,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const dateFrom = (body.dateFrom || body.date_from) as string;
   const dateTo = (body.dateTo || body.date_to) as string;
-  const env = (body.env === "test" ? "test" : "prod") as "test" | "prod" | undefined;
+  // Gdy env niepodany – fetchInvoicesFromKsef użyje getKsefActiveEnv() (test/prod z ustawień)
+  const env = body.env === "test" ? "test" : body.env === "prod" ? "prod" : undefined;
 
   const from = dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const to = dateTo || new Date().toISOString().slice(0, 10);

@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const dateFrom = (body.dateFrom || body.date_from) as string | undefined;
   const dateTo = (body.dateTo || body.date_to) as string | undefined;
-  const env = (body.env === "test" ? "test" : "prod") as KsefEnv | undefined;
+  // Gdy env niepodany – fetchInvoicesFromKsef użyje getKsefActiveEnv() (test/prod z ustawień)
+  const env: KsefEnv | undefined =
+    body.env === "test" ? "test" : body.env === "prod" ? "prod" : undefined;
 
   const now = new Date();
   const from =
