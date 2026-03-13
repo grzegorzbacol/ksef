@@ -216,23 +216,48 @@ export async function POST(req: NextRequest) {
 
   const issueDate = new Date(baseData.issueDate);
   const invoiceType = data.type === "cost" ? "cost" : "sales";
-  const prefix = isCorrection ? "FV-K" : invoiceType === "cost" ? "FK" : "FV";
 
   const invoice = await prisma.$transaction(async (tx) => {
     let number = data.number?.trim();
     if (!number) {
-      const year = issueDate.getFullYear();
-      const counterKey = isCorrection
-        ? `invoice_counter_sales_correction_${year}`
-        : `invoice_counter_${invoiceType}_${year}`;
-      const row = await tx.setting.findUnique({ where: { key: counterKey } });
-      const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
-      await tx.setting.upsert({
-        where: { key: counterKey },
-        create: { key: counterKey, value: String(nextSeq) },
-        update: { value: String(nextSeq) },
-      });
-      number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
+      if (invoiceType === "sales" && !isCorrection) {
+        // Format: NUMER/US/MIESIAC/ROK – pierwszy wolny numer (zwolnione po usunięciu faktur)
+        const month = issueDate.getMonth() + 1;
+        const year = issueDate.getFullYear();
+        const startOfMonth = new Date(year, month - 1, 1);
+        const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+        const salesInMonth = await tx.invoice.findMany({
+          where: {
+            type: "sales",
+            correctionOfId: null,
+            issueDate: { gte: startOfMonth, lte: endOfMonth },
+          },
+          select: { number: true },
+        });
+        const usPattern = /^(\d+)\/US\/\d+\/\d+$/;
+        const used = new Set<number>();
+        for (const inv of salesInMonth) {
+          const m = inv.number.match(usPattern);
+          if (m) used.add(parseInt(m[1], 10));
+        }
+        let nextSeq = 1;
+        while (used.has(nextSeq)) nextSeq++;
+        number = `${nextSeq}/US/${month}/${year}`;
+      } else {
+        const prefix = isCorrection ? "FV-K" : invoiceType === "cost" ? "FK" : "FV";
+        const year = issueDate.getFullYear();
+        const counterKey = isCorrection
+          ? `invoice_counter_sales_correction_${year}`
+          : `invoice_counter_${invoiceType}_${year}`;
+        const row = await tx.setting.findUnique({ where: { key: counterKey } });
+        const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
+        await tx.setting.upsert({
+          where: { key: counterKey },
+          create: { key: counterKey, value: String(nextSeq) },
+          update: { value: String(nextSeq) },
+        });
+        number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
+      }
     }
 
     const expenseType = invoiceType === "cost" && data.expenseType === "car" && data.carId

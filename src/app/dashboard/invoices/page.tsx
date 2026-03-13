@@ -71,6 +71,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
+    number: "",
     issueDate: new Date().toISOString().slice(0, 10),
     saleDate: new Date().toISOString().slice(0, 10),
     paymentDueDays: "",
@@ -288,6 +289,7 @@ export default function InvoicesPage() {
     const gross = parseFloat(form.grossAmount) || net + vat;
     const payload: Record<string, unknown> = {
       type: invoiceType,
+      number: form.number.trim() || undefined,
       issueDate: form.issueDate,
       saleDate: form.saleDate || undefined,
       paymentDueDate: form.paymentDueDate || undefined,
@@ -314,6 +316,7 @@ export default function InvoicesPage() {
     setShowForm(false);
     setLines([]);
     setForm({
+      number: "",
       issueDate: new Date().toISOString().slice(0, 10),
       saleDate: new Date().toISOString().slice(0, 10),
       paymentDueDays: "",
@@ -400,8 +403,18 @@ export default function InvoicesPage() {
             <FileText className="w-5 h-5" style={{ color: "var(--accent)" }} />
             <h2 className="font-medium text-content-text">Nowa faktura sprzedaży</h2>
           </div>
-          <p className="text-sm" style={{ color: "var(--content-text-secondary)" }}>Faktura sprzedaży – my jesteśmy sprzedawcą. Numer (FV/rok/numer) nadawany automatycznie.</p>
+          <p className="text-sm" style={{ color: "var(--content-text-secondary)" }}>Faktura sprzedaży – my jesteśmy sprzedawcą. Numer format: NUMER/US/MIESIAC/ROK (np. 1/US/2/2026). Nadawany automatycznie, jeśli nie wpiszesz – możesz go edytować ręcznie.</p>
           <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Numer faktury (opcjonalnie)</label>
+              <input
+                type="text"
+                value={form.number}
+                onChange={(e) => setForm((p) => ({ ...p, number: e.target.value }))}
+                placeholder="np. 1/US/2/2026 – zostaw puste, aby nadać automatycznie"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
+              />
+            </div>
             <div>
               <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Data wystawienia</label>
               <input
