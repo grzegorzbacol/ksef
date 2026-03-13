@@ -32,6 +32,7 @@ type Invoice = {
   ksefId: string | null;
   ksefStatus: string | null;
   source: string;
+  recurringPurchaseInvoiceId?: string | null;
   payment?: { paidAt: string } | null;
   vatDeductionPercent?: number | null;
   costDeductionPercent?: number | null;
@@ -139,9 +140,15 @@ function sourceLabel(source: string): string {
       return "Wprowadzona ręcznie";
     case "mail":
       return "Mail";
+    case "recurring":
+      return "Cykliczna";
     default:
       return source || "—";
   }
+}
+
+function isEmptyRecurringPurchase(inv: Invoice): boolean {
+  return !!(inv.recurringPurchaseInvoiceId && inv.grossAmount === 0 && inv.netAmount === 0);
 }
 
 function InvoiceNumberCell({
@@ -220,6 +227,21 @@ function InvoiceNumberCell({
 
   useEffect(() => {
     loadInvoices();
+  }, [month, year]);
+
+  useEffect(() => {
+    const y = year ?? new Date().getFullYear();
+    const m = month ?? new Date().getMonth() + 1;
+    fetch("/api/recurring-purchase-invoices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year: y, month: m }),
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((data) => {
+        if (data?.created > 0) loadInvoices();
+      })
+      .catch(() => {});
   }, [month, year]);
 
   useEffect(() => {
@@ -1086,7 +1108,7 @@ function InvoiceNumberCell({
       {loading ? (
         <p className="text-content-text-secondary">Ładowanie…</p>
       ) : invoices.length === 0 ? (
-        <p className="text-content-text-secondary">Brak faktur zakupu. Pobierz z KSEF lub dodaj ręcznie. Faktury trafiają od razu do rozrachunków.</p>
+        <p className="text-content-text-secondary">Brak faktur zakupu. Pobierz z KSEF, dodaj ręcznie lub skonfiguruj <Link href="/dashboard/settings" className="text-accent hover:underline">cykliczne faktury zakupu</Link> w Ustawieniach. Faktury trafiają od razu do rozrachunków.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-content-border bg-white shadow-sm">
           <table className="w-full text-sm">
@@ -1173,11 +1195,18 @@ function InvoiceNumberCell({
                         </span>
                       )
                     ) : (
-                      <InvoiceNumberCell
-                        invoiceId={inv.id}
-                        invoiceNumber={inv.number}
-                        onError={(msg) => alert(msg)}
-                      />
+                      <span className="flex flex-wrap items-center gap-2">
+                        <InvoiceNumberCell
+                          invoiceId={inv.id}
+                          invoiceNumber={inv.number}
+                          onError={(msg) => alert(msg)}
+                        />
+                        {isEmptyRecurringPurchase(inv) && (
+                          <span className="rounded bg-gray-200 px-1.5 py-0.5 text-xs text-gray-600" title="Faktura cykliczna bez pozycji – uzupełnij w szczegółach">
+                            Pusta
+                          </span>
+                        )}
+                      </span>
                     )}
                   </td>
                   <td className="p-3">

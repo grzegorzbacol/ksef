@@ -190,7 +190,7 @@ function isKsef2Metadata(item: Record<string, unknown>): boolean {
 export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
   const targetEnv = env ?? (await getKsefActiveEnv());
   const envOk = !!process.env.KSEF_API_URL?.trim() && !!process.env.KSEF_TOKEN?.trim();
-  if (envOk && targetEnv === "prod") return true;
+  if (envOk) return true;
   const s = await getKsefSettings(targetEnv);
   return !!s.apiUrl && !!s.token;
 }

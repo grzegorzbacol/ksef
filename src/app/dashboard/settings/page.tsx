@@ -125,6 +125,27 @@ export default function SettingsPage() {
   const [savingCategory, setSavingCategory] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  type RecurringPurchaseInvoice = {
+    id: string;
+    name: string;
+    dayOfMonth: number;
+    sellerName: string;
+    sellerNip: string;
+    expenseCategoryId: string | null;
+    expenseCategory?: { id: string; name: string } | null;
+    sortOrder: number;
+  };
+  const [recurringPurchaseInvoices, setRecurringPurchaseInvoices] = useState<RecurringPurchaseInvoice[]>([]);
+  const [rpiForm, setRpiForm] = useState({
+    name: "",
+    dayOfMonth: "10",
+    sellerName: "",
+    sellerNip: "",
+    expenseCategoryId: "",
+  });
+  const [savingRpi, setSavingRpi] = useState(false);
+  const [editingRpiId, setEditingRpiId] = useState<string | null>(null);
+  const [deletingRpiId, setDeletingRpiId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -133,6 +154,7 @@ export default function SettingsPage() {
       fetch("/api/settings/payment-reminders").then((r) => r.json()),
       fetch("/api/cars").then((r) => r.json()).then((data) => setCars(Array.isArray(data) ? data : [])).catch(() => setCars([])),
       fetch("/api/expense-categories").then((r) => r.json()).then((data) => setExpenseCategories(Array.isArray(data) ? data : [])).catch(() => setExpenseCategories([])),
+      fetch("/api/recurring-purchase-invoices").then((r) => r.json()).then((data) => setRecurringPurchaseInvoices(Array.isArray(data) ? data : [])).catch(() => setRecurringPurchaseInvoices([])),
     ])
       .then(([ksefData, companyData, reminderData]) => {
         const fill = (d: Record<string, unknown>) => ({
@@ -873,6 +895,197 @@ export default function SettingsPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-content-border bg-white p-6 max-w-3xl mb-8 shadow-sm">
+        <h2 className="font-medium mb-2 text-content-text">Cykliczne faktury zakupu</h2>
+        <p className="text-content-text-secondary text-sm mb-4">
+          Szablony faktur wystawianych cyklicznie (np. co 10. dnia miesiąca). Dla każdego miesiąca tworzona jest pusta faktura z datą wystawienia – uzupełnisz pozycje i kwoty później.
+        </p>
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const name = rpiForm.name.trim();
+            const sellerName = rpiForm.sellerName.trim();
+            const sellerNip = rpiForm.sellerNip.trim();
+            const dayOfMonth = parseInt(rpiForm.dayOfMonth, 10);
+            if (!name || !sellerName || !sellerNip || isNaN(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+              alert("Wypełnij nazwę, dostawcę (NIP) i dzień miesiąca (1–31).");
+              return;
+            }
+            setSavingRpi(true);
+            try {
+              if (editingRpiId) {
+                const res = await fetch(`/api/recurring-purchase-invoices/${editingRpiId}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name,
+                    dayOfMonth,
+                    sellerName,
+                    sellerNip,
+                    expenseCategoryId: rpiForm.expenseCategoryId || null,
+                  }),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const updated = await res.json();
+                setRecurringPurchaseInvoices((prev) =>
+                  prev.map((r) => (r.id === editingRpiId ? updated : r))
+                );
+                setEditingRpiId(null);
+              } else {
+                const res = await fetch("/api/recurring-purchase-invoices", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    name,
+                    dayOfMonth,
+                    sellerName,
+                    sellerNip,
+                    expenseCategoryId: rpiForm.expenseCategoryId || null,
+                  }),
+                });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  alert(d.error || "Błąd zapisu");
+                  return;
+                }
+                const created = await res.json();
+                setRecurringPurchaseInvoices((prev) => [...prev, created].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)));
+              }
+              setRpiForm({ name: "", dayOfMonth: "10", sellerName: "", sellerNip: "", expenseCategoryId: "" });
+            } finally {
+              setSavingRpi(false);
+            }
+          }}
+          className="flex flex-wrap gap-3 mb-4"
+        >
+          <input
+            type="text"
+            value={rpiForm.name}
+            onChange={(e) => setRpiForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="Nazwa (np. Abonament biurowy)"
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text min-w-[160px]"
+          />
+          <input
+            type="number"
+            min={1}
+            max={31}
+            value={rpiForm.dayOfMonth}
+            onChange={(e) => setRpiForm((f) => ({ ...f, dayOfMonth: e.target.value }))}
+            placeholder="Dzień miesiąca"
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text w-24"
+            title="Dzień miesiąca wystawienia (1–31)"
+          />
+          <input
+            type="text"
+            value={rpiForm.sellerName}
+            onChange={(e) => setRpiForm((f) => ({ ...f, sellerName: e.target.value }))}
+            placeholder="Dostawca"
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text min-w-[140px]"
+          />
+          <input
+            type="text"
+            value={rpiForm.sellerNip}
+            onChange={(e) => setRpiForm((f) => ({ ...f, sellerNip: e.target.value }))}
+            placeholder="NIP dostawcy"
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text w-32"
+          />
+          <select
+            value={rpiForm.expenseCategoryId}
+            onChange={(e) => setRpiForm((f) => ({ ...f, expenseCategoryId: e.target.value }))}
+            className="rounded border border-content-border bg-white px-3 py-2 text-sm text-content-text min-w-[120px]"
+          >
+            <option value="">Kategoria (opcjonalnie)</option>
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <button
+            type="submit"
+            disabled={savingRpi || !rpiForm.name.trim() || !rpiForm.sellerName.trim() || !rpiForm.sellerNip.trim()}
+            className="rounded-lg px-4 py-2 text-white font-medium hover:opacity-90 disabled:opacity-50 text-sm"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            {savingRpi ? "Zapisywanie…" : editingRpiId ? "Zapisz" : "Dodaj szablon"}
+          </button>
+          {editingRpiId && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingRpiId(null);
+                setRpiForm({ name: "", dayOfMonth: "10", sellerName: "", sellerNip: "", expenseCategoryId: "" });
+              }}
+              className="rounded border border-content-border px-4 py-2 text-sm text-content-text hover:bg-gray-100"
+            >
+              Anuluj
+            </button>
+          )}
+        </form>
+        {recurringPurchaseInvoices.length > 0 && (
+          <div className="border-t border-content-border pt-4">
+            <h3 className="font-medium mb-2 text-content-text">Szablony</h3>
+            <ul className="space-y-2">
+              {recurringPurchaseInvoices.map((r) => (
+                <li
+                  key={r.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded border border-content-border bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span>
+                    <span className="font-medium">{r.name}</span>
+                    <span className="text-content-text-secondary ml-2">
+                      – {r.sellerName} (NIP {r.sellerNip}), dzień {r.dayOfMonth}.
+                      {r.expenseCategory ? ` Kategoria: ${r.expenseCategory.name}` : ""}
+                    </span>
+                  </span>
+                  <span className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingRpiId(r.id);
+                        setRpiForm({
+                          name: r.name,
+                          dayOfMonth: String(r.dayOfMonth),
+                          sellerName: r.sellerName,
+                          sellerNip: r.sellerNip,
+                          expenseCategoryId: r.expenseCategoryId || "",
+                        });
+                      }}
+                      className="text-accent font-medium text-sm hover:underline"
+                    >
+                      Edytuj
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingRpiId === r.id}
+                      onClick={async () => {
+                        if (!confirm(`Usunąć szablon „${r.name}"? Istniejące faktury nie zostaną usunięte.`)) return;
+                        setDeletingRpiId(r.id);
+                        try {
+                          const res = await fetch(`/api/recurring-purchase-invoices/${r.id}`, { method: "DELETE" });
+                          if (res.ok) setRecurringPurchaseInvoices((prev) => prev.filter((x) => x.id !== r.id));
+                          else alert("Błąd usuwania");
+                        } finally {
+                          setDeletingRpiId(null);
+                        }
+                      }}
+                      className="text-red-600 font-medium text-sm hover:underline disabled:opacity-50"
+                    >
+                      Usuń
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-content-text-secondary text-xs mt-2">
+              Faktury generowane są automatycznie przy wejściu na stronę Faktury zakupu oraz 1. dnia miesiąca (cron).
+            </p>
           </div>
         )}
       </div>

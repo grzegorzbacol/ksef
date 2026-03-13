@@ -66,9 +66,11 @@ model Invoice {
   remarks             String?   @db.Text // uwagi – opis dokumentu (faktury zakupu, rozrachunki)
   expenseCategoryId   String?   // kategoria kosztu (tylko faktury zakupu)
   correctionOfId      String?   // ID faktury, którą ta korekta koryguje (tylko faktury sprzedaży)
+  recurringPurchaseInvoiceId String?   // szablon faktury zakupu cyklicznej (gdy source=recurring, type=cost)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   payment          Payment?
+  recurringPurchaseInvoice RecurringPurchaseInvoice? @relation(fields: [recurringPurchaseInvoiceId], references: [id], onDelete: SetNull)
   car               Car?         @relation(fields: [carId], references: [id], onDelete: SetNull)
   expenseCategory   ExpenseCategory? @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
   correctionOf      Invoice?     @relation("InvoiceCorrection", fields: [correctionOfId], references: [id], onDelete: SetNull)
@@ -84,6 +86,7 @@ model ExpenseCategory {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   invoices  Invoice[]
+  recurringPurchaseInvoices RecurringPurchaseInvoice[]
 }
 
 model Car {
@@ -109,6 +112,20 @@ model RecurringSettlement {
   sellerNip  String   @default("") // NIP wystawcy / odbiorcy (opcjonalnie)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model RecurringPurchaseInvoice {
+  id                String   @id @default(cuid())
+  name              String   // e.g. "Abonament biurowy", "Dzierżawa serwera"
+  dayOfMonth        Int      // 1–31 – dzień miesiąca wystawienia
+  sellerName        String
+  sellerNip         String
+  expenseCategoryId String?
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  expenseCategory   ExpenseCategory? @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
+  invoices          Invoice[]
 }
 
 model InvoiceEmailAttachment {

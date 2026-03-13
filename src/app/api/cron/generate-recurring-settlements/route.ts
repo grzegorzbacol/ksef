@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateRecurringSettlementsForMonth } from "@/lib/recurring-settlements";
+import { generateRecurringPurchaseInvoicesForMonth } from "@/lib/recurring-purchase-invoices";
 
 /**
- * Cron: 1. dzień miesiąca – generuje rozrachunki cykliczne (ZUS, PIT-5, VAT-7) na bieżący miesiąc.
+ * Cron: 1. dzień miesiąca – generuje rozrachunki cykliczne (ZUS, PIT-5, VAT-7)
+ * oraz puste faktury zakupu cykliczne na bieżący miesiąc.
  * Wywołuj przez Vercel Cron lub zewnętrzny cron z Bearer CRON_SECRET.
  */
 export async function GET(req: NextRequest) {
@@ -19,13 +21,16 @@ export async function GET(req: NextRequest) {
   const month = now.getMonth() + 1;
 
   try {
-    const result = await generateRecurringSettlementsForMonth(year, month);
+    const [settlements, purchaseInvoices] = await Promise.all([
+      generateRecurringSettlementsForMonth(year, month),
+      generateRecurringPurchaseInvoicesForMonth(year, month),
+    ]);
     return NextResponse.json({
       ok: true,
       year,
       month,
-      created: result.created,
-      invoiceIds: result.invoiceIds,
+      settlements: { created: settlements.created, invoiceIds: settlements.invoiceIds },
+      purchaseInvoices: { created: purchaseInvoices.created, invoiceIds: purchaseInvoices.invoiceIds },
     });
   } catch (err) {
     console.error("cron generate-recurring-settlements:", err);
