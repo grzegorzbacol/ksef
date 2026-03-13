@@ -6,7 +6,7 @@
 
 import fs from "fs";
 import path from "path";
-import { fetchTeslaInventoryPage, parseCars, runTest } from "@/lib/tesla-scanner";
+import { fetchTeslaInventory, parseCars, runTest } from "@/lib/tesla-scanner";
 
 // --- Konfiguracja ---
 // Ustaw w .env lub podaj tutaj (nie commituj tokena!):
@@ -84,15 +84,15 @@ async function run(): Promise<void> {
   log("Start skanowania Tesla inventory...");
   const seen = loadSeen();
 
-  let html: string;
+  let json: string;
   try {
-    html = await fetchTeslaInventoryPage();
+    json = await fetchTeslaInventory();
   } catch (e) {
-    log("Błąd pobierania strony: " + (e instanceof Error ? e.message : String(e)));
+    log("Błąd pobierania: " + (e instanceof Error ? e.message : String(e)));
     return;
   }
 
-  const cars = parseCars(html);
+  const cars = parseCars(json);
   log(`Znaleziono ${cars.length} aut w inventory.`);
 
   let newCount = 0;

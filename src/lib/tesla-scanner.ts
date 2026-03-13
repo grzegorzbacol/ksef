@@ -11,14 +11,26 @@ const SEEN_FILE = path.join(DATA_DIR, "tesla_seen.json");
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "tesla.log");
 
-const TESLA_INVENTORY_URL =
-  "https://www.tesla.com/pl_PL/inventory/new/my?CATEGORY=PRAWD&arrangeby=plh&zip=00-510&range=0";
+const TESLA_API_URL = "https://www.tesla.com/inventory/api/v1/inventory-results";
 
-const BROWSER_HEADERS = {
-  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "text/html,application/xhtml+xml",
-  "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-  Referer: "https://www.tesla.com/",
+const API_HEADERS = {
+  "User-Agent": "Mozilla/5.0",
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
+const API_BODY = {
+  query: {
+    model: "my",
+    condition: "new",
+    options: {
+      Region: "PL",
+      Zip: "00-510",
+      Range: 0,
+    },
+    arrangeby: "Price",
+    order: "asc",
+  },
 };
 
 const REQUEST_TIMEOUT_MS = 10000;
@@ -54,17 +66,17 @@ function log(message: string): void {
 }
 
 /**
- * Pobiera surowy HTML strony inventory Tesli.
- * Używa axios z nagłówkami przeglądarki, retry przy 403/błędzie sieci, timeout 10s.
+ * Pobiera dane z oficjalnego API inventory Tesli (POST).
+ * Zwraca JSON. Retry 3x, timeout 10s.
  * @throws Error przy nieudanym pobraniu
  */
-export async function fetchTeslaInventoryPage(): Promise<string> {
+export async function fetchTeslaInventory(): Promise<string> {
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await axios.get(TESLA_INVENTORY_URL, {
-        headers: BROWSER_HEADERS,
+      const res = await axios.post(TESLA_API_URL, API_BODY, {
+        headers: API_HEADERS,
         timeout: REQUEST_TIMEOUT_MS,
         responseType: "text",
         validateStatus: () => true,
@@ -72,7 +84,7 @@ export async function fetchTeslaInventoryPage(): Promise<string> {
 
       if (res.status !== 200) {
         const msg = `HTTP ${res.status} (próba ${attempt}/${MAX_RETRIES})`;
-        log(`Błąd pobierania strony Tesli: ${msg}`);
+        log(`Błąd API Tesli: ${msg}`);
         lastError = new Error(msg);
         if (attempt < MAX_RETRIES && (res.status === 403 || res.status >= 500)) {
           await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
@@ -92,7 +104,7 @@ export async function fetchTeslaInventoryPage(): Promise<string> {
         ? (e.response ? `HTTP ${e.response.status}` : e.message)
         : lastError.message;
 
-      log(`Błąd pobierania (próba ${attempt}/${MAX_RETRIES}): ${errMsg}`);
+      log(`Błąd API Tesli (próba ${attempt}/${MAX_RETRIES}): ${errMsg}`);
 
       const shouldRetry = (is403 || isNetwork || isTimeout) && attempt < MAX_RETRIES;
       if (shouldRetry) {
@@ -103,41 +115,22 @@ export async function fetchTeslaInventoryPage(): Promise<string> {
     }
   }
 
-  throw lastError ?? new Error("Nie udało się pobrać strony");
-}
-
-/** @deprecated Użyj fetchTeslaInventoryPage */
-export async function fetchInventoryPage(): Promise<string> {
-  return fetchTeslaInventoryPage();
+  throw lastError ?? new Error("Nie udało się pobrać danych");
 }
 
 /**
- * Parsuje listę samochodów z HTML (__NEXT_DATA__) lub surowego JSON.
+ * Parsuje JSON z API inventory – wyciąga VIN, model, cenę, link.
  */
-export function parseCars(htmlOrJson: string): TeslaCar[] {
+export function parseCars(json: string): TeslaCar[] {
   const cars: TeslaCar[] = [];
-  let results: Array<Record<string, unknown>> = [];
 
   try {
-    if (htmlOrJson.trim().startsWith("<")) {
-      const match = htmlOrJson.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-      if (match) {
-        const nextData = JSON.parse(match[1]) as Record<string, unknown>;
-        const inventory =
-          (nextData?.props as Record<string, unknown>)?.["pageProps"] as Record<string, unknown> | undefined;
-        const inv = inventory?.initialState as Record<string, unknown> | undefined;
-        const invData = inv?.inventory as Record<string, unknown> | undefined;
-        const invObj = invData?.inventory as { results?: unknown[] } | undefined;
-        results = (invObj?.results ?? []) as Array<Record<string, unknown>>;
-      }
-    } else {
-      const data = JSON.parse(htmlOrJson) as { results?: Array<Record<string, unknown>> };
-      results = data?.results ?? [];
-    }
+    const data = JSON.parse(json) as { results?: Array<Record<string, unknown>> };
+    const results = data?.results ?? [];
 
     for (const r of results) {
-      const id = (r.VIN ?? r.ID ?? r.vin ?? r.id ?? "") as string;
-      if (!id) continue;
+      const vin = (r.VIN ?? r.vin ?? r.ID ?? r.id ?? "") as string;
+      if (!vin) continue;
       const model = ((r.Model ?? r.TrimName ?? r.model) as string) ?? "Tesla Model Y";
       const priceVal = (r.InventoryPrice ?? r.Price ?? r.inventoryPrice ?? r.price ?? 0) as number;
       const price =
@@ -145,11 +138,11 @@ export function parseCars(htmlOrJson: string): TeslaCar[] {
           ? `${(priceVal / 1000).toFixed(0)} 000 PLN`
           : String(priceVal);
       const link =
-        (r.Url as string) ?? `https://www.tesla.com/pl_PL/inventory/new/my?VIN=${id}`;
-      cars.push({ id, model, price, link });
+        (r.Url as string) ?? `https://www.tesla.com/pl_PL/inventory/new/my?VIN=${vin}`;
+      cars.push({ id: vin, model, price, link });
     }
   } catch (e) {
-    log("Błąd parsowania: " + (e instanceof Error ? e.message : String(e)));
+    log("Błąd parsowania JSON: " + (e instanceof Error ? e.message : String(e)));
   }
   return cars;
 }
@@ -204,7 +197,7 @@ export async function runTest(): Promise<TestResult> {
   };
 
   try {
-    const json = await fetchInventoryPage();
+    const json = await fetchTeslaInventory();
     const cars = parseCars(json);
     result.api = { ok: true, message: `OK – znaleziono ${cars.length} aut`, carCount: cars.length };
   } catch (e) {
