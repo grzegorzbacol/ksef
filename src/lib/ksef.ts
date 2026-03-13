@@ -186,14 +186,20 @@ function isKsef2Metadata(item: Record<string, unknown>): boolean {
   return typeof item.seller === "object" || typeof item.buyer === "object";
 }
 
-/** Sprawdza, czy KSEF jest skonfigurowany dla aktywnego środowiska (ustawienia z bazy + env łącznie). */
+/** Sprawdza, czy KSEF jest skonfigurowany. Uwzględnia aktywne środowisko i drugie (fallback). */
 export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
   const targetEnv = env ?? (await getKsefActiveEnv());
-  const s = await getKsefSettings(targetEnv);
-  const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || "").trim() ||
-    (targetEnv === "prod" ? DEFAULT_API_URL : "");
-  const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
-  return !!apiUrl && !!token;
+  const check = (s: { apiUrl: string; token: string }, e: KsefEnv) => {
+    const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || "").trim() ||
+      (e === "prod" ? DEFAULT_API_URL : "");
+    const token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+    return !!apiUrl && !!token;
+  };
+  const [sActive, sOther] = await Promise.all([
+    getKsefSettings(targetEnv),
+    getKsefSettings(targetEnv === "prod" ? "test" : "prod"),
+  ]);
+  return check(sActive, targetEnv) || check(sOther, targetEnv === "prod" ? "test" : "prod");
 }
 
 /**

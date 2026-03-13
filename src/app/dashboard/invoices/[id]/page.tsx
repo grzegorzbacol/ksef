@@ -26,7 +26,16 @@ function SendKsefButton({
       activeEnv: s.activeEnv === "test" ? "test" : "prod",
     });
     if (s.configured !== true) {
-      alert("KSeF nie jest skonfigurowany. Uzupełnij dane w Ustawieniach → Integracja KSeF.");
+      const h = s._hint;
+      let msg = "KSeF nie jest skonfigurowany.\n\n";
+      if (h?.hasTest || h?.hasProd) {
+        msg += "Masz dane w bazie – upewnij się, że wybrałeś właściwe środowisko (Test/Produkcja) i kliknij Zapisz w Ustawieniach → Integracja KSeF.";
+      } else if (h?.hasEnvVars) {
+        msg += "Masz zmienne env (KSEF_API_URL, KSEF_TOKEN) – sprawdź, czy aktywny env pasuje do adresu API.";
+      } else {
+        msg += "1) W Ustawieniach → Integracja KSeF rozwiń sekcję KSeF Test,\n2) Wklej token z MCU, wpisz NIP,\n3) Kliknij „Zaloguj tokenem KSeF” (zapisze token),\n4) Wybierz „Test” jako aktywne środowisko i Zapisz.";
+      }
+      alert(msg);
       return;
     }
     setShowConfirm(true);

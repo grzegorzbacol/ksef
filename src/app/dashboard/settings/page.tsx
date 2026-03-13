@@ -1218,10 +1218,11 @@ export default function SettingsPage() {
                         if (data.ok === true && data.accessToken) {
                           const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
                           setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          if (env === "test") setKsefActiveEnv("test");
                           const saveRes = await fetch("/api/settings/ksef", {
                             method: "PUT", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              activeEnv: ksefActiveEnv,
+                              activeEnv: env,
                               prod: env === "prod" ? updated : ksefProd,
                               test: env === "test" ? updated : ksefTest,
                             }),
@@ -1277,10 +1278,11 @@ export default function SettingsPage() {
                         if (data.ok === true && data.accessToken) {
                           const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
                           setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          if (env === "test") setKsefActiveEnv("test");
                           const saveRes = await fetch("/api/settings/ksef", {
                             method: "PUT", headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
-                              activeEnv: ksefActiveEnv,
+                              activeEnv: env,
                               prod: env === "prod" ? updated : ksefProd,
                               test: env === "test" ? updated : ksefTest,
                             }),
