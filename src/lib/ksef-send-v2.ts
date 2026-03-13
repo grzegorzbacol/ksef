@@ -153,11 +153,14 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       <P_17>2</P_17>
       <P_18>2</P_18>
       <P_18A>2</P_18A>
+      <Zwolnienie>
+        <P_19N>1</P_19N>
+      </Zwolnienie>
     </Adnotacje>
     <RodzajFaktury>VAT</RodzajFaktury>
     ${rows.length > 0 ? rows.join("\n") : ""}
     <Platnosc>
-      <Termin>${paymentDue}</Termin>
+      <TerminPlatnosci>${paymentDue}</TerminPlatnosci>
     </Platnosc>
   </Fa>
 </Faktura>`;
