@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchInvoicesFromKsef } from "@/lib/ksef";
+import { getCompanySettings } from "@/lib/settings";
+
+function normalizeNip(nip: string): string {
+  return String(nip ?? "").replace(/\D/g, "").trim();
+}
 
 /**
  * Cron: co 1h pobiera faktury z KSEF (ostatnie 30 dni) i zapisuje do bazy.
@@ -28,7 +33,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const imported = result.invoices || [];
+    const company = await getCompanySettings();
+    const ourNip = normalizeNip(company.nip);
+
+    // Tylko faktury zakupu: my jesteśmy nabywcą (buyerNip = nasz NIP).
+    // Faktury sprzedaży (gdzie my jesteśmy sprzedawcą) NIE trafiają do faktur zakupu.
+    const allFromKsef = result.invoices || [];
+    const imported = ourNip
+      ? allFromKsef.filter((inv) => normalizeNip(inv.buyerNip) === ourNip)
+      : allFromKsef;
     for (const inv of imported) {
       if (!inv?.number) continue;
       try {

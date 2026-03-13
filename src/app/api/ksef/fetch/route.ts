@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { fetchInvoicesFromKsef } from "@/lib/ksef";
+import { getCompanySettings } from "@/lib/settings";
+
+function normalizeNip(nip: string): string {
+  return String(nip ?? "").replace(/\D/g, "").trim();
+}
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -22,7 +27,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z KSEF" }, { status: 200 });
   }
 
-  const imported = result.invoices || [];
+  const company = await getCompanySettings();
+  const ourNip = normalizeNip(company.nip);
+
+  // Tylko faktury zakupu: my jesteśmy nabywcą (buyerNip = nasz NIP).
+  // Faktury sprzedaży (gdzie my jesteśmy sprzedawcą) NIE trafiają do faktur zakupu.
+  const allFromKsef = result.invoices || [];
+  const imported = ourNip
+    ? allFromKsef.filter((inv) => normalizeNip(inv.buyerNip) === ourNip)
+    : allFromKsef;
   for (const inv of imported) {
     if (!inv?.number) continue;
     try {
@@ -65,11 +78,20 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Popraw też istniejące faktury KSEF (np. po wcześniejszym błędnym przypisaniu).
-  await prisma.invoice.updateMany({
-    where: { source: "ksef" },
-    data: { type: "cost" },
-  });
+  // Popraw istniejące faktury KSEF (tylko te, gdzie jesteśmy nabywcą – nie zmieniamy typu faktur sprzedaży).
+  if (ourNip) {
+    const ksefInvoices = await prisma.invoice.findMany({
+      where: { source: "ksef" },
+      select: { id: true, buyerNip: true },
+    });
+    const toFix = ksefInvoices.filter((i) => normalizeNip(i.buyerNip) === ourNip);
+    if (toFix.length > 0) {
+      await prisma.invoice.updateMany({
+        where: { id: { in: toFix.map((i) => i.id) } },
+        data: { type: "cost" },
+      });
+    }
+  }
 
   return NextResponse.json({ ok: true, imported: imported.length });
 }
