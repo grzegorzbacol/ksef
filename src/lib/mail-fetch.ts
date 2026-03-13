@@ -411,13 +411,20 @@ export async function fetchInvoicesFromMail(prisma: PrismaClient): Promise<Fetch
           const parsed = await parseEmailToInvoice(buffer, msg.envelope?.from?.[0]?.address || "");
           if (!parsed) continue;
 
-          // Deduplikacja TYLKO po tożsamości wiadomości (Message-ID lub IMAP UID). Nowy mail = nowa wiadomość = import.
+          // Deduplikacja po tożsamości wiadomości (Message-ID lub IMAP UID) oraz po liście ignorowanych (usunięte faktury z maila).
           const messageId = parsed.emailMessageId || `imap:${(settings.imapFolder || "INBOX").replace(/[/\\]/g, "_")}:${msg.uid}`;
           const existing = await prisma.invoice.findFirst({
             where: { emailMessageId: messageId },
           });
           if (existing) {
             skippedAlreadyImported++;
+            continue;
+          }
+          const ignored = await prisma.deletedMailInvoiceMessageId.findUnique({
+            where: { emailMessageId: messageId },
+          });
+          if (ignored) {
+            skippedDeleted++;
             continue;
           }
 
