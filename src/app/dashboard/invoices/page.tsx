@@ -11,6 +11,7 @@ import {
   Trash2,
   Search,
   FileText,
+  Upload,
 } from "lucide-react";
 
 type Invoice = {
@@ -88,6 +89,7 @@ export default function InvoicesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncKsefLoading, setSyncKsefLoading] = useState(false);
   const [sendingKsefId, setSendingKsefId] = useState<string | null>(null);
+  const [importJpkLoading, setImportJpkLoading] = useState(false);
 
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
@@ -103,6 +105,8 @@ export default function InvoicesPage() {
         return "Wprowadzona ręcznie";
       case "mail":
         return "Mail";
+      case "jpk-fa":
+        return "JPK FA";
       default:
         return source || "—";
     }
@@ -154,6 +158,40 @@ export default function InvoicesPage() {
       alert("Błąd: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       setSyncKsefLoading(false);
+    }
+  }
+
+  async function handleImportJpkFa(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setImportJpkLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/invoices/import-jpk-fa", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || "Błąd importu pliku JPK_FA");
+        return;
+      }
+      const msg =
+        data.imported > 0
+          ? `Zaimportowano: ${data.imported} faktur.${data.skipped ? ` Pominięto (istniejące): ${data.skipped}.` : ""}`
+          : data.skipped > 0
+            ? `Wszystkie faktury już istnieją (pominięto ${data.skipped}).`
+            : "Brak faktur do importu.";
+      if (data.errors?.length) alert(msg + "\nBłędy:\n" + data.errors.join("\n"));
+      else alert(msg);
+      loadInvoices();
+    } catch (err) {
+      alert("Błąd: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setImportJpkLoading(false);
     }
   }
 
@@ -327,6 +365,14 @@ export default function InvoicesPage() {
             <Printer className="w-4 h-4" />
             Wyślij / drukuj
           </button>
+          <label
+            className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 ${importJpkLoading ? "cursor-not-allowed opacity-60" : ""}`}
+            style={{ borderColor: "var(--content-border)", color: "var(--content-text)" }}
+          >
+            <input type="file" accept=".xml,application/xml,text/xml" className="sr-only" onChange={handleImportJpkFa} disabled={importJpkLoading} />
+            <Upload className={`w-4 h-4 ${importJpkLoading ? "animate-pulse" : ""}`} />
+            Import JPK FA
+          </label>
           <button
             type="button"
             onClick={syncKsefStatus}
