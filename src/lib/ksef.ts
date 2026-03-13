@@ -329,7 +329,8 @@ export async function fetchInvoicesFromKsef(
       return rawList;
     };
 
-    const wanted = subjectType === "Subject2" ? ["Subject2"] : subjectType === "Subject1" ? ["Subject1"] : ["Subject1", "Subject2"];
+    const wanted: ("Subject1" | "Subject2")[] =
+      subjectType === "Subject2" ? ["Subject2"] : subjectType === "Subject1" ? ["Subject1"] : ["Subject1", "Subject2"];
     const lists = await Promise.all(wanted.map((s) => fetchForSubject(s)));
     const seen = new Set<string>();
     const invoices: KsefInvoiceNormalized[] = [];
