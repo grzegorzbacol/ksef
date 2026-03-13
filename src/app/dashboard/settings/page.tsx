@@ -86,8 +86,12 @@ type ExpenseCategory = {
   sortOrder: number;
 };
 
+type KsefEnv = "prod" | "test";
+
 export default function SettingsPage() {
-  const [ksef, setKsef] = useState<KsefSettings>(emptyKsef);
+  const [ksefProd, setKsefProd] = useState<KsefSettings>(emptyKsef);
+  const [ksefTest, setKsefTest] = useState<KsefSettings>(emptyKsef);
+  const [ksefActiveEnv, setKsefActiveEnv] = useState<KsefEnv>("prod");
   const [company, setCompany] = useState<CompanySettings>(emptyCompany);
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,12 +99,12 @@ export default function SettingsPage() {
   const [savingCompany, setSavingCompany] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [companyMessage, setCompanyMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message?: string; error?: string; detail?: string } | null>(null);
-  const [redeeming, setRedeeming] = useState(false);
-  const [redeemResult, setRedeemResult] = useState<{ ok: boolean; error?: string; detail?: string } | null>(null);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [loginResult, setLoginResult] = useState<{ ok: boolean; error?: string; detail?: string } | null>(null);
+  const [testingFor, setTestingFor] = useState<KsefEnv | null>(null);
+  const [testResult, setTestResult] = useState<{ for: KsefEnv; ok: boolean; message?: string; error?: string; detail?: string } | null>(null);
+  const [redeemingFor, setRedeemingFor] = useState<KsefEnv | null>(null);
+  const [redeemResult, setRedeemResult] = useState<{ for: KsefEnv; ok: boolean; error?: string; detail?: string } | null>(null);
+  const [loginLoadingFor, setLoginLoadingFor] = useState<KsefEnv | null>(null);
+  const [loginResult, setLoginResult] = useState<{ for: KsefEnv; ok: boolean; error?: string; detail?: string } | null>(null);
   const [paymentReminder, setPaymentReminder] = useState<PaymentReminderSettings>(emptyPaymentReminder);
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderMessage, setReminderMessage] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -131,15 +135,18 @@ export default function SettingsPage() {
       fetch("/api/expense-categories").then((r) => r.json()).then((data) => setExpenseCategories(Array.isArray(data) ? data : [])).catch(() => setExpenseCategories([])),
     ])
       .then(([ksefData, companyData, reminderData]) => {
-        setKsef({
-          apiUrl: ksefData.apiUrl ?? "",
-          token: ksefData.token === "********" ? "" : (ksefData.token ?? ""),
-          refreshToken: ksefData.refreshToken === "********" ? "" : (ksefData.refreshToken ?? ""),
-          queryPath: ksefData.queryPath ?? "",
-          sendPath: ksefData.sendPath ?? "",
-          nip: ksefData.nip ?? "",
-          invoicePdfPath: ksefData.invoicePdfPath ?? "",
+        const fill = (d: Record<string, unknown>) => ({
+          apiUrl: (d.apiUrl as string) ?? "",
+          token: (d.token as string) === "********" ? "" : ((d.token as string) ?? ""),
+          refreshToken: (d.refreshToken as string) === "********" ? "" : ((d.refreshToken as string) ?? ""),
+          queryPath: (d.queryPath as string) ?? "",
+          sendPath: (d.sendPath as string) ?? "",
+          nip: (d.nip as string) ?? "",
+          invoicePdfPath: (d.invoicePdfPath as string) ?? "",
         });
+        setKsefProd(fill(ksefData.prod ?? ksefData));
+        setKsefTest(fill(ksefData.test ?? emptyKsef));
+        setKsefActiveEnv(ksefData.activeEnv === "test" ? "test" : "prod");
         setCompany({
           name: companyData.name ?? "",
           nip: companyData.nip ?? "",
@@ -176,13 +183,9 @@ export default function SettingsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiUrl: ksef.apiUrl,
-          token: ksef.token,
-          refreshToken: ksef.refreshToken,
-          queryPath: ksef.queryPath,
-          sendPath: ksef.sendPath,
-          nip: ksef.nip,
-          invoicePdfPath: ksef.invoicePdfPath,
+          activeEnv: ksefActiveEnv,
+          prod: ksefProd,
+          test: ksefTest,
         }),
       });
       if (!res.ok) {
@@ -872,101 +875,218 @@ export default function SettingsPage() {
       <form onSubmit={handleKsefSubmit} className="rounded-xl border border-border bg-card p-6 max-w-2xl">
         <h2 className="font-medium mb-4">Integracja KSEF</h2>
         <p className="text-muted text-sm mb-2">
-          Uzupełnij dane, aby aplikacja mogła łączyć się z KSEF. Wymagane minimum: URL API i token.
+          Możesz skonfigurować dwa połączenia: <strong>produkcyjne</strong> (api.ksef.mf.gov.pl) i <strong>testowe</strong> (api-demo.ksef.mf.gov.pl). Aktywne środowisko jest używane przy pobieraniu faktur i wysyłce.
         </p>
-        <p className="text-muted text-xs mb-2">
-          <strong>Kolejność:</strong> (1) Wklej w „Token” cały token z MCU (np. ref|nip-XXX|secret z portalu{" "}
-          <a href="https://ksef.mf.gov.pl" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ksef.mf.gov.pl</a>
-          ). (2) Wpisz NIP. (3) Kliknij <strong>„Zaloguj tokenem KSeF”</strong> – w pole wpisze się token dostępu (JWT). (4) Kliknij „Zapisz ustawienia KSEF”. Dopiero potem „Sprawdź połączenie” – działa tylko z JWT w polu, nie z tokenem z MCU.
-        </p>
-        <p className="text-muted text-xs mb-4">
-          Przy 401: upewnij się, że najpierw wykonałeś krok 3 (Zaloguj tokenem KSeF). W polu musi być JWT, nie surowy token z MCU.
-          Aplikacja automatycznie odświeża token przed wygaśnięciem (access token ~15 min, refresh token ~7 dni). Po zapisaniu refresh token wylogowywanie powinno być rzadsze.
-        </p>
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-sm text-muted">Aktywne środowisko:</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="ksef_active"
+              checked={ksefActiveEnv === "prod"}
+              onChange={() => setKsefActiveEnv("prod")}
+              className="rounded-full"
+            />
+            <span>Produkcja</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="ksef_active"
+              checked={ksefActiveEnv === "test"}
+              onChange={() => setKsefActiveEnv("test")}
+              className="rounded-full"
+            />
+            <span>Test</span>
+          </label>
+        </div>
         <details className="text-muted text-xs mb-4">
-          <summary className="cursor-pointer text-accent hover:underline">Inne sposoby logowania do KSEF</summary>
-          <ul className="mt-2 space-y-1 list-disc list-inside">
-            <li><strong>Token z MCU</strong> (implementowane): portal ksef.mf.gov.pl → token → wklej tutaj → „Zaloguj tokenem KSeF” → zapisz. Refresh token zapewnia automatyczne odświeżanie.</li>
-            <li><strong>Wymiana tokena</strong>: jeśli masz już auth token (Bearer) z innego źródła, wklej go i kliknij „Wymień token” – otrzymasz access + refresh.</li>
-            <li><strong>Certyfikat kwalifikowany</strong>: KSEF API 2.0 obsługuje też logowanie certyfikatem (PKCS#12), wymaga dodatkowej implementacji.</li>
-            <li><strong>Profil zaufany (ePUAP)</strong>: alternatywna metoda dostępna w dokumentacji MF.</li>
+          <summary className="cursor-pointer text-accent hover:underline">Pomoc: logowanie tokenem z MCU</summary>
+          <p className="mt-2">(1) Wklej token z MCU (portal ksef.mf.gov.pl). (2) Wpisz NIP. (3) Kliknij „Zaloguj tokenem KSeF”. (4) Zapisz ustawienia.</p>
+          <ul className="mt-2 list-disc list-inside">
+            <li><strong>Produkcja:</strong> https://api.ksef.mf.gov.pl</li>
+            <li><strong>Test:</strong> https://api-demo.ksef.mf.gov.pl</li>
           </ul>
         </details>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-muted mb-1">URL API KSEF</label>
-            <input
-              type="url"
-              value={ksef.apiUrl}
-              onChange={(e) => setKsef((s) => ({ ...s, apiUrl: e.target.value }))}
-              placeholder="https://api.ksef.mf.gov.pl"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-muted mb-1">Token (JWT)</label>
-            <input
-              type="password"
-              value={ksef.token}
-              onChange={(e) => setKsef((s) => ({ ...s, token: e.target.value }))}
-              placeholder="Token z portalu KSEF"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-              autoComplete="off"
-            />
-            <p className="text-xs text-muted mt-1">
-              Wklej cały token z MCU (np. „ref|nip-XXX|secret” – ze spacjami lub bez) – aplikacja użyje właściwej części do szyfrowania. Podaj NIP i kliknij „Zaloguj tokenem KSeF”.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm text-muted mb-1">NIP (wymagany do logowania tokenem z MCU)</label>
-            <input
-              type="text"
-              value={ksef.nip}
-              onChange={(e) => setKsef((s) => ({ ...s, nip: e.target.value }))}
-              placeholder="10 cyfr NIP"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-muted mb-1">Ścieżka zapytania o faktury (opcjonalnie)</label>
-            <input
-              type="text"
-              value={ksef.queryPath}
-              onChange={(e) => setKsef((s) => ({ ...s, queryPath: e.target.value }))}
-              placeholder="/v2/invoices/query/metadata"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-muted mb-1">Ścieżka wysyłki faktury (opcjonalnie)</label>
-            <input
-              type="text"
-              value={ksef.sendPath}
-              onChange={(e) => setKsef((s) => ({ ...s, sendPath: e.target.value }))}
-              placeholder="/api/online/Invoice/Send"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-muted mb-1">Ścieżka pobierania PDF z KSEF (opcjonalnie)</label>
-            <input
-              type="text"
-              value={ksef.invoicePdfPath}
-              onChange={(e) => setKsef((s) => ({ ...s, invoicePdfPath: e.target.value }))}
-              placeholder="/v2/invoices/ksef/{referenceNumber}"
-              className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
-            />
-            <p className="text-muted text-xs mt-1">Użyj {"{referenceNumber}"} jako placeholder numeru KSEF. Domyślnie API 2.0 zwraca XML – aplikacja konwertuje go na PDF. Możesz podać własną ścieżkę do usługi zwracającej gotowy PDF.</p>
-          </div>
-        </div>
+        {(["prod", "test"] as KsefEnv[]).map((env) => {
+          const ksef = env === "prod" ? ksefProd : ksefTest;
+          const setKsef = env === "prod" ? setKsefProd : setKsefTest;
+          const defaultUrl = env === "prod" ? "https://api.ksef.mf.gov.pl" : "https://api-demo.ksef.mf.gov.pl";
+          const title = env === "prod" ? "KSeF Produkcja" : "KSeF Test";
+          return (
+            <details key={env} open={env === "prod"} className="mb-6 border border-border rounded-lg overflow-hidden">
+              <summary className="cursor-pointer bg-bg/50 px-4 py-3 font-medium hover:bg-bg/70">
+                {title}
+              </summary>
+              <div className="p-4 pt-2 space-y-4 border-t border-border">
+                <div>
+                  <label className="block text-sm text-muted mb-1">URL API KSEF</label>
+                  <input
+                    type="url"
+                    value={ksef.apiUrl}
+                    onChange={(e) => setKsef((s) => ({ ...s, apiUrl: e.target.value }))}
+                    placeholder={defaultUrl}
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">Token (JWT)</label>
+                  <input
+                    type="password"
+                    value={ksef.token}
+                    onChange={(e) => setKsef((s) => ({ ...s, token: e.target.value }))}
+                    placeholder="Token z portalu KSEF"
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">NIP</label>
+                  <input
+                    type="text"
+                    value={ksef.nip}
+                    onChange={(e) => setKsef((s) => ({ ...s, nip: e.target.value }))}
+                    placeholder="10 cyfr NIP"
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-muted mb-1">Ścieżka zapytania (opcjonalnie)</label>
+                    <input
+                      type="text"
+                      value={ksef.queryPath}
+                      onChange={(e) => setKsef((s) => ({ ...s, queryPath: e.target.value }))}
+                      placeholder="/v2/invoices/query/metadata"
+                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-muted mb-1">Ścieżka wysyłki (opcjonalnie)</label>
+                    <input
+                      type="text"
+                      value={ksef.sendPath}
+                      onChange={(e) => setKsef((s) => ({ ...s, sendPath: e.target.value }))}
+                      placeholder="/api/online/Invoice/Send"
+                      className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-muted mb-1">Ścieżka PDF (opcjonalnie)</label>
+                  <input
+                    type="text"
+                    value={ksef.invoicePdfPath}
+                    onChange={(e) => setKsef((s) => ({ ...s, invoicePdfPath: e.target.value }))}
+                    placeholder="/v2/invoices/ksef/{referenceNumber}"
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-text"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={loginLoadingFor !== null || !ksef.token.trim() || ksef.nip.replace(/\D/g, "").length !== 10}
+                    onClick={async () => {
+                      setLoginResult(null); setTestResult(null); setRedeemResult(null);
+                      setLoginLoadingFor(env);
+                      try {
+                        const nip10 = ksef.nip.replace(/\D/g, "");
+                        const res = await fetch("/api/ksef/login-token", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: ksef.token, nip: nip10 }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (data.ok === true && data.accessToken) {
+                          setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          setLoginResult({ for: env, ok: true });
+                        } else setLoginResult({ for: env, ok: false, error: data.error ?? "Błąd", detail: data.detail });
+                      } catch {
+                        setLoginResult({ for: env, ok: false, error: "Błąd połączenia." });
+                      } finally {
+                        setLoginLoadingFor(null);
+                      }
+                    }}
+                    className="rounded-lg bg-amber-600 px-3 py-1.5 text-white text-sm hover:bg-amber-700 disabled:opacity-50"
+                  >
+                    {loginLoadingFor === env ? "Logowanie…" : "Zaloguj tokenem KSeF"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={testingFor !== null || !ksef.token.trim()}
+                    onClick={async () => {
+                      setTestResult(null); setLoginResult(null); setRedeemResult(null);
+                      setTestingFor(env);
+                      try {
+                        const res = await fetch("/api/ksef/test-connection", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: ksef.token }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        setTestResult({ for: env, ok: data.ok === true, message: data.message, error: data.error, detail: data.detail });
+                      } catch {
+                        setTestResult({ for: env, ok: false, error: "Błąd połączenia." });
+                      } finally {
+                        setTestingFor(null);
+                      }
+                    }}
+                    className="rounded-lg border border-border bg-bg px-3 py-1.5 text-sm hover:bg-border disabled:opacity-50"
+                  >
+                    {testingFor === env ? "Sprawdzanie…" : "Sprawdź połączenie"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={redeemingFor !== null || !ksef.token.trim()}
+                    onClick={async () => {
+                      setRedeemResult(null); setTestResult(null); setLoginResult(null);
+                      setRedeemingFor(env);
+                      try {
+                        const res = await fetch("/api/ksef/redeem-token", {
+                          method: "POST", headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: ksef.token }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (data.ok === true && data.accessToken) {
+                          setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          setRedeemResult({ for: env, ok: true });
+                        } else setRedeemResult({ for: env, ok: false, error: data.error ?? "Błąd", detail: data.detail });
+                      } catch {
+                        setRedeemResult({ for: env, ok: false, error: "Błąd połączenia." });
+                      } finally {
+                        setRedeemingFor(null);
+                      }
+                    }}
+                    className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-3 py-1.5 text-sm text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
+                  >
+                    {redeemingFor === env ? "Wymiana…" : "Wymień token"}
+                  </button>
+                </div>
+                {testResult?.for === env && (
+                  <div className={`p-3 rounded-lg text-sm ${testResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
+                    {testResult.ok ? <p>{testResult.message ?? "Połączenie poprawne."}</p> : <><p>{testResult.error}</p>{testResult.detail && <p className="text-xs mt-1">{testResult.detail}</p>}</>}
+                  </div>
+                )}
+                {loginResult?.for === env && (
+                  <div className={`p-3 rounded-lg text-sm ${loginResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
+                    {loginResult.ok ? <p>Zalogowano. Zapisz ustawienia KSEF.</p> : <><p>{loginResult.error}</p>{loginResult.detail && <p className="text-xs mt-1">{loginResult.detail}</p>}</>}
+                  </div>
+                )}
+                {redeemResult?.for === env && (
+                  <div className={`p-3 rounded-lg text-sm ${redeemResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
+                    {redeemResult.ok ? <p>Token zapisany w polu. Zapisz ustawienia KSEF.</p> : <><p>{redeemResult.error}</p>{redeemResult.detail && <p className="text-xs mt-1">{redeemResult.detail}</p>}</>}
+                  </div>
+                )}
+              </div>
+            </details>
+          );
+        })}
 
         {message && (
           <p className={`mt-4 text-sm ${message.type === "ok" ? "text-success" : "text-red-400"}`}>
             {message.text}
           </p>
         )}
-        <div className="mt-4 flex flex-wrap gap-3 items-center">
+        <div className="mt-4">
           <button
             type="submit"
             disabled={saving}
@@ -974,158 +1094,7 @@ export default function SettingsPage() {
           >
             {saving ? "Zapisywanie…" : "Zapisz ustawienia KSEF"}
           </button>
-          <button
-            type="button"
-            disabled={loginLoading || !ksef.token.trim() || ksef.nip.replace(/\D/g, "").length !== 10}
-            onClick={async () => {
-              setLoginResult(null);
-              setTestResult(null);
-              setRedeemResult(null);
-              setLoginLoading(true);
-              try {
-                const nip10 = ksef.nip.replace(/\D/g, "");
-                const res = await fetch("/api/ksef/login-token", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    apiUrl: ksef.apiUrl || "https://api.ksef.mf.gov.pl",
-                    token: ksef.token,
-                    nip: nip10,
-                  }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (data.ok === true && data.accessToken) {
-                  setKsef((s) => ({
-                    ...s,
-                    token: data.accessToken,
-                    ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}),
-                  }));
-                  setLoginResult({ ok: true });
-                } else {
-                  setLoginResult({
-                    ok: false,
-                    error: data.error ?? "Logowanie nie powiodło się.",
-                    detail: data.detail,
-                  });
-                }
-              } catch {
-                setLoginResult({ ok: false, error: "Błąd połączenia z serwerem." });
-              } finally {
-                setLoginLoading(false);
-              }
-            }}
-            className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50"
-          >
-            {loginLoading ? "Logowanie…" : "Zaloguj tokenem KSeF"}
-          </button>
-          <button
-            type="button"
-            disabled={testing || !ksef.token.trim()}
-            title={ksef.token.includes("|") ? "Najpierw użyj „Zaloguj tokenem KSeF” – w polu musi być JWT." : undefined}
-            onClick={async () => {
-              setTestResult(null);
-              setRedeemResult(null);
-              setLoginResult(null);
-              setTesting(true);
-              try {
-                const res = await fetch("/api/ksef/test-connection", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ apiUrl: ksef.apiUrl || "https://api.ksef.mf.gov.pl", token: ksef.token }),
-                });
-                const data = await res.json().catch(() => ({}));
-                setTestResult({
-                  ok: data.ok === true,
-                  message: data.message,
-                  error: data.error,
-                  detail: data.detail,
-                });
-              } catch {
-                setTestResult({ ok: false, error: "Błąd połączenia z serwerem." });
-              } finally {
-                setTesting(false);
-              }
-            }}
-            className="rounded-lg border border-border bg-bg px-4 py-2 text-text hover:bg-border disabled:opacity-50"
-          >
-            {testing ? "Sprawdzanie…" : "Sprawdź połączenie"}
-          </button>
-          <button
-            type="button"
-            disabled={redeeming || !ksef.token.trim()}
-            onClick={async () => {
-              setRedeemResult(null);
-              setTestResult(null);
-              setLoginResult(null);
-              setRedeeming(true);
-              try {
-                const res = await fetch("/api/ksef/redeem-token", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ apiUrl: ksef.apiUrl || "https://api.ksef.mf.gov.pl", token: ksef.token }),
-                });
-                const data = await res.json().catch(() => ({}));
-                if (data.ok === true && data.accessToken) {
-                  setKsef((s) => ({
-                    ...s,
-                    token: data.accessToken,
-                    ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}),
-                  }));
-                  setRedeemResult({ ok: true });
-                } else {
-                  setRedeemResult({
-                    ok: false,
-                    error: data.error ?? "Wymiana tokena nie powiodła się.",
-                    detail: data.detail,
-                  });
-                }
-              } catch {
-                setRedeemResult({ ok: false, error: "Błąd połączenia z serwerem." });
-              } finally {
-                setRedeeming(false);
-              }
-            }}
-            className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-2 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 disabled:opacity-50"
-          >
-            {redeeming ? "Wymiana…" : "Wymień token"}
-          </button>
         </div>
-        {testResult && (
-          <div className={`mt-3 p-3 rounded-lg text-sm ${testResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
-            {testResult.ok ? (
-              <p>{testResult.message ?? "Połączenie z KSEF poprawne."}</p>
-            ) : (
-              <>
-                <p>{testResult.error ?? "Błąd połączenia."}</p>
-                {testResult.detail && <p className="mt-1 text-xs opacity-90">{testResult.detail}</p>}
-              </>
-            )}
-          </div>
-        )}
-        {redeemResult && (
-          <div className={`mt-3 p-3 rounded-lg text-sm ${redeemResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
-            {redeemResult.ok ? (
-              <p>Otrzymano token dostępu. Kliknij „Zapisz ustawienia KSEF”, aby zapisać token i refresh token (automatyczne odświeżanie przy 401).</p>
-            ) : (
-              <>
-                <p>{redeemResult.error ?? "Wymiana tokena nie powiodła się."}</p>
-                {redeemResult.detail && <p className="mt-1 text-xs opacity-90">{redeemResult.detail}</p>}
-              </>
-            )}
-          </div>
-        )}
-        {loginResult && (
-          <div className={`mt-3 p-3 rounded-lg text-sm ${loginResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
-            {loginResult.ok ? (
-              <p>Zalogowano. Token dostępu wpisany w pole powyżej. Kliknij „Zapisz ustawienia KSEF”, aby zapisać też refresh token (automatyczne odświeżanie przy wygaśnięciu).</p>
-            ) : (
-              <>
-                <p>{loginResult.error ?? "Logowanie nie powiodło się."}</p>
-                {loginResult.detail && <p className="mt-1 text-xs opacity-90">{loginResult.detail}</p>}
-              </>
-            )}
-          </div>
-        )}
       </form>
     </div>
   );

@@ -85,12 +85,12 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
   };
 
   return (
-    <div className="flex items-center gap-1 rounded-lg border border-border bg-bg px-1 py-1">
+    <div className="flex items-center gap-1 rounded-lg border border-content-border bg-white px-1 py-1 shadow-sm">
       <button
         type="button"
         onClick={handlePrev}
         disabled={!canPrev}
-        className="rounded p-2 text-muted hover:bg-border hover:text-text disabled:opacity-40 disabled:hover:bg-transparent"
+        className="rounded p-2 text-content-text-secondary hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
         aria-label="Poprzedni miesiąc"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,7 +100,7 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
       <button
         type="button"
         onClick={handleOpen}
-        className="min-w-[140px] rounded px-3 py-1.5 text-center text-sm font-medium hover:bg-border focus:outline-none focus:ring-2 focus:ring-accent"
+        className="min-w-[140px] rounded px-3 py-1.5 text-center text-sm font-medium text-content-text hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
       >
         {label}
       </button>
@@ -108,7 +108,7 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
         type="button"
         onClick={handleNext}
         disabled={!canNext}
-        className="rounded p-2 text-muted hover:bg-border hover:text-text disabled:opacity-40 disabled:hover:bg-transparent"
+        className="rounded p-2 text-content-text-secondary hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
         aria-label="Następny miesiąc"
       >
         <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +124,7 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
             aria-hidden
           />
           <div
-            className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border bg-card shadow-xl sm:max-w-xs"
+            className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-content-border bg-white shadow-xl sm:max-w-xs"
             role="dialog"
             aria-label="Wybierz miesiąc i rok"
           >
@@ -134,7 +134,7 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded p-1 hover:bg-bg focus:outline-none focus:ring-2 focus:ring-accent"
+              className="rounded p-1 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
               aria-label="Zamknij"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,14 +145,14 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
 
           <div className="space-y-4">
             <div>
-              <label className="mb-2 block text-sm font-medium text-muted">Rok</label>
+              <label className="mb-2 block text-sm font-medium text-content-text-secondary">Rok</label>
               <select
                 value={pendingYear ?? ""}
                 onChange={(e) => {
                   const val = e.target.value;
                   setPendingYear(val === "" ? null : parseInt(val, 10));
                 }}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm"
               >
                 <option value="">Wszystkie</option>
                 {years.map((y) => (
@@ -164,14 +164,14 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
             </div>
 
             <div>
-              <label className="mb-2 block text-sm font-medium text-muted">Miesiąc</label>
+              <label className="mb-2 block text-sm font-medium text-content-text-secondary">Miesiąc</label>
               <select
                 value={pendingMonth ?? ""}
                 onChange={(e) => {
                   const val = e.target.value;
                   setPendingMonth(val === "" ? null : parseInt(val, 10));
                 }}
-                className="w-full rounded border border-border bg-bg px-3 py-2 text-sm"
+                className="w-full rounded border border-content-border bg-white px-3 py-2 text-sm"
               >
                 <option value="">Wszystkie</option>
                 {MONTH_NAMES.map((name, i) => (
@@ -183,7 +183,7 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
             </div>
           </div>
 
-          <p className="mt-2 text-xs text-muted">
+          <p className="mt-2 text-xs text-content-text-secondary">
             Tylko pełne miesiące. Lata od 2026 do aktualnego.
           </p>
 
@@ -191,14 +191,15 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
             <button
               type="button"
               onClick={handleApply}
-              className="w-full rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full rounded-lg px-4 py-2 text-white hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent"
+            style={{ backgroundColor: "var(--accent)" }}
             >
               Zastosuj
             </button>
             <button
               type="button"
               onClick={handleClear}
-              className="w-full rounded-lg border border-border px-4 py-2 text-sm hover:bg-bg focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full rounded-lg border border-content-border px-4 py-2 text-sm text-content-text hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-accent"
             >
               Wyczyść filtr
             </button>

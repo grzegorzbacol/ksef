@@ -19,7 +19,9 @@ export async function setSetting(key: string, value: string): Promise<void> {
   CACHE[key] = value;
 }
 
-export async function getKsefSettings(): Promise<{
+export type KsefEnv = "test" | "prod";
+
+export type KsefSettingsData = {
   apiUrl: string;
   token: string;
   refreshToken: string;
@@ -27,25 +29,94 @@ export async function getKsefSettings(): Promise<{
   sendPath: string;
   nip: string;
   invoicePdfPath: string;
-}> {
-  const [apiUrl, token, refreshToken, queryPath, sendPath, nip, invoicePdfPath] = await Promise.all([
-    getSetting("ksef_api_url"),
-    getSetting("ksef_token"),
-    getSetting("ksef_refresh_token"),
-    getSetting("ksef_query_path"),
-    getSetting("ksef_send_path"),
-    getSetting("ksef_nip"),
-    getSetting("ksef_invoice_pdf_path"),
-  ]);
+};
+
+const KSEF_KEYS = [
+  "api_url",
+  "token",
+  "refresh_token",
+  "query_path",
+  "send_path",
+  "nip",
+  "invoice_pdf_path",
+] as const;
+
+function ksefKey(env: KsefEnv, key: (typeof KSEF_KEYS)[number]): string {
+  return `ksef_${env}_${key}`;
+}
+
+/** Zwraca ustawienia KSeF dla danego środowiska. Dla prod: fallback na stare klucze (ksef_api_url itd.) dla kompatybilności wstecznej. */
+export async function getKsefSettings(env?: KsefEnv): Promise<KsefSettingsData> {
+  const targetEnv = env ?? (await getKsefActiveEnv());
+
+  const prefixed = await Promise.all(
+    KSEF_KEYS.map((k) => getSetting(ksefKey(targetEnv, k)))
+  );
+
+  // Dla prod: fallback na stare, nieprefiksowane klucze (migracja)
+  let fallback: (string | null)[] = [];
+  if (targetEnv === "prod") {
+    fallback = await Promise.all([
+      getSetting("ksef_api_url"),
+      getSetting("ksef_token"),
+      getSetting("ksef_refresh_token"),
+      getSetting("ksef_query_path"),
+      getSetting("ksef_send_path"),
+      getSetting("ksef_nip"),
+      getSetting("ksef_invoice_pdf_path"),
+    ]);
+  }
+
+  const vals = KSEF_KEYS.map((_, i) => (prefixed[i]?.trim() || fallback[i]?.trim() || ""));
+
   return {
-    apiUrl: apiUrl?.trim() || "",
-    token: token?.trim() || "",
-    refreshToken: refreshToken?.trim() || "",
-    queryPath: queryPath?.trim() || "",
-    sendPath: sendPath?.trim() || "",
-    nip: nip?.trim() || "",
-    invoicePdfPath: invoicePdfPath?.trim() || "",
+    apiUrl: vals[0] ?? "",
+    token: vals[1] ?? "",
+    refreshToken: vals[2] ?? "",
+    queryPath: vals[3] ?? "",
+    sendPath: vals[4] ?? "",
+    nip: vals[5] ?? "",
+    invoicePdfPath: vals[6] ?? "",
   };
+}
+
+/** Aktywne środowisko KSeF (używane domyślnie przy pobieraniu/wysyłaniu). */
+export async function getKsefActiveEnv(): Promise<KsefEnv> {
+  const v = await getSetting("ksef_active_env");
+  return v === "test" ? "test" : "prod";
+}
+
+export async function setKsefActiveEnv(env: KsefEnv): Promise<void> {
+  await setSetting("ksef_active_env", env);
+}
+
+/** Zapisuje ustawienia KSeF dla danego środowiska. */
+export async function setKsefSettings(env: KsefEnv, data: Partial<KsefSettingsData>): Promise<void> {
+  const keys: (keyof KsefSettingsData)[] = [
+    "apiUrl",
+    "token",
+    "refreshToken",
+    "queryPath",
+    "sendPath",
+    "nip",
+    "invoicePdfPath",
+  ];
+  const keyMap: Record<string, (typeof KSEF_KEYS)[number]> = {
+    apiUrl: "api_url",
+    token: "token",
+    refreshToken: "refresh_token",
+    queryPath: "query_path",
+    sendPath: "send_path",
+    nip: "nip",
+    invoicePdfPath: "invoice_pdf_path",
+  };
+  for (const k of keys) {
+    if (data[k as keyof KsefSettingsData] !== undefined) {
+      const val = data[k as keyof KsefSettingsData];
+      if ((k === "token" || k === "refreshToken") && (val === "" || val === "********")) continue;
+      await setSetting(ksefKey(env, keyMap[k]!), String(val ?? ""));
+    }
+  }
 }
 
 export type CompanySettings = {

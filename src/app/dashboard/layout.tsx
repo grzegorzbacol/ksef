@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
 import { DashboardNav } from "./DashboardNav";
+import { DashboardHeader } from "./DashboardHeader";
 
 export default async function DashboardLayout({
   children,
@@ -13,33 +14,49 @@ export default async function DashboardLayout({
   if (!session) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-bg flex">
-      {/* Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 h-screen w-56 border-r border-border bg-[var(--bg-elevated)] flex flex-col">
-        <div className="p-4 border-b border-border">
+    <div className="min-h-screen flex">
+      {/* Sidebar – dark Intaxo-style */}
+      <aside
+        className="fixed left-0 top-0 z-40 h-screen w-56 flex flex-col"
+        style={{
+          backgroundColor: "var(--sidebar-bg)",
+          borderRight: "1px solid var(--sidebar-border)",
+        }}
+      >
+        <div className="p-4 border-b flex items-center gap-2" style={{ borderColor: "var(--sidebar-border)" }}>
+          <div
+            className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-sm"
+            style={{ backgroundColor: "var(--sidebar-active)" }}
+          >
+            B
+          </div>
           <Link
             href="/dashboard"
-            className="text-lg font-semibold text-accent tracking-tight hover:text-[var(--accent-hover)] transition-colors"
+            className="text-lg font-semibold tracking-tight transition-colors hover:opacity-90"
+            style={{ color: "var(--sidebar-text)" }}
           >
             BONEA ERP
           </Link>
         </div>
         <DashboardNav />
-        <div className="p-3 border-t border-border">
-          <div className="rounded-lg px-3 py-2 text-xs text-muted truncate" title={session.login}>
+        <div className="p-3 border-t" style={{ borderColor: "var(--sidebar-border)" }}>
+          <div
+            className="rounded-lg px-3 py-2 text-xs truncate mb-1"
+            style={{ color: "var(--sidebar-text-muted)" }}
+            title={session.login}
+          >
             {session.login}
           </div>
           <LogoutButton login={session.login} />
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 pl-56 min-h-screen flex flex-col">
-        <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-md">
-          <div className="h-14 flex items-center justify-between px-6">
-            <span className="text-sm text-muted">Panel zarządzania</span>
-          </div>
-        </header>
+      {/* Main content – light Intaxo-style */}
+      <main
+        className="flex-1 pl-56 min-h-screen flex flex-col"
+        style={{ backgroundColor: "var(--content-bg)" }}
+      >
+        <DashboardHeader />
         <div className="flex-1 p-6">{children}</div>
       </main>
     </div>

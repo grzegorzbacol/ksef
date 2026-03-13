@@ -1,20 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getKsefSettings, setSetting } from "@/lib/settings";
+import {
+  getKsefSettings,
+  getKsefActiveEnv,
+  setKsefSettings,
+  setKsefActiveEnv,
+  type KsefEnv,
+} from "@/lib/settings";
+
+function maskToken(t: string) {
+  return t ? "********" : "";
+}
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const s = await getKsefSettings();
+  const [prod, test, activeEnv] = await Promise.all([
+    getKsefSettings("prod"),
+    getKsefSettings("test"),
+    getKsefActiveEnv(),
+  ]);
+
   return NextResponse.json({
-    apiUrl: s.apiUrl,
-    token: s.token ? "********" : "",
-    refreshToken: s.refreshToken ? "********" : "",
-    queryPath: s.queryPath,
-    sendPath: s.sendPath,
-    nip: s.nip,
-    invoicePdfPath: s.invoicePdfPath,
+    activeEnv,
+    prod: {
+      apiUrl: prod.apiUrl,
+      token: maskToken(prod.token),
+      refreshToken: maskToken(prod.refreshToken),
+      queryPath: prod.queryPath,
+      sendPath: prod.sendPath,
+      nip: prod.nip,
+      invoicePdfPath: prod.invoicePdfPath,
+    },
+    test: {
+      apiUrl: test.apiUrl,
+      token: maskToken(test.token),
+      refreshToken: maskToken(test.refreshToken),
+      queryPath: test.queryPath,
+      sendPath: test.sendPath,
+      nip: test.nip,
+      invoicePdfPath: test.invoicePdfPath,
+    },
+    // Zachowanie wsteczne: zwróć też płaskie pole dla aktywnego env (stare klienty)
+    apiUrl: activeEnv === "test" ? test.apiUrl : prod.apiUrl,
+    token: maskToken(activeEnv === "test" ? test.token : prod.token),
+    refreshToken: maskToken(activeEnv === "test" ? test.refreshToken : prod.refreshToken),
+    queryPath: activeEnv === "test" ? test.queryPath : prod.queryPath,
+    sendPath: activeEnv === "test" ? test.sendPath : prod.sendPath,
+    nip: activeEnv === "test" ? test.nip : prod.nip,
+    invoicePdfPath: activeEnv === "test" ? test.invoicePdfPath : prod.invoicePdfPath,
   });
 }
 
@@ -23,23 +58,34 @@ export async function PUT(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({}));
-  const keys = ["ksef_api_url", "ksef_token", "ksef_refresh_token", "ksef_query_path", "ksef_send_path", "ksef_nip", "ksef_invoice_pdf_path"];
-  const map: Record<string, string> = {
-    ksef_api_url: "apiUrl",
-    ksef_token: "token",
-    ksef_refresh_token: "refreshToken",
-    ksef_query_path: "queryPath",
-    ksef_send_path: "sendPath",
-    ksef_nip: "nip",
-    ksef_invoice_pdf_path: "invoicePdfPath",
-  };
 
-  for (const key of keys) {
-    const bodyKey = map[key];
-    if (bodyKey && body[bodyKey] !== undefined) {
-      const val = body[bodyKey];
-      if ((key === "ksef_token" || key === "ksef_refresh_token") && (val === "" || val === "********")) continue;
-      await setSetting(key, String(val ?? ""));
+  if (body.activeEnv === "test" || body.activeEnv === "prod") {
+    await setKsefActiveEnv(body.activeEnv);
+  }
+
+  for (const env of ["prod", "test"] as KsefEnv[]) {
+    const data = body[env];
+    if (data && typeof data === "object") {
+      const toSet: Record<string, string> = {};
+      const keys = [
+        "apiUrl",
+        "token",
+        "refreshToken",
+        "queryPath",
+        "sendPath",
+        "nip",
+        "invoicePdfPath",
+      ] as const;
+      for (const k of keys) {
+        const v = data[k];
+        if (v !== undefined) {
+          if ((k === "token" || k === "refreshToken") && (v === "" || v === "********")) continue;
+          toSet[k] = String(v ?? "");
+        }
+      }
+      if (Object.keys(toSet).length > 0) {
+        await setKsefSettings(env, toSet);
+      }
     }
   }
 

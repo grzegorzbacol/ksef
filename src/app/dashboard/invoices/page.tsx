@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { MonthYearFilter } from "@/components/MonthYearFilter";
+import {
+  Plus,
+  Send,
+  Printer,
+  RefreshCw,
+  Trash2,
+  Search,
+  FileText,
+} from "lucide-react";
 
 type Invoice = {
   id: string;
@@ -237,63 +246,93 @@ export default function InvoicesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Faktury sprzedaży</h1>
-        <div className="flex flex-wrap gap-3">
+        <h1 className="text-2xl font-bold text-content-text">Faktury sprzedaży</h1>
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)" }}
           >
-            {showForm ? "Anuluj" : "Nowa faktura sprzedaży"}
+            <Plus className="w-4 h-4" />
+            {showForm ? "Anuluj" : "Wystaw fakturę"}
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: "#337ab7" }}
+          >
+            <Send className="w-4 h-4" />
+            <Printer className="w-4 h-4" />
+            Wyślij / drukuj
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            <RefreshCw className="w-4 h-4" />
+            Zmień status
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+            style={{ backgroundColor: "var(--danger)" }}
+          >
+            <Trash2 className="w-4 h-4" />
+            Usuń zaznaczone
           </button>
         </div>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="mb-8 rounded-xl border border-border bg-card p-6 space-y-4">
-          <h2 className="font-medium">Nowa faktura sprzedaży</h2>
-          <p className="text-muted text-sm">Faktura sprzedaży – my jesteśmy sprzedawcą. Numer (FV/rok/numer) nadawany automatycznie.</p>
+        <form onSubmit={handleCreate} className="mb-8 rounded-xl border bg-white p-6 space-y-4 shadow-sm" style={{ borderColor: "var(--content-border)" }}>
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5" style={{ color: "var(--accent)" }} />
+            <h2 className="font-medium text-content-text">Nowa faktura sprzedaży</h2>
+          </div>
+          <p className="text-sm" style={{ color: "var(--content-text-secondary)" }}>Faktura sprzedaży – my jesteśmy sprzedawcą. Numer (FV/rok/numer) nadawany automatycznie.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm text-muted mb-1">Data wystawienia</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Data wystawienia</label>
               <input
                 type="date"
                 value={form.issueDate}
                 onChange={(e) => setForm((p) => ({ ...p, issueDate: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Data sprzedaży (opcjonalnie)</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Data sprzedaży (opcjonalnie)</label>
               <input
                 type="date"
                 value={form.saleDate}
                 onChange={(e) => setForm((p) => ({ ...p, saleDate: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm text-muted mb-1">Sprzedawca (nasza firma) – nazwa</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Sprzedawca (nasza firma) – nazwa</label>
               <input
                 value={form.sellerName}
                 onChange={(e) => setForm((p) => ({ ...p, sellerName: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Sprzedawca – NIP</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Sprzedawca – NIP</label>
               <input
                 value={form.sellerNip}
                 onChange={(e) => setForm((p) => ({ ...p, sellerNip: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
                 required
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm text-muted mb-1">Nabywca (kontrahent)</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Nabywca (kontrahent)</label>
               <select
                 value=""
                 onChange={(e) => {
@@ -305,7 +344,7 @@ export default function InvoicesPage() {
                   }
                   e.target.value = "";
                 }}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               >
                 <option value="">— wybierz nabywcę z bazy kontrahentów —</option>
                 {contractors.map((c) => (
@@ -316,34 +355,34 @@ export default function InvoicesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Nabywca – nazwa</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Nabywca – nazwa</label>
               <input
                 value={form.buyerName}
                 onChange={(e) => setForm((p) => ({ ...p, buyerName: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Nabywca – NIP</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Nabywca – NIP</label>
               <input
                 value={form.buyerNip}
                 onChange={(e) => setForm((p) => ({ ...p, buyerNip: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
                 required
               />
             </div>
           </div>
-          <div className="border-t border-border pt-4 mt-4">
-            <h3 className="font-medium mb-2">Pozycje z magazynu</h3>
-            <p className="text-muted text-sm mb-3">Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
+          <div className="border-t pt-4 mt-4" style={{ borderColor: "var(--content-border)" }}>
+            <h3 className="font-medium mb-2 text-content-text">Pozycje z magazynu</h3>
+            <p className="text-sm mb-3" style={{ color: "var(--content-text-secondary)" }}>Wybierz towar/usługę i ilość, aby dodać do faktury. Suma netto/VAT/brutto ustawi się automatycznie.</p>
             <div className="flex flex-wrap gap-3 items-end mb-4">
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Produkt</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--content-text-secondary)" }}>Produkt</label>
                 <select
                   value={addProductId}
                   onChange={(e) => setAddProductId(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 min-w-[200px] max-w-[280px]"
+                  className="rounded border border-content-border bg-white px-3 py-2 min-w-[200px] max-w-[280px]"
                 >
                   <option value="">— wybierz —</option>
                   {products.map((p) => (
@@ -354,27 +393,27 @@ export default function InvoicesPage() {
                 </select>
               </div>
               <div className="flex-shrink-0">
-                <label className="block text-xs text-muted mb-1">Ilość</label>
+                <label className="block text-xs mb-1" style={{ color: "var(--content-text-secondary)" }}>Ilość</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0.01"
                   value={addQty}
                   onChange={(e) => setAddQty(e.target.value)}
-                  className="rounded border border-border bg-bg px-3 py-2 w-24 box-border"
+                  className="rounded border border-content-border bg-white px-3 py-2 w-24 box-border"
                 />
               </div>
               <button
                 type="button"
                 onClick={addLineFromWarehouse}
                 disabled={!addProductId}
-                className="rounded-lg border border-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0"
+                className="rounded-lg border border-content-border px-4 py-2 hover:border-accent disabled:opacity-50 flex-shrink-0 text-content-text"
               >
                 Dodaj do faktury
               </button>
             </div>
             {lines.length > 0 && (
-              <div className="overflow-x-auto rounded border border-border mb-4">
+              <div className="overflow-x-auto rounded border border-content-border mb-4">
                 <table className="w-full text-sm table-fixed">
                   <colgroup>
                     <col style={{ width: "auto" }} />
@@ -386,7 +425,7 @@ export default function InvoicesPage() {
                     <col style={{ width: "56px" }} />
                   </colgroup>
                   <thead>
-                    <tr className="border-b border-border bg-bg/50">
+                    <tr className="border-b bg-gray-50" style={{ borderColor: "var(--content-border)" }}>
                       <th className="p-2 text-left">Nazwa</th>
                       <th className="p-2 text-right">Ilość</th>
                       <th className="p-2 text-right">Cena netto</th>
@@ -398,7 +437,7 @@ export default function InvoicesPage() {
                   </thead>
                   <tbody>
                     {lines.map((l, i) => (
-                      <tr key={i} className="border-b border-border">
+                      <tr key={i} className="border-b" style={{ borderColor: "var(--content-border)" }}>
                         <td className="p-2 overflow-hidden text-ellipsis align-middle">{l.name}</td>
                         <td className="p-2 text-right align-middle whitespace-nowrap">
                           <input
@@ -407,7 +446,7 @@ export default function InvoicesPage() {
                             min="0.01"
                             value={l.quantity}
                             onChange={(e) => updateLine(i, "quantity", e.target.value)}
-                            className="w-16 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
+                            className="w-16 rounded border border-content-border bg-white px-2 py-1 text-right inline-block max-w-full"
                           />
                           <span className="ml-1">{l.unit}</span>
                         </td>
@@ -418,7 +457,7 @@ export default function InvoicesPage() {
                             min="0"
                             value={l.unitPriceNet}
                             onChange={(e) => updateLine(i, "unitPriceNet", e.target.value)}
-                            className="w-full max-w-[88px] rounded border border-border bg-bg px-2 py-1 text-right box-border"
+                            className="w-full max-w-[88px] rounded border border-content-border bg-white px-2 py-1 text-right box-border"
                             title="Cena netto za jednostkę – edytowalna"
                           />
                         </td>
@@ -430,7 +469,7 @@ export default function InvoicesPage() {
                             max="100"
                             value={l.vatRate}
                             onChange={(e) => updateLine(i, "vatRate", e.target.value)}
-                            className="w-12 rounded border border-border bg-bg px-2 py-1 text-right inline-block max-w-full"
+                            className="w-12 rounded border border-content-border bg-white px-2 py-1 text-right inline-block max-w-full"
                           />
                           %
                         </td>
@@ -456,48 +495,48 @@ export default function InvoicesPage() {
 
           <div className="grid gap-4 sm:grid-cols-4">
             <div>
-              <label className="block text-sm text-muted mb-1">Netto</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Netto</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.net.toFixed(2) : form.netAmount}
                 onChange={(e) => setForm((p) => ({ ...p, netAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">VAT</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>VAT</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.vat.toFixed(2) : form.vatAmount}
                 onChange={(e) => setForm((p) => ({ ...p, vatAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Brutto</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Brutto</label>
               <input
                 type="number"
                 step="0.01"
                 value={lines.length > 0 ? totalsFromLines.gross.toFixed(2) : form.grossAmount}
                 onChange={(e) => setForm((p) => ({ ...p, grossAmount: e.target.value }))}
                 readOnly={lines.length > 0}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm text-muted mb-1">Waluta</label>
+              <label className="block text-sm mb-1" style={{ color: "var(--content-text-secondary)" }}>Waluta</label>
               <input
                 value={form.currency}
                 onChange={(e) => setForm((p) => ({ ...p, currency: e.target.value }))}
-                className="w-full rounded border border-border bg-bg px-3 py-2"
+                className="w-full rounded border border-content-border px-3 py-2 bg-white"
               />
             </div>
           </div>
-          <button type="submit" className="rounded-lg bg-accent px-4 py-2 text-white hover:opacity-90">
+          <button type="submit" className="rounded-lg px-4 py-2 text-white hover:opacity-90" style={{ backgroundColor: "var(--accent)" }}>
             Zapisz fakturę sprzedaży
           </button>
         </form>
@@ -507,63 +546,116 @@ export default function InvoicesPage() {
         <MonthYearFilter month={month} year={year} onChange={(m, y) => { setMonth(m); setYear(y); }} />
       </div>
 
+      <div className="mb-3 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          className="p-2 rounded-lg transition-colors hover:bg-gray-200"
+          style={{ color: "var(--content-text-secondary)" }}
+          title="Filtry"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+        </button>
+      </div>
+
       {loading ? (
-        <p className="text-muted">Ładowanie…</p>
+        <div className="flex items-center gap-2 py-8" style={{ color: "var(--content-text-secondary)" }}>
+          <RefreshCw className="w-5 h-5 animate-spin" />
+          Ładowanie…
+        </div>
       ) : invoices.length === 0 ? (
-        <p className="text-muted">Brak faktur sprzedaży. Dodaj pierwszą ręcznie.</p>
+        <div className="rounded-xl border border-content-border bg-white p-12 text-center shadow-sm">
+          <FileText className="w-12 h-12 mx-auto mb-4 opacity-40" style={{ color: "var(--content-text-secondary)" }} />
+          <p className="text-content-text-secondary">Brak faktur sprzedaży. Dodaj pierwszą ręcznie.</p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border">
+        <div className="overflow-x-auto rounded-xl border border-content-border bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-card">
-                <th className="p-3 text-left">Numer</th>
-                <th className="p-3 text-left">Data</th>
-                <th className="p-3 text-left">Nabywca</th>
-                <th className="p-3 text-right">Brutto</th>
-                <th className="p-3">Źródło</th>
-                <th className="p-3">KSEF</th>
-                <th className="p-3">Rozliczono</th>
-                <th className="p-3 w-20"></th>
+              <tr className="border-b bg-gray-50" style={{ borderColor: "var(--content-border)" }}>
+                <th className="p-3 text-left font-medium text-content-text">
+                  <input type="checkbox" className="rounded border-content-border" />
+                </th>
+                <th className="p-3 text-left font-medium text-content-text">Numer</th>
+                <th className="p-3 text-left font-medium text-content-text">Data wystaw.</th>
+                <th className="p-3 text-left font-medium text-content-text">Kontrahent</th>
+                <th className="p-3 text-right font-medium text-content-text">Netto</th>
+                <th className="p-3 text-right font-medium text-content-text">Brutto</th>
+                <th className="p-3 font-medium text-content-text">Źródło</th>
+                <th className="p-3 font-medium text-content-text">KSEF</th>
+                <th className="p-3 font-medium text-content-text">Status</th>
+                <th className="p-3 w-12"></th>
               </tr>
             </thead>
             <tbody>
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-border">
-                  <td className="p-3 font-medium">{inv.number}</td>
-                  <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.buyerName}</td>
-                  <td className="p-3 text-right">{inv.grossAmount.toFixed(2)} {inv.currency}</td>
-                  <td className="p-3">{sourceLabel(inv.source)}</td>
+                <tr key={inv.id} className="border-b transition-colors hover:bg-gray-50/80" style={{ borderColor: "var(--content-border)" }}>
+                  <td className="p-3">
+                    <input type="checkbox" className="rounded border-content-border" />
+                  </td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <Link href={`/dashboard/invoices/${inv.id}`} className="font-medium text-content-text hover:underline flex items-center gap-1.5">
+                        <Search className="w-4 h-4 opacity-60" />
+                        {inv.number}
+                      </Link>
+                      {inv.correctionOfId && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                          Korekta
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="p-3 text-content-text">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
+                  <td className="p-3 text-content-text">{inv.buyerName}</td>
+                  <td className="p-3 text-right text-content-text">{(inv.netAmount ?? 0).toLocaleString("pl-PL", { minimumFractionDigits: 2 })} zł</td>
+                  <td className="p-3 text-right text-content-text font-medium">{inv.grossAmount.toLocaleString("pl-PL", { minimumFractionDigits: 2 })} {inv.currency}</td>
+                  <td className="p-3 text-content-text-secondary">{sourceLabel(inv.source)}</td>
                   <td className="p-3">
                     {inv.ksefSentAt ? (
-                      <span className="text-success">Wysłano</span>
+                      <span className="text-success font-medium">Wysłano</span>
                     ) : (
-                      <span className="text-muted">—</span>
+                      <span className="text-content-text-secondary">—</span>
                     )}
                   </td>
                   <td className="p-3">
                     {inv.payment ? (
-                      <span className="text-success">
-                        Tak, {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
-                      </span>
+                      <div>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: "var(--success)" }}>
+                          Opłacono
+                        </span>
+                        <p className="text-xs mt-0.5" style={{ color: "var(--content-text-secondary)" }}>
+                          {new Date(inv.payment.paidAt).toLocaleDateString("pl-PL")}
+                        </p>
+                      </div>
                     ) : (
-                      <Link href="/dashboard/rozrachunki" className="text-muted hover:text-text">
-                        Nie
+                      <Link href="/dashboard/rozrachunki" className="text-content-text-secondary hover:text-accent transition-colors">
+                        Nie rozliczono
                       </Link>
                     )}
                   </td>
-                  <td className="p-3 flex gap-2">
-                    <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
-                      Szczegóły
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(inv)}
-                      disabled={deletingId === inv.id}
-                      className="text-red-400 hover:underline disabled:opacity-50"
-                    >
-                      Usuń
-                    </button>
+                  <td className="p-3">
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/dashboard/invoices/${inv.id}`}
+                        className="p-1.5 rounded hover:bg-gray-200 transition-colors"
+                        style={{ color: "var(--accent)" }}
+                        title="Szczegóły"
+                      >
+                        <Search className="w-4 h-4" />
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(inv)}
+                        disabled={deletingId === inv.id}
+                        className="p-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                        style={{ color: "var(--danger)" }}
+                        title="Usuń"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -4,7 +4,7 @@
  * Dokumentacja: https://ksef.mf.gov.pl, API 2.0
  */
 
-import { getKsefSettings, setSetting } from "./settings";
+import { getKsefSettings, setKsefSettings, getKsefActiveEnv, type KsefEnv } from "./settings";
 
 const DEFAULT_API_URL = "https://api.ksef.mf.gov.pl";
 
@@ -33,8 +33,8 @@ function getJwtExpSeconds(token: string): number | null {
 /** Odświeża token proaktywnie, jeśli wygasa w ciągu 5 minut. Zapobiega częstemu wylogowaniu z KSEF. */
 const PROACTIVE_REFRESH_BUFFER_SEC = 5 * 60;
 
-async function ensureValidKsefToken(): Promise<string | null> {
-  const s = await getKsefSettings();
+async function ensureValidKsefToken(env?: KsefEnv): Promise<string | null> {
+  const s = await getKsefSettings(env);
   let token = (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   if (!token) return null;
 
@@ -42,7 +42,8 @@ async function ensureValidKsefToken(): Promise<string | null> {
   if (exp != null) {
     const nowSec = Math.floor(Date.now() / 1000);
     if (exp - nowSec < PROACTIVE_REFRESH_BUFFER_SEC) {
-      const refreshed = await refreshKsefAccessToken();
+      const targetEnv = env ?? (await getKsefActiveEnv());
+      const refreshed = await refreshKsefAccessToken(targetEnv);
       if (refreshed) token = refreshed;
     }
   }
@@ -185,21 +186,23 @@ function isKsef2Metadata(item: Record<string, unknown>): boolean {
   return typeof item.seller === "object" || typeof item.buyer === "object";
 }
 
-/** Sprawdza, czy KSEF jest skonfigurowany (ustawienia lub env: URL + token). */
-export async function isKsefConfigured(): Promise<boolean> {
+/** Sprawdza, czy KSEF jest skonfigurowany dla aktywnego środowiska (ustawienia lub env: URL + token). */
+export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
+  const targetEnv = env ?? (await getKsefActiveEnv());
   const envOk = !!process.env.KSEF_API_URL?.trim() && !!process.env.KSEF_TOKEN?.trim();
-  if (envOk) return true;
-  const s = await getKsefSettings();
+  if (envOk && targetEnv === "prod") return true;
+  const s = await getKsefSettings(targetEnv);
   return !!s.apiUrl && !!s.token;
 }
 
 /**
  * Odświeża token dostępu KSEF za pomocą refresh tokena (KSEF 2.0: POST /v2/auth/token/refresh).
- * Zapisuje nowy access token (i ewentualnie nowy refresh token) w ustawieniach.
+ * Zapisuje nowy access token (i ewentualnie nowy refresh token) w ustawieniach dla danego env.
  * Zwraca nowy access token lub null przy braku refresh tokena / błędzie.
  */
-export async function refreshKsefAccessToken(): Promise<string | null> {
-  const s = await getKsefSettings();
+export async function refreshKsefAccessToken(env?: KsefEnv): Promise<string | null> {
+  const targetEnv = env ?? (await getKsefActiveEnv());
+  const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
   const refreshToken = (s.refreshToken || "").trim();
   if (!refreshToken) return null;
@@ -223,8 +226,7 @@ export async function refreshKsefAccessToken(): Promise<string | null> {
     const newAccess = data.accessToken?.token;
     const newRefresh = data.refreshToken?.token;
     if (!newAccess) return null;
-    await setSetting("ksef_token", newAccess);
-    if (newRefresh) await setSetting("ksef_refresh_token", newRefresh);
+    await setKsefSettings(targetEnv, { token: newAccess, ...(newRefresh ? { refreshToken: newRefresh } : {}) });
     return newAccess;
   } catch {
     return null;
@@ -237,11 +239,13 @@ export async function refreshKsefAccessToken(): Promise<string | null> {
  */
 export async function fetchInvoicesFromKsef(
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  env?: KsefEnv
 ): Promise<KsefFetchResult> {
-  const s = await getKsefSettings();
+  const targetEnv = env ?? (await getKsefActiveEnv());
+  const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken(targetEnv)) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const queryPath = s.queryPath || process.env.KSEF_QUERY_INVOICES_PATH || "/v2/invoices/query/metadata";
 
   if (!token) {
@@ -335,8 +339,8 @@ export async function fetchInvoicesFromKsef(
     return { success: true, invoices, count: invoices.length };
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
-    if (errMsg.includes("401") && (await refreshKsefAccessToken())) {
-      const s2 = await getKsefSettings();
+    if (errMsg.includes("401") && (await refreshKsefAccessToken(targetEnv))) {
+      const s2 = await getKsefSettings(targetEnv);
       const newToken = (s2.token || "").trim();
       if (newToken) {
         try {
@@ -358,10 +362,11 @@ export async function fetchInvoicesFromKsef(
  * Wysyła fakturę do KSEF (struktura FA w XML/JSON).
  * W produkcji: pełna struktura FA(2)/FA(3) i certyfikat.
  */
-export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResult> {
-  const s = await getKsefSettings();
+export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promise<KsefSendResult> {
+  const targetEnv = env ?? (await getKsefActiveEnv());
+  const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken(targetEnv)) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const sendPath = s.sendPath || process.env.KSEF_SEND_INVOICE_PATH || "/api/online/Invoice/Send";
 
   if (!token) {
@@ -413,8 +418,8 @@ export async function sendInvoiceToKsef(invoice: unknown): Promise<KsefSendResul
 
   try {
     let result = await doSend(token);
-    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken())) {
-      const s2 = await getKsefSettings();
+    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken(targetEnv))) {
+      const s2 = await getKsefSettings(targetEnv);
       const newToken = (s2.token || "").trim();
       if (newToken) result = await doSend(newToken);
     }
@@ -437,10 +442,11 @@ export type KsefInvoicePdfResult =
  * Ścieżka API jest konfigurowalna przez env KSEF_INVOICE_PDF_PATH (np. /v2/invoices/{referenceNumber}/file).
  * W treści ścieżki {referenceNumber} zostanie zastąpione przez ksefId.
  */
-export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoicePdfResult> {
-  const s = await getKsefSettings();
+export async function getInvoicePdfFromKsef(ksefId: string, env?: KsefEnv): Promise<KsefInvoicePdfResult> {
+  const targetEnv = env ?? (await getKsefActiveEnv());
+  const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
-  let token = (await ensureValidKsefToken()) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
+  let token = (await ensureValidKsefToken(targetEnv)) ?? (s.token || (process.env.KSEF_TOKEN ?? "")).trim();
   const pathTemplate =
     s.invoicePdfPath || process.env.KSEF_INVOICE_PDF_PATH?.trim() || DEFAULT_INVOICE_PDF_PATH;
   const path = pathTemplate.replace(/\{referenceNumber\}/g, encodeURIComponent(ksefId));
@@ -507,8 +513,8 @@ export async function getInvoicePdfFromKsef(ksefId: string): Promise<KsefInvoice
 
   try {
     let result = await doFetch(token);
-    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken())) {
-      const s2 = await getKsefSettings();
+    if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken(targetEnv))) {
+      const s2 = await getKsefSettings(targetEnv);
       const newToken = (s2.token || "").trim();
       if (newToken) result = await doFetch(newToken);
     }
