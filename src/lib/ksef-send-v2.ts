@@ -111,7 +111,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<FA xmlns="${FA3_NS}">
+<Faktura xmlns="${FA3_NS}">
   <Naglowek>
     <KodFormularza kodSystemowy="FA (3)" wersjaSchemy="1-0E">FA</KodFormularza>
     <WariantFormularza>3</WariantFormularza>
@@ -160,7 +160,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       <Termin>${paymentDue}</Termin>
     </Platnosc>
   </Fa>
-</FA>`;
+</Faktura>`;
 }
 
 export type EncryptionData = {
