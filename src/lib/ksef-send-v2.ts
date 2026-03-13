@@ -169,7 +169,7 @@ export async function createEncryptionData(
 
 /** Szyfruje dane AES-256-CBC z IV jako prefiks. */
 export function encryptAes256Cbc(data: Buffer, key: Buffer, iv: Buffer): Buffer {
-  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv, { authTagLength: 0 });
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
   const enc = Buffer.concat([cipher.update(data), cipher.final()]);
   return Buffer.concat([iv, enc]);
 }
