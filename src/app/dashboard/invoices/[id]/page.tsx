@@ -200,6 +200,9 @@ export default function InvoiceDetailPage() {
   const [editRemarks, setEditRemarks] = useState("");
   const [savingRemarks, setSavingRemarks] = useState(false);
   const [creatingCorrection, setCreatingCorrection] = useState(false);
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [correctionIssueDate, setCorrectionIssueDate] = useState("");
+  const [correctionSelectedItemIds, setCorrectionSelectedItemIds] = useState<Set<string>>(new Set());
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -278,6 +281,15 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     if (invoice?.issueDate) setEditDate(new Date(invoice.issueDate).toISOString().slice(0, 10));
   }, [invoice?.issueDate]);
+
+  useEffect(() => {
+    if (showCorrectionModal) {
+      setCorrectionIssueDate(new Date().toISOString().slice(0, 10));
+      setCorrectionSelectedItemIds(
+        new Set((invoice?.items ?? []).map((it) => it.id))
+      );
+    }
+  }, [showCorrectionModal, invoice?.items]);
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
@@ -1143,36 +1155,163 @@ export default function InvoiceDetailPage() {
             hasMailAttachments={(invoice.emailAttachments?.length ?? 0) > 0}
           />
           {canIssueCorrection && (
-            <button
-              type="button"
-              disabled={creatingCorrection}
-              onClick={async () => {
-                if (!confirm("Wystawić korektę ujemną tej faktury? Zostanie utworzona nowa faktura z odwróconymi kwotami.")) return;
-                setCreatingCorrection(true);
-                try {
-                  const res = await fetch("/api/invoices", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      correctionOfId: id,
-                      issueDate: new Date().toISOString().slice(0, 10),
-                      type: "sales",
-                    }),
-                  });
-                  const data = await res.json().catch(() => ({}));
-                  if (!res.ok) {
-                    alert(data.error || "Błąd wystawiania korekty");
-                    return;
-                  }
-                  window.location.href = `/dashboard/invoices/${data.id}`;
-                } finally {
-                  setCreatingCorrection(false);
-                }
-              }}
-              className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50"
-            >
-              {creatingCorrection ? "Tworzenie korekty…" : "Wystaw korektę"}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowCorrectionModal(true)}
+                className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700"
+              >
+                Wystaw korektę
+              </button>
+              {showCorrectionModal && (
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                  onClick={() => !creatingCorrection && setShowCorrectionModal(false)}
+                >
+                  <div
+                    className="rounded-xl border border-border bg-card p-6 shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="text-lg font-semibold mb-4">Wystaw korektę faktury</h3>
+                    <p className="text-sm text-muted mb-4">
+                      {invoice?.items && invoice.items.length > 0
+                        ? "Wybierz pozycje do skorygowania. Zostaną odwrócone (ujemne kwoty)."
+                        : "Korekta odwróci kwoty całej faktury."}
+                    </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-muted mb-1">Data wystawienia korekty</label>
+                        <input
+                          type="date"
+                          value={correctionIssueDate}
+                          onChange={(e) => setCorrectionIssueDate(e.target.value)}
+                          className="rounded border border-border bg-bg px-3 py-2 w-full"
+                        />
+                      </div>
+                      {invoice?.items && invoice.items.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-medium text-muted">Pozycje do skorygowania</label>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setCorrectionSelectedItemIds(new Set(invoice.items!.map((it) => it.id)))
+                                }
+                                className="text-xs text-accent hover:underline"
+                              >
+                                Zaznacz wszystkie
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCorrectionSelectedItemIds(new Set())}
+                                className="text-xs text-accent hover:underline"
+                              >
+                                Odznacz wszystkie
+                              </button>
+                            </div>
+                          </div>
+                          <div className="border border-border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-bg/50 border-b border-border">
+                                  <th className="p-2 w-10"></th>
+                                  <th className="p-2 text-left">Nazwa</th>
+                                  <th className="p-2 text-right">Ilość</th>
+                                  <th className="p-2 text-right">Netto</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {invoice.items.map((it) => (
+                                  <tr key={it.id} className="border-t border-border hover:bg-bg/30">
+                                    <td className="p-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={correctionSelectedItemIds.has(it.id)}
+                                        onChange={(e) => {
+                                          setCorrectionSelectedItemIds((prev) => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) next.add(it.id);
+                                            else next.delete(it.id);
+                                            return next;
+                                          });
+                                        }}
+                                        className="rounded border-border"
+                                      />
+                                    </td>
+                                    <td className="p-2">{it.name}</td>
+                                    <td className="p-2 text-right">{it.quantity} {it.unit}</td>
+                                    <td className="p-2 text-right">{it.amountNet.toFixed(2)} zł</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {invoice.items.length > 0 && correctionSelectedItemIds.size === 0 && (
+                            <p className="text-xs text-amber-600 mt-1">
+                              Zaznacz co najmniej jedną pozycję do skorygowania.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        type="button"
+                        disabled={
+                          creatingCorrection ||
+                          (!!invoice?.items &&
+                            invoice.items.length > 0 &&
+                            correctionSelectedItemIds.size === 0)
+                        }
+                        onClick={async () => {
+                          setCreatingCorrection(true);
+                          try {
+                            const payload: Record<string, unknown> = {
+                              correctionOfId: id,
+                              issueDate: correctionIssueDate,
+                              type: "sales",
+                            };
+                            if (
+                              invoice?.items &&
+                              invoice.items.length > 0 &&
+                              correctionSelectedItemIds.size > 0
+                            ) {
+                              payload.correctionItemIds = Array.from(correctionSelectedItemIds);
+                            }
+                            const res = await fetch("/api/invoices", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify(payload),
+                            });
+                            const data = await res.json().catch(() => ({}));
+                            if (!res.ok) {
+                              alert(data.error || "Błąd wystawiania korekty");
+                              return;
+                            }
+                            setShowCorrectionModal(false);
+                            window.location.href = `/dashboard/invoices/${data.id}`;
+                          } finally {
+                            setCreatingCorrection(false);
+                          }
+                        }}
+                        className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50"
+                      >
+                        {creatingCorrection ? "Tworzenie korekty…" : "Wystaw korektę"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={creatingCorrection}
+                        onClick={() => setShowCorrectionModal(false)}
+                        className="rounded-lg border border-border px-4 py-2 hover:bg-bg/80"
+                      >
+                        Anuluj
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {isCost && (
             <Link href="/dashboard/tax-benefits" className="rounded border border-border px-4 py-2 hover:border-accent">

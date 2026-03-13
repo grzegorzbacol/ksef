@@ -31,6 +31,8 @@ const createSchema = z.object({
   expenseCategoryId: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
   correctionOfId: z.string().optional(),
+  /** IDs pozycji do skorygowania (gdy faktura ma pozycje). Gdy brak – koryguje wszystkie. */
+  correctionItemIds: z.array(z.string()).optional(),
 }).refine(
   (d) => d.correctionOfId || (d.sellerName && d.sellerNip && d.buyerName && d.buyerNip && d.netAmount != null),
   { message: "Dla nowej faktury wymagane: sprzedawca, nabywca i kwoty (lub pozycje). Dla korekty: correctionOfId." }
@@ -150,6 +152,10 @@ export async function POST(req: NextRequest) {
     if (original.correctionOfId)
       return NextResponse.json({ error: "Nie można skorygować korekty" }, { status: 400 });
     correctionOfId = original.id;
+    const selectedItems =
+      original.items.length > 0 && data.correctionItemIds != null && data.correctionItemIds.length > 0
+        ? original.items.filter((it) => data.correctionItemIds!.includes(it.id))
+        : original.items;
     baseData = {
       issueDate: data.issueDate,
       saleDate: data.saleDate,
@@ -161,14 +167,17 @@ export async function POST(req: NextRequest) {
       vatAmount: -original.vatAmount,
       grossAmount: -original.grossAmount,
       currency: original.currency,
-      items: original.items.map((it) => ({
-        productId: it.productId ?? undefined,
-        name: it.name,
-        quantity: -it.quantity,
-        unit: it.unit,
-        unitPriceNet: it.unitPriceNet,
-        vatRate: it.vatRate,
-      })),
+      items:
+        selectedItems.length > 0
+          ? selectedItems.map((it) => ({
+              productId: it.productId ?? undefined,
+              name: it.name,
+              quantity: -it.quantity,
+              unit: it.unit,
+              unitPriceNet: it.unitPriceNet,
+              vatRate: it.vatRate,
+            }))
+          : undefined,
     };
   } else {
     const netAmount = data.netAmount ?? 0;

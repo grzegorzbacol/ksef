@@ -829,7 +829,8 @@ function InvoiceNumberCell({
                 type="button"
                 onClick={addLineFromWarehouse}
                 disabled={!addProductId}
-                className="rounded-lg border border-content-border px-4 py-2 text-content-text hover:bg-gray-100 disabled:opacity-50 flex-shrink-0"
+                className="rounded-lg px-4 py-2 text-white hover:opacity-90 disabled:opacity-50 flex-shrink-0"
+                style={{ backgroundColor: "var(--accent)" }}
               >
                 Dodaj do faktury
               </button>
