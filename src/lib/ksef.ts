@@ -244,10 +244,15 @@ export async function refreshKsefAccessToken(env?: KsefEnv): Promise<string | nu
  * Pobiera faktury z KSEF z podanego zakresu dat.
  * Endpoint zgodny z API KSeF 2.0 (zapytanie o faktury po zakresie dat).
  */
+/**
+ * subjectType: "Subject1" = my jesteśmy sprzedawcą (FV), "Subject2" = my jesteśmy nabywcą (FK).
+ * Dla importu faktur zakupu użyj "Subject2".
+ */
 export async function fetchInvoicesFromKsef(
   dateFrom: string,
   dateTo: string,
-  env?: KsefEnv
+  env?: KsefEnv,
+  subjectType?: "Subject1" | "Subject2" | "both"
 ): Promise<KsefFetchResult> {
   const targetEnv = env ?? (await getKsefActiveEnv());
   const s = await getKsefSettings(targetEnv);
@@ -324,13 +329,11 @@ export async function fetchInvoicesFromKsef(
       return rawList;
     };
 
-    const [list1, list2] = await Promise.all([
-      fetchForSubject("Subject1"),
-      fetchForSubject("Subject2"),
-    ]);
+    const wanted = subjectType === "Subject2" ? ["Subject2"] : subjectType === "Subject1" ? ["Subject1"] : ["Subject1", "Subject2"];
+    const lists = await Promise.all(wanted.map((s) => fetchForSubject(s)));
     const seen = new Set<string>();
     const invoices: KsefInvoiceNormalized[] = [];
-    for (const raw of [...list1, ...list2]) {
+    for (const raw of lists.flat()) {
       const normalized = normalizeKsefInvoice(raw as KsefInvoiceRaw);
       if (!normalized) continue;
       const key = `${normalized.number}|${normalized.issueDate}|${normalized.sellerNip}|${normalized.buyerNip}`;

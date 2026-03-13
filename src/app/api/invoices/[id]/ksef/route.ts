@@ -21,7 +21,7 @@ async function verifyInKsef(
   env: KsefEnv | undefined
 ): Promise<boolean> {
   const dateStr = issueDate.toISOString().slice(0, 10);
-  const result = await fetchInvoicesFromKsef(dateStr, dateStr, env);
+  const result = await fetchInvoicesFromKsef(dateStr, dateStr, env, "Subject1");
   if (!result.success || !result.invoices) return false;
   const company = await getCompanySettings();
   const ourNip = normalizeNip(company.nip);

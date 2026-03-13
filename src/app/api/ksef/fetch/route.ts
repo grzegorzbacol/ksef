@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
   const from = dateFrom || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const to = dateTo || new Date().toISOString().slice(0, 10);
 
-  const result = await fetchInvoicesFromKsef(from, to, env);
+  // Subject2 = my jesteśmy nabywcą = faktury zakupu
+  const result = await fetchInvoicesFromKsef(from, to, env, "Subject2");
   if (!result.success) {
     return NextResponse.json({ ok: false, error: result.error || "Błąd pobierania z KSEF" }, { status: 200 });
   }
