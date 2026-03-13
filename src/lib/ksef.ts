@@ -412,6 +412,10 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
       } catch {
         if (text) errMsg += ` – ${text.slice(0, 120)}`;
       }
+      if (res.status === 404) {
+        errMsg +=
+          "\n\nŚcieżka /api/online/Invoice/Send nie istnieje w KSeF 2.0. Oficjalne API wymaga sesji, szyfrowania XML itd. Użyj np. KSeFAPI.dev (demo.ksefapi.dev, POST /api/invoices) – przyjmuje JSON i obsługuje KSeF. W Ustawieniach → KSeF ustaw URL i ścieżkę wysyłki dla wybranego serwisu.";
+      }
       return { success: false, error: errMsg };
     }
     const data = await res.json().catch(() => ({}));

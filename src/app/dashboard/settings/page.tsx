@@ -1126,6 +1126,10 @@ export default function SettingsPage() {
             <li><strong>Test:</strong> https://api-demo.ksef.mf.gov.pl</li>
           </ul>
         </details>
+        <details className="text-content-text-secondary text-xs mb-4">
+          <summary className="cursor-pointer text-accent hover:underline">Wysyłka faktur (KSeF 2.0)</summary>
+          <p className="mt-2">Oficjalne KSeF 2.0 nie ma prostego endpointu JSON – wymaga sesji, szyfrowania XML itd. <strong>Alternatywa:</strong> KSeFAPI.dev – URL <code>https://demo.ksefapi.dev</code>, ścieżka <code>/api/invoices</code>. Zarejestruj firmę, ustaw token i wyślij faktury w formacie JSON.</p>
+        </details>
 
         {(["prod", "test"] as KsefEnv[]).map((env) => {
           const ksef = env === "prod" ? ksefProd : ksefTest;
