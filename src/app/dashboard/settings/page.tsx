@@ -1216,7 +1216,17 @@ export default function SettingsPage() {
                         });
                         const data = await res.json().catch(() => ({}));
                         if (data.ok === true && data.accessToken) {
+                          const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
                           setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          const saveRes = await fetch("/api/settings/ksef", {
+                            method: "PUT", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              activeEnv: ksefActiveEnv,
+                              prod: env === "prod" ? updated : ksefProd,
+                              test: env === "test" ? updated : ksefTest,
+                            }),
+                          });
+                          if (saveRes.ok) setMessage({ type: "ok", text: "Zalogowano i zapisano token." });
                           setLoginResult({ for: env, ok: true });
                         } else setLoginResult({ for: env, ok: false, error: data.error ?? "Błąd", detail: data.detail });
                       } catch {
@@ -1265,7 +1275,17 @@ export default function SettingsPage() {
                         });
                         const data = await res.json().catch(() => ({}));
                         if (data.ok === true && data.accessToken) {
+                          const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
                           setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          const saveRes = await fetch("/api/settings/ksef", {
+                            method: "PUT", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              activeEnv: ksefActiveEnv,
+                              prod: env === "prod" ? updated : ksefProd,
+                              test: env === "test" ? updated : ksefTest,
+                            }),
+                          });
+                          if (saveRes.ok) setMessage({ type: "ok", text: "Token wymieniony i zapisany." });
                           setRedeemResult({ for: env, ok: true });
                         } else setRedeemResult({ for: env, ok: false, error: data.error ?? "Błąd", detail: data.detail });
                       } catch {
@@ -1286,12 +1306,12 @@ export default function SettingsPage() {
                 )}
                 {loginResult?.for === env && (
                   <div className={`p-3 rounded-lg text-sm ${loginResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
-                    {loginResult.ok ? <p>Zalogowano. Zapisz ustawienia KSEF.</p> : <><p>{loginResult.error}</p>{loginResult.detail && <p className="text-xs mt-1">{loginResult.detail}</p>}</>}
+                    {loginResult.ok ? <p>Zalogowano i zapisano token.</p> : <><p>{loginResult.error}</p>{loginResult.detail && <p className="text-xs mt-1">{loginResult.detail}</p>}</>}
                   </div>
                 )}
                 {redeemResult?.for === env && (
                   <div className={`p-3 rounded-lg text-sm ${redeemResult.ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-red-500/10 text-red-700 dark:text-red-400"}`}>
-                    {redeemResult.ok ? <p>Token zapisany w polu. Zapisz ustawienia KSEF.</p> : <><p>{redeemResult.error}</p>{redeemResult.detail && <p className="text-xs mt-1">{redeemResult.detail}</p>}</>}
+                    {redeemResult.ok ? <p>Token wymieniony i zapisany.</p> : <><p>{redeemResult.error}</p>{redeemResult.detail && <p className="text-xs mt-1">{redeemResult.detail}</p>}</>}
                   </div>
                 )}
               </div>

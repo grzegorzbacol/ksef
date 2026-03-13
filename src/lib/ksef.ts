@@ -186,13 +186,14 @@ function isKsef2Metadata(item: Record<string, unknown>): boolean {
   return typeof item.seller === "object" || typeof item.buyer === "object";
 }
 
-/** Sprawdza, czy KSEF jest skonfigurowany dla aktywnego środowiska (ustawienia lub env: URL + token). */
+/** Sprawdza, czy KSEF jest skonfigurowany dla aktywnego środowiska (ustawienia z bazy + env łącznie). */
 export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
   const targetEnv = env ?? (await getKsefActiveEnv());
-  const envOk = !!process.env.KSEF_API_URL?.trim() && !!process.env.KSEF_TOKEN?.trim();
-  if (envOk) return true;
   const s = await getKsefSettings(targetEnv);
-  return !!s.apiUrl && !!s.token;
+  const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || "").trim() ||
+    (targetEnv === "prod" ? DEFAULT_API_URL : "");
+  const token = (s.token || process.env.KSEF_TOKEN ?? "").trim();
+  return !!apiUrl && !!token;
 }
 
 /**
