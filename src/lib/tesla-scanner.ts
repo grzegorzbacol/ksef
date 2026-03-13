@@ -2,6 +2,7 @@
  * Tesla Inventory Scanner – logika współdzielona (CLI + API)
  */
 
+import axios, { AxiosError } from "axios";
 import fs from "fs";
 import path from "path";
 
@@ -10,20 +11,19 @@ const SEEN_FILE = path.join(DATA_DIR, "tesla_seen.json");
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "tesla.log");
 
-const DEFAULT_HEADERS: Record<string, string> = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "application/json, text/html, */*",
+const TESLA_INVENTORY_URL =
+  "https://www.tesla.com/pl_PL/inventory/new/my?CATEGORY=PRAWD&arrangeby=plh&zip=00-510&range=0";
+
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml",
   "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-  Referer: "https://www.tesla.com/pl_PL/inventory/new/my",
-  Origin: "https://www.tesla.com",
-  "sec-ch-ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-  "sec-ch-ua-mobile": "?0",
-  "sec-ch-ua-platform": '"macOS"',
-  "sec-fetch-dest": "empty",
-  "sec-fetch-mode": "cors",
-  "sec-fetch-site": "same-origin",
+  Referer: "https://www.tesla.com/",
 };
+
+const REQUEST_TIMEOUT_MS = 10000;
+const RETRY_DELAY_MS = 3000;
+const MAX_RETRIES = 3;
 
 export type TeslaCar = {
   id: string;
@@ -53,93 +53,88 @@ function log(message: string): void {
   }
 }
 
-const CORS_PROXIES = [
-  { url: (u: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, unwrap: (t: string) => { try { const p = JSON.parse(t) as { contents?: string }; return p.contents ?? t; } catch { return t; } } },
-  { url: (u: string) => `https://corsproxy.io/?${encodeURIComponent(u)}`, unwrap: (t: string) => t },
-];
+/**
+ * Pobiera surowy HTML strony inventory Tesli.
+ * Używa axios z nagłówkami przeglądarki, retry przy 403/błędzie sieci, timeout 10s.
+ * @throws Error przy nieudanym pobraniu
+ */
+export async function fetchTeslaInventoryPage(): Promise<string> {
+  let lastError: Error | null = null;
 
-async function fetchWithProxy(apiUrl: string, proxyUrl: string): Promise<string> {
-  const { ProxyAgent, fetch: ufetch } = await import("undici");
-  const agent = new ProxyAgent(proxyUrl);
-  const res = await ufetch(apiUrl, {
-    headers: DEFAULT_HEADERS,
-    dispatcher: agent,
-  } as Record<string, unknown>);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.text();
-}
-
-async function fetchViaCorsProxy(apiUrl: string, proxyIndex: number): Promise<string> {
-  const proxy = CORS_PROXIES[proxyIndex];
-  const res = await fetch(proxy.url(apiUrl), {
-    headers: { "User-Agent": DEFAULT_HEADERS["User-Agent"] ?? "" },
-  });
-  if (!res.ok) throw new Error(`Proxy HTTP ${res.status}`);
-  const text = await res.text();
-  return proxy.unwrap(text);
-}
-
-export async function fetchInventoryPage(): Promise<string> {
-  const apiQuery = encodeURIComponent(
-    JSON.stringify({
-      query: {
-        model: "my",
-        condition: "new",
-        market: "PL",
-        language: "pl",
-        arrangeby: "Price",
-        order: "asc",
-        zip: "00-510",
-        range: 0,
-        super_region: "europe",
-      },
-      offset: 0,
-      count: 50,
-      outsideOffset: 0,
-      outsideSearch: false,
-    })
-  );
-  const apiUrl = `https://www.tesla.com/inventory/api/v1/inventory-results?query=${apiQuery}`;
-  const proxyEnv = process.env.TESLA_PROXY_URL?.trim();
-
-  if (proxyEnv) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      log("Używam TESLA_PROXY_URL...");
-      const text = await fetchWithProxy(apiUrl, proxyEnv);
-      const parsed = JSON.parse(text);
-      if (parsed.results !== undefined) return text;
-    } catch (e) {
-      log(`Proxy nie powiódł się: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
+      const res = await axios.get(TESLA_INVENTORY_URL, {
+        headers: BROWSER_HEADERS,
+        timeout: REQUEST_TIMEOUT_MS,
+        responseType: "text",
+        validateStatus: () => true,
+      });
 
-  let res = await fetch(apiUrl, { headers: DEFAULT_HEADERS });
-  if (res.ok) return res.text();
-
-  if (res.status === 403 || res.status === 429) {
-    log("Bezpośredni fetch zablokowany, próba przez CORS proxy...");
-    for (let i = 0; i < CORS_PROXIES.length; i++) {
-      try {
-        const text = await fetchViaCorsProxy(apiUrl, i);
-        const parsed = JSON.parse(text);
-        if (parsed.results !== undefined) {
-          log(`CORS proxy ${i + 1} OK`);
-          return text;
+      if (res.status !== 200) {
+        const msg = `HTTP ${res.status} (próba ${attempt}/${MAX_RETRIES})`;
+        log(`Błąd pobierania strony Tesli: ${msg}`);
+        lastError = new Error(msg);
+        if (attempt < MAX_RETRIES && (res.status === 403 || res.status >= 500)) {
+          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          continue;
         }
-      } catch (e) {
-        log(`CORS proxy ${i + 1} nie powiódł się: ${e instanceof Error ? e.message : String(e)}`);
+        throw lastError;
+      }
+
+      return res.data as string;
+    } catch (e) {
+      const is403 = e instanceof AxiosError && e.response?.status === 403;
+      const isNetwork = e instanceof AxiosError && !e.response;
+      const isTimeout = e instanceof AxiosError && e.code === "ECONNABORTED";
+
+      lastError = e instanceof Error ? e : new Error(String(e));
+      const errMsg = e instanceof AxiosError
+        ? (e.response ? `HTTP ${e.response.status}` : e.message)
+        : lastError.message;
+
+      log(`Błąd pobierania (próba ${attempt}/${MAX_RETRIES}): ${errMsg}`);
+
+      const shouldRetry = (is403 || isNetwork || isTimeout) && attempt < MAX_RETRIES;
+      if (shouldRetry) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      } else {
+        throw lastError;
       }
     }
   }
 
-  throw new Error(`HTTP ${res.status}`);
+  throw lastError ?? new Error("Nie udało się pobrać strony");
 }
 
-export function parseCars(json: string): TeslaCar[] {
+/** @deprecated Użyj fetchTeslaInventoryPage */
+export async function fetchInventoryPage(): Promise<string> {
+  return fetchTeslaInventoryPage();
+}
+
+/**
+ * Parsuje listę samochodów z HTML (__NEXT_DATA__) lub surowego JSON.
+ */
+export function parseCars(htmlOrJson: string): TeslaCar[] {
   const cars: TeslaCar[] = [];
+  let results: Array<Record<string, unknown>> = [];
+
   try {
-    const data = JSON.parse(json) as { results?: Array<Record<string, unknown>> };
-    const results = data?.results ?? [];
+    if (htmlOrJson.trim().startsWith("<")) {
+      const match = htmlOrJson.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+      if (match) {
+        const nextData = JSON.parse(match[1]) as Record<string, unknown>;
+        const inventory =
+          (nextData?.props as Record<string, unknown>)?.["pageProps"] as Record<string, unknown> | undefined;
+        const inv = inventory?.initialState as Record<string, unknown> | undefined;
+        const invData = inv?.inventory as Record<string, unknown> | undefined;
+        const invObj = invData?.inventory as { results?: unknown[] } | undefined;
+        results = (invObj?.results ?? []) as Array<Record<string, unknown>>;
+      }
+    } else {
+      const data = JSON.parse(htmlOrJson) as { results?: Array<Record<string, unknown>> };
+      results = data?.results ?? [];
+    }
+
     for (const r of results) {
       const id = (r.VIN ?? r.ID ?? r.vin ?? r.id ?? "") as string;
       if (!id) continue;
@@ -154,7 +149,7 @@ export function parseCars(json: string): TeslaCar[] {
       cars.push({ id, model, price, link });
     }
   } catch (e) {
-    log("Błąd parsowania JSON: " + (e instanceof Error ? e.message : String(e)));
+    log("Błąd parsowania: " + (e instanceof Error ? e.message : String(e)));
   }
   return cars;
 }

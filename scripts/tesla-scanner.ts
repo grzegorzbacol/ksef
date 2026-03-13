@@ -6,7 +6,7 @@
 
 import fs from "fs";
 import path from "path";
-import { runTest } from "@/lib/tesla-scanner";
+import { fetchTeslaInventoryPage, parseCars, runTest } from "@/lib/tesla-scanner";
 
 // --- Konfiguracja ---
 // Ustaw w .env lub podaj tutaj (nie commituj tokena!):
@@ -15,20 +15,10 @@ import { runTest } from "@/lib/tesla-scanner";
 const telegramToken = process.env.TESLA_TELEGRAM_TOKEN ?? "";
 const telegramChatId = process.env.TESLA_TELEGRAM_CHAT_ID ?? "";
 
-const INVENTORY_URL =
-  "https://www.tesla.com/pl_PL/inventory/new/my?CATEGORY=PRAWD&arrangeby=plh&zip=00-510&range=0";
-
 const DATA_DIR = path.join(process.cwd(), "data");
 const SEEN_FILE = path.join(DATA_DIR, "tesla_seen.json");
 const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "tesla.log");
-
-type TeslaCar = {
-  id: string;
-  model: string;
-  price: string;
-  link: string;
-};
 
 // --- Logging ---
 function log(message: string): void {
@@ -41,71 +31,6 @@ function log(message: string): void {
   } catch {
     // ignore write errors
   }
-}
-
-const DEFAULT_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  Accept: "application/json, text/html, */*",
-  "Accept-Language": "pl-PL,pl;q=0.9,en;q=0.8",
-  Referer: "https://www.tesla.com/pl_PL/inventory/new/my",
-};
-
-// --- Pobieranie danych (API inventory – HTML jest blokowany) ---
-async function fetchInventoryPage(): Promise<string> {
-  const apiQuery = encodeURIComponent(
-    JSON.stringify({
-      query: {
-        model: "my",
-        condition: "new",
-        market: "PL",
-        language: "pl",
-        arrangeby: "Price",
-        order: "asc",
-        zip: "00-510",
-        range: 0,
-        super_region: "europe",
-      },
-      offset: 0,
-      count: 50,
-      outsideOffset: 0,
-      outsideSearch: false,
-    })
-  );
-  const apiUrl = `https://www.tesla.com/inventory/api/v1/inventory-results?query=${apiQuery}`;
-  const res = await fetch(apiUrl, { headers: DEFAULT_HEADERS });
-  if (!res.ok) {
-    if (res.status === 403) {
-      log("HTTP 403: Tesla może blokować requesty. Spróbuj z innej sieci lub użyj proxy.");
-    }
-    throw new Error(`HTTP ${res.status}`);
-  }
-  return res.text();
-}
-
-// --- Parsowanie listy aut z JSON API ---
-function parseCars(json: string): TeslaCar[] {
-  const cars: TeslaCar[] = [];
-  try {
-    const data = JSON.parse(json) as { results?: Array<Record<string, unknown>> };
-    const results = data?.results ?? [];
-    for (const r of results) {
-      const id = (r.VIN ?? r.ID ?? r.vin ?? r.id ?? "") as string;
-      if (!id) continue;
-      const model = ((r.Model ?? r.TrimName ?? r.model) as string) ?? "Tesla Model Y";
-      const priceVal = (r.InventoryPrice ?? r.Price ?? r.inventoryPrice ?? r.price ?? 0) as number;
-      const price =
-        typeof priceVal === "number"
-          ? `${(priceVal / 1000).toFixed(0)} 000 PLN`
-          : String(priceVal);
-      const link =
-        (r.Url as string) ?? `https://www.tesla.com/pl_PL/inventory/new/my?VIN=${id}`;
-      cars.push({ id, model, price, link });
-    }
-  } catch (e) {
-    log("Błąd parsowania JSON: " + (e instanceof Error ? e.message : String(e)));
-  }
-  return cars;
 }
 
 // --- Wysyłanie wiadomości Telegram ---
@@ -159,15 +84,15 @@ async function run(): Promise<void> {
   log("Start skanowania Tesla inventory...");
   const seen = loadSeen();
 
-  let json: string;
+  let html: string;
   try {
-    json = await fetchInventoryPage();
+    html = await fetchTeslaInventoryPage();
   } catch (e) {
-    log("Błąd pobierania danych: " + (e instanceof Error ? e.message : String(e)));
+    log("Błąd pobierania strony: " + (e instanceof Error ? e.message : String(e)));
     return;
   }
 
-  const cars = parseCars(json);
+  const cars = parseCars(html);
   log(`Znaleziono ${cars.length} aut w inventory.`);
 
   let newCount = 0;
