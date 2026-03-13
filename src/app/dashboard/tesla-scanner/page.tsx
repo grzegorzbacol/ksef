@@ -1,15 +1,101 @@
 "use client";
 
-import { Car } from "lucide-react";
+import { Car, Loader2, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
+
+type TestResult = {
+  ok: boolean;
+  api: { ok: boolean; message: string; carCount?: number };
+  telegram: { ok: boolean; message: string };
+  files: { ok: boolean; message: string };
+};
 
 export default function TeslaScannerPage() {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<TestResult | null>(null);
+
+  async function runTest() {
+    setTesting(true);
+    setResult(null);
+    try {
+      const res = await fetch("/api/tesla-scanner/test", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Błąd");
+      setResult(data);
+    } catch (e) {
+      setResult({
+        ok: false,
+        api: { ok: false, message: (e instanceof Error ? e.message : String(e)) },
+        telegram: { ok: false, message: "-" },
+        files: { ok: false, message: "-" },
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <div>
-      <div className="mb-6 flex items-center gap-3">
-        <Car className="h-8 w-8" />
-        <h1 className="text-2xl font-semibold">Tesla Scanner</h1>
+      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-3">
+          <Car className="h-8 w-8" />
+          <h1 className="text-2xl font-semibold">Tesla Scanner</h1>
+        </div>
+        <button
+          onClick={runTest}
+          disabled={testing}
+          className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-card disabled:opacity-50 flex items-center gap-2"
+        >
+          {testing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Testowanie…
+            </>
+          ) : (
+            "Testuj konfigurację"
+          )}
+        </button>
       </div>
+
+      {result && (
+        <div
+          className={`mb-6 rounded-xl border p-4 max-w-2xl ${
+            result.ok ? "border-green-500/50 bg-green-500/5" : "border-amber-500/50 bg-amber-500/5"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            {result.ok ? (
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            ) : (
+              <XCircle className="h-5 w-5 text-amber-600" />
+            )}
+            <span className="font-medium">
+              {result.ok ? "Wszystkie testy zaliczone" : "Niektóre testy nie powiodły się"}
+            </span>
+          </div>
+          <ul className="space-y-1 text-sm">
+            <li>
+              <strong>API Tesli:</strong>{" "}
+              <span className={result.api.ok ? "text-green-600" : "text-amber-600"}>
+                {result.api.message}
+              </span>
+            </li>
+            <li>
+              <strong>Telegram:</strong>{" "}
+              <span className={result.telegram.ok ? "text-green-600" : "text-amber-600"}>
+                {result.telegram.message}
+              </span>
+            </li>
+            <li>
+              <strong>Pliki:</strong>{" "}
+              <span className={result.files.ok ? "text-green-600" : "text-amber-600"}>
+                {result.files.message}
+              </span>
+            </li>
+          </ul>
+        </div>
+      )}
 
       <p className="text-muted mb-4 max-w-2xl">
         Skrypt sprawdza dostępność nowych Tesli w polskim inventory (Model Y, PRAWD) i wysyła
@@ -37,7 +123,11 @@ export default function TeslaScannerPage() {
 
       <div className="mt-6 rounded-xl border border-border bg-card p-6 max-w-2xl">
         <h2 className="text-lg font-medium mb-3">Uruchamianie</h2>
-        <p className="text-sm text-muted mb-2">Ręcznie:</p>
+        <p className="text-sm text-muted mb-2">Test (API + Telegram + pliki):</p>
+        <pre className="rounded-lg bg-bg p-3 text-sm overflow-x-auto">
+          npm run tesla-scan:test
+        </pre>
+        <p className="text-sm text-muted mt-4 mb-2">Skanowanie:</p>
         <pre className="rounded-lg bg-bg p-3 text-sm overflow-x-auto">
           npm run tesla-scan
         </pre>

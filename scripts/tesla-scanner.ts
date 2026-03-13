@@ -6,6 +6,7 @@
 
 import fs from "fs";
 import path from "path";
+import { runTest } from "@/lib/tesla-scanner";
 
 // --- Konfiguracja ---
 // Ustaw w .env lub podaj tutaj (nie commituj tokena!):
@@ -193,6 +194,16 @@ const WATCH_INTERVAL_MS = 5 * 60 * 1000; // 5 minut
 
 async function main(): Promise<void> {
   const watch = process.argv.includes("--watch");
+  const test = process.argv.includes("--test");
+
+  if (test) {
+    log("=== Test konfiguracji Tesla Scanner ===");
+    const res = await runTest();
+    log("---");
+    console.log(JSON.stringify(res));
+    process.exit(res.ok ? 0 : 1);
+  }
+
   if (watch) {
     log("Tryb watch: skanowanie co 5 minut.");
     while (true) {

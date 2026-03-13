@@ -7,6 +7,7 @@
   },
   "scripts": {
     "tesla-scan": "tsx scripts/tesla-scanner.ts",
+    "tesla-scan:test": "tsx scripts/tesla-scanner.ts --test",
     "tesla-scan:watch": "tsx scripts/tesla-scanner.ts --watch",
     "dev": "next dev",
     "build": "next build",
