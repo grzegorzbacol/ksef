@@ -160,6 +160,9 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
         <P_22N>1</P_22N>
       </NoweSrodkiTransportu>
       <P_23>2</P_23>
+      <PMarzy>
+        <P_PMarzyN>1</P_PMarzyN>
+      </PMarzy>
     </Adnotacje>
     <RodzajFaktury>VAT</RodzajFaktury>
     ${rows.length > 0 ? rows.join("\n") : ""}
