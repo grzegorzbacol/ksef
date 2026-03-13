@@ -71,7 +71,7 @@ export default function InvoicesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     issueDate: new Date().toISOString().slice(0, 10),
-    saleDate: "",
+    saleDate: new Date().toISOString().slice(0, 10),
     paymentDueDays: "",
     paymentDueDate: "",
     sellerName: "",
@@ -222,7 +222,7 @@ export default function InvoicesPage() {
     setLines([]);
     setForm({
       issueDate: new Date().toISOString().slice(0, 10),
-      saleDate: "",
+      saleDate: new Date().toISOString().slice(0, 10),
       paymentDueDays: "",
       paymentDueDate: "",
       sellerName: "",

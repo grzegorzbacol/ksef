@@ -148,13 +148,13 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     <P_13_1>${(Number(inv.netAmount) || 0).toFixed(2)}</P_13_1>
     <P_14_1>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_14_1>
     <P_15>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_15>
-    <RodzajFaktury>VAT</RodzajFaktury>
     <Adnotacje>
       <P_16>2</P_16>
       <P_17>2</P_17>
       <P_18>2</P_18>
       <P_18A>2</P_18A>
     </Adnotacje>
+    <RodzajFaktury>VAT</RodzajFaktury>
     ${rows.length > 0 ? rows.join("\n") : ""}
     <Platnosc>
       <Termin>${paymentDue}</Termin>

@@ -81,7 +81,7 @@ export default function InvoicesSalesPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     issueDate: new Date().toISOString().slice(0, 10),
-    saleDate: "",
+    saleDate: new Date().toISOString().slice(0, 10),
     sellerName: "",
     sellerNip: "",
     buyerName: "",
@@ -413,7 +413,7 @@ function InvoiceNumberCell({
     setAttachmentFile(null);
     setForm({
       issueDate: new Date().toISOString().slice(0, 10),
-      saleDate: "",
+      saleDate: new Date().toISOString().slice(0, 10),
       sellerName: "",
       sellerNip: "",
       buyerName: "",
