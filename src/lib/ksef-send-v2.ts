@@ -220,11 +220,10 @@ export async function createEncryptionData(
   };
 }
 
-/** Szyfruje dane AES-256-CBC z IV jako prefiks. */
+/** Szyfruje dane AES-256-CBC. IV wysyłany osobno przy otwarciu sesji – encryptedInvoiceContent = tylko szyfrogram. */
 export function encryptAes256Cbc(data: Buffer, key: Buffer, iv: Buffer): Buffer {
   const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
-  const enc = Buffer.concat([cipher.update(data), cipher.final()]);
-  return Buffer.concat([iv, enc]);
+  return Buffer.concat([cipher.update(data), cipher.final()]);
 }
 
 /** SHA-256 skrót, Base64. */
@@ -266,12 +265,12 @@ export async function sendInvoiceToKsefV2(
   const encData = await createEncryptionData(certPem, cert);
   const xml = buildFa2Xml(invoice);
   const xmlBuf = Buffer.from(xml, "utf-8");
-  const cipherWithIv = encryptAes256Cbc(xmlBuf, encData.key, encData.iv);
+  const ciphertext = encryptAes256Cbc(xmlBuf, encData.key, encData.iv);
   const invoiceHash = sha256Base64(xmlBuf);
   const invoiceSize = xmlBuf.length;
-  const encryptedHash = sha256Base64(cipherWithIv);
-  const encryptedSize = cipherWithIv.length;
-  const encryptedContent = cipherWithIv.toString("base64");
+  const encryptedHash = sha256Base64(ciphertext);
+  const encryptedSize = ciphertext.length;
+  const encryptedContent = ciphertext.toString("base64");
 
   const openRes = await fetch(`${baseV2}/sessions/online`, {
     method: "POST",
