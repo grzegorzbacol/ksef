@@ -76,8 +76,18 @@ export default function RozrachunkiPage() {
       fetch("/api/invoices?type=cost&payment=true").then((r) => r.json()),
     ])
       .then(([salesData, costData]) => {
-        setNaleznosci(Array.isArray(salesData) ? salesData : []);
-        setZobowiazania(Array.isArray(costData) ? costData : []);
+        const sales = Array.isArray(salesData) ? salesData : [];
+        const cost = Array.isArray(costData) ? costData : [];
+        // Należności: faktury sprzedaży (kwota ≥ 0) + faktury zakupu – korekty (kwota < 0 → dostawca ma zwrócić)
+        setNaleznosci([
+          ...sales.filter((i: Invoice) => (i.grossAmount ?? 0) >= 0),
+          ...cost.filter((i: Invoice) => (i.grossAmount ?? 0) < 0),
+        ]);
+        // Zobowiązania: faktury zakupu (kwota ≥ 0) + faktury sprzedaży – korekty (kwota < 0 → my mamy zwrócić)
+        setZobowiazania([
+          ...cost.filter((i: Invoice) => (i.grossAmount ?? 0) >= 0),
+          ...sales.filter((i: Invoice) => (i.grossAmount ?? 0) < 0),
+        ]);
       })
       .finally(() => setLoading(false));
   }
@@ -172,7 +182,7 @@ export default function RozrachunkiPage() {
 
   async function saveAmount(invoiceId: string, valueStr: string) {
     const num = parseFloat(valueStr.replace(",", "."));
-    if (Number.isNaN(num) || num < 0) {
+    if (Number.isNaN(num)) {
       setEditingAmountId(null);
       return;
     }
@@ -343,7 +353,7 @@ export default function RozrachunkiPage() {
             <span className="font-medium">
               Do odbioru: {naleznosci
                 .filter((i) => !i.payment)
-                .reduce((sum, i) => sum + i.grossAmount, 0)
+                .reduce((sum, i) => sum + Math.abs(i.grossAmount ?? 0), 0)
                 .toFixed(2)}{" "}
               PLN
             </span>
@@ -386,12 +396,12 @@ export default function RozrachunkiPage() {
                   </td>
                   <td className="p-3 font-semibold">{typLabel(inv)}</td>
                   <td className="p-3 font-medium">
-                    <Link href={`/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
+                    <Link href={inv.type === "sales" ? `/dashboard/invoices/${inv.id}` : `/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
                       {inv.number}
                     </Link>
                   </td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.buyerName}</td>
+                  <td className="p-3">{inv.type === "sales" ? inv.buyerName : inv.sellerName}</td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (
                       <span className="inline-flex items-center gap-1">
@@ -528,7 +538,7 @@ export default function RozrachunkiPage() {
             <span className="font-medium">
               Do zapłaty: {zobowiazania
                 .filter((i) => !i.payment)
-                .reduce((sum, i) => sum + i.grossAmount, 0)
+                .reduce((sum, i) => sum + Math.abs(i.grossAmount ?? 0), 0)
                 .toFixed(2)}{" "}
               PLN
             </span>
@@ -572,12 +582,12 @@ export default function RozrachunkiPage() {
                   </td>
                   <td className="p-3 font-semibold">{typLabel(inv)}</td>
                   <td className="p-3 font-medium">
-                    <Link href={`/dashboard/invoices-sales/${inv.id}`} className="text-accent hover:underline">
+                    <Link href={inv.type === "cost" ? `/dashboard/invoices-sales/${inv.id}` : `/dashboard/invoices/${inv.id}`} className="text-accent hover:underline">
                       {inv.number}
                     </Link>
                   </td>
                   <td className="p-3">{new Date(inv.issueDate).toLocaleDateString("pl-PL")}</td>
-                  <td className="p-3">{inv.sellerName}</td>
+                  <td className="p-3">{inv.type === "cost" ? inv.sellerName : inv.buyerName}</td>
                   <td className="p-3 text-right">
                     {editingAmountId === inv.id ? (
                       <span className="inline-flex items-center gap-1">

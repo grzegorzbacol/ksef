@@ -70,9 +70,9 @@ export async function PATCH(
         ? null
         : new Date(body.paymentDueDate);
   }
-  if (typeof body.netAmount === "number" && body.netAmount >= 0) update.netAmount = body.netAmount;
-  if (typeof body.vatAmount === "number" && body.vatAmount >= 0) update.vatAmount = body.vatAmount;
-  if (typeof body.grossAmount === "number" && body.grossAmount >= 0)
+  if (typeof body.netAmount === "number" && !Number.isNaN(body.netAmount)) update.netAmount = body.netAmount;
+  if (typeof body.vatAmount === "number" && !Number.isNaN(body.vatAmount)) update.vatAmount = body.vatAmount;
+  if (typeof body.grossAmount === "number" && !Number.isNaN(body.grossAmount))
     update.grossAmount = body.grossAmount;
   if (typeof body.sellerName === "string") update.sellerName = body.sellerName.trim();
   if (typeof body.sellerNip === "string") update.sellerNip = body.sellerNip.trim().replace(/\s/g, "");
