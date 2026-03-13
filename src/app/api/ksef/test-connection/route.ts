@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const testUrl = `${apiUrl}/v2/auth/sessions?pageSize=1`;
+  const testUrl = `${apiUrl}/v2/auth/sessions?pageSize=10`;
   try {
     const res = await fetch(testUrl, {
       method: "GET",
