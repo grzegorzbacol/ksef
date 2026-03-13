@@ -6,6 +6,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
+    "tesla-scan": "tsx scripts/tesla-scanner.ts",
+    "tesla-scan:watch": "tsx scripts/tesla-scanner.ts --watch",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
