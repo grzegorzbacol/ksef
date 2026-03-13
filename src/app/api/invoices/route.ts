@@ -17,20 +17,24 @@ const createSchema = z.object({
   number: z.string().optional(),
   issueDate: z.string(),
   saleDate: z.string().optional(),
-  sellerName: z.string().min(1),
-  sellerNip: z.string().min(1),
-  buyerName: z.string().min(1),
-  buyerNip: z.string().min(1),
-  netAmount: z.number(),
-  vatAmount: z.number(),
-  grossAmount: z.number(),
+  sellerName: z.string().min(1).optional(),
+  sellerNip: z.string().min(1).optional(),
+  buyerName: z.string().min(1).optional(),
+  buyerNip: z.string().min(1).optional(),
+  netAmount: z.number().optional(),
+  vatAmount: z.number().optional(),
+  grossAmount: z.number().optional(),
   currency: z.string().default("PLN"),
   items: z.array(itemSchema).optional(),
   expenseType: z.enum(["standard", "car"]).optional(),
   carId: z.string().optional().nullable(),
   expenseCategoryId: z.string().optional().nullable(),
   remarks: z.string().optional().nullable(),
-});
+  correctionOfId: z.string().optional(),
+}).refine(
+  (d) => d.correctionOfId || (d.sellerName && d.sellerNip && d.buyerName && d.buyerNip && d.netAmount != null),
+  { message: "Dla nowej faktury wymagane: sprzedawca, nabywca i kwoty (lub pozycje). Dla korekty: correctionOfId." }
+);
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -116,14 +120,82 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  let netAmount = data.netAmount;
-  let vatAmount = data.vatAmount;
-  let grossAmount = data.grossAmount;
 
-  if (data.items && data.items.length > 0) {
+  // Korekta faktury – kopiuje dane z oryginału i neguje kwoty
+  let baseData: {
+    issueDate: string;
+    saleDate?: string;
+    sellerName: string;
+    sellerNip: string;
+    buyerName: string;
+    buyerNip: string;
+    netAmount: number;
+    vatAmount: number;
+    grossAmount: number;
+    currency: string;
+    items?: { productId?: string; name: string; quantity: number; unit: string; unitPriceNet: number; vatRate: number }[];
+  };
+  let correctionOfId: string | undefined;
+  const isCorrection = !!data.correctionOfId;
+
+  if (isCorrection) {
+    const original = await prisma.invoice.findUnique({
+      where: { id: data.correctionOfId },
+      include: { items: true },
+    });
+    if (!original)
+      return NextResponse.json({ error: "Nie znaleziono faktury do skorygowania" }, { status: 404 });
+    if (original.type !== "sales")
+      return NextResponse.json({ error: "Korekty można wystawiać tylko dla faktur sprzedaży" }, { status: 400 });
+    if (original.correctionOfId)
+      return NextResponse.json({ error: "Nie można skorygować korekty" }, { status: 400 });
+    correctionOfId = original.id;
+    baseData = {
+      issueDate: data.issueDate,
+      saleDate: data.saleDate,
+      sellerName: original.sellerName,
+      sellerNip: original.sellerNip,
+      buyerName: original.buyerName,
+      buyerNip: original.buyerNip,
+      netAmount: -original.netAmount,
+      vatAmount: -original.vatAmount,
+      grossAmount: -original.grossAmount,
+      currency: original.currency,
+      items: original.items.map((it) => ({
+        productId: it.productId ?? undefined,
+        name: it.name,
+        quantity: -it.quantity,
+        unit: it.unit,
+        unitPriceNet: it.unitPriceNet,
+        vatRate: it.vatRate,
+      })),
+    };
+  } else {
+    const netAmount = data.netAmount ?? 0;
+    const vatAmount = data.vatAmount ?? 0;
+    const grossAmount = data.grossAmount ?? netAmount + vatAmount;
+    baseData = {
+      issueDate: data.issueDate,
+      saleDate: data.saleDate,
+      sellerName: data.sellerName!,
+      sellerNip: data.sellerNip!,
+      buyerName: data.buyerName!,
+      buyerNip: data.buyerNip!,
+      netAmount,
+      vatAmount,
+      grossAmount,
+      currency: data.currency,
+    };
+  }
+
+  let netAmount = baseData.netAmount;
+  let vatAmount = baseData.vatAmount;
+  let grossAmount = baseData.grossAmount;
+
+  if (baseData.items && baseData.items.length > 0) {
     netAmount = 0;
     vatAmount = 0;
-    for (const row of data.items) {
+    for (const row of baseData.items) {
       const lineNet = row.quantity * row.unitPriceNet;
       const lineVat = lineNet * (row.vatRate / 100);
       netAmount += lineNet;
@@ -132,21 +204,22 @@ export async function POST(req: NextRequest) {
     grossAmount = netAmount + vatAmount;
   }
 
-  const issueDate = new Date(data.issueDate);
-
+  const issueDate = new Date(baseData.issueDate);
   const invoiceType = data.type === "cost" ? "cost" : "sales";
-  const prefix = invoiceType === "cost" ? "FK" : "FV";
+  const prefix = isCorrection ? "FV-K" : invoiceType === "cost" ? "FK" : "FV";
 
   const invoice = await prisma.$transaction(async (tx) => {
     let number = data.number?.trim();
     if (!number) {
       const year = issueDate.getFullYear();
-      const key = `invoice_counter_${invoiceType}_${year}`;
-      const row = await tx.setting.findUnique({ where: { key } });
+      const counterKey = isCorrection
+        ? `invoice_counter_sales_correction_${year}`
+        : `invoice_counter_${invoiceType}_${year}`;
+      const row = await tx.setting.findUnique({ where: { key: counterKey } });
       const nextSeq = (row?.value ? parseInt(row.value, 10) : 0) + 1;
       await tx.setting.upsert({
-        where: { key },
-        create: { key, value: String(nextSeq) },
+        where: { key: counterKey },
+        create: { key: counterKey, value: String(nextSeq) },
         update: { value: String(nextSeq) },
       });
       number = `${prefix}/${year}/${String(nextSeq).padStart(4, "0")}`;
@@ -162,25 +235,27 @@ export async function POST(req: NextRequest) {
         type: invoiceType,
         number,
         issueDate,
-        saleDate: data.saleDate ? new Date(data.saleDate) : null,
-        sellerName: data.sellerName,
-        sellerNip: data.sellerNip,
-        buyerName: data.buyerName,
-        buyerNip: data.buyerNip,
+        saleDate: baseData.saleDate ? new Date(baseData.saleDate) : null,
+        sellerName: baseData.sellerName,
+        sellerNip: baseData.sellerNip,
+        buyerName: baseData.buyerName,
+        buyerNip: baseData.buyerNip,
         netAmount,
         vatAmount,
         grossAmount,
-        currency: data.currency,
+        currency: baseData.currency,
         expenseType,
         carId,
         expenseCategoryId: invoiceType === "cost" && data.expenseCategoryId ? data.expenseCategoryId : null,
         remarks: data.remarks?.trim() || null,
+        correctionOfId: correctionOfId ?? null,
       },
     });
   });
 
-  if (data.items && data.items.length > 0) {
-    for (const row of data.items) {
+  const items = baseData.items ?? data.items ?? [];
+  if (items.length > 0) {
+    for (const row of items) {
       const amountNet = row.quantity * row.unitPriceNet;
       const amountVat = amountNet * (row.vatRate / 100);
       await prisma.invoiceItem.create({

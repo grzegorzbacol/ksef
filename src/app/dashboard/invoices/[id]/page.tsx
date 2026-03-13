@@ -134,6 +134,9 @@ type Invoice = {
     limit200k: number;
     vatDeductionPercent: number;
   } | null;
+  correctionOfId?: string | null;
+  correctionOf?: { id: string; number: string } | null;
+  correctedBy?: { id: string; number: string }[];
 };
 
 type Car = {
@@ -196,6 +199,7 @@ export default function InvoiceDetailPage() {
   const [editingRemarks, setEditingRemarks] = useState(false);
   const [editRemarks, setEditRemarks] = useState("");
   const [savingRemarks, setSavingRemarks] = useState(false);
+  const [creatingCorrection, setCreatingCorrection] = useState(false);
 
   function loadInvoice() {
     return fetch(`/api/invoices/${id}`)
@@ -280,7 +284,8 @@ export default function InvoiceDetailPage() {
 
   const isCost = invoice.type === "cost";
   const listHref = isCost ? "/dashboard/invoices-sales" : "/dashboard/invoices";
-  const typeLabel = isCost ? "Faktura kosztowa" : "Faktura sprzedaży";
+  const typeLabel = isCost ? "Faktura kosztowa" : invoice.correctionOf ? "Korekta faktury sprzedaży" : "Faktura sprzedaży";
+  const canIssueCorrection = !isCost && !invoice.correctionOfId;
 
   const saveSellerInline = async () => {
     if (
@@ -602,6 +607,28 @@ export default function InvoiceDetailPage() {
                     {(invoice.remarks ?? "").trim() || "— dodaj opis dokumentu —"}
                   </button>
                 )}
+              </dd>
+            </>
+          )}
+          {invoice.correctionOf && (
+            <>
+              <dt className="text-muted">Korekta faktury</dt>
+              <dd>
+                <Link href={`/dashboard/invoices/${invoice.correctionOf.id}`} className="text-accent hover:underline">
+                  {invoice.correctionOf.number}
+                </Link>
+              </dd>
+            </>
+          )}
+          {!invoice.correctionOfId && invoice.correctedBy && invoice.correctedBy.length > 0 && (
+            <>
+              <dt className="text-muted">Skorygowano</dt>
+              <dd>
+                {invoice.correctedBy.map((c) => (
+                  <Link key={c.id} href={`/dashboard/invoices/${c.id}`} className="text-accent hover:underline block">
+                    {c.number}
+                  </Link>
+                ))}
               </dd>
             </>
           )}
@@ -1115,6 +1142,38 @@ export default function InvoiceDetailPage() {
             ksefId={invoice.ksefId}
             hasMailAttachments={(invoice.emailAttachments?.length ?? 0) > 0}
           />
+          {canIssueCorrection && (
+            <button
+              type="button"
+              disabled={creatingCorrection}
+              onClick={async () => {
+                if (!confirm("Wystawić korektę ujemną tej faktury? Zostanie utworzona nowa faktura z odwróconymi kwotami.")) return;
+                setCreatingCorrection(true);
+                try {
+                  const res = await fetch("/api/invoices", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      correctionOfId: id,
+                      issueDate: new Date().toISOString().slice(0, 10),
+                      type: "sales",
+                    }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    alert(data.error || "Błąd wystawiania korekty");
+                    return;
+                  }
+                  window.location.href = `/dashboard/invoices/${data.id}`;
+                } finally {
+                  setCreatingCorrection(false);
+                }
+              }}
+              className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              {creatingCorrection ? "Tworzenie korekty…" : "Wystaw korektę"}
+            </button>
+          )}
           {isCost && (
             <Link href="/dashboard/tax-benefits" className="rounded border border-border px-4 py-2 hover:border-accent">
               Korzyści podatkowe

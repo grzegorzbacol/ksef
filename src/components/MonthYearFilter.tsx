@@ -32,16 +32,39 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
 
   const now = new Date();
   const currentYear = now.getFullYear();
-  // Lata od 2026 do aktualnego (min. 2026 jeśli jesteśmy wcześniej)
+  const currentMonth = now.getMonth() + 1;
   const years = Array.from(
     { length: Math.max(1, currentYear - START_YEAR + 1) },
     (_, i) => START_YEAR + i
   ).reverse();
 
+  const m = month ?? currentMonth;
+  const y = year ?? currentYear;
   const label =
     month != null && year != null
       ? `${MONTH_NAMES[month - 1]} ${year}`
       : "Wszystkie miesiące";
+
+  const canPrev = y > START_YEAR || (y === START_YEAR && m > 1);
+  const canNext = y < currentYear || (y === currentYear && m < currentMonth);
+
+  const handlePrev = () => {
+    if (month == null || year == null) {
+      onChange(currentMonth, currentYear);
+      return;
+    }
+    if (m === 1) onChange(12, year - 1);
+    else onChange(m - 1, year);
+  };
+
+  const handleNext = () => {
+    if (month == null || year == null) {
+      onChange(currentMonth, currentYear);
+      return;
+    }
+    if (m === 12) onChange(1, year + 1);
+    else onChange(m + 1, year);
+  };
 
   const handleOpen = () => {
     setPendingMonth(month);
@@ -62,42 +85,49 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
   };
 
   return (
-    <>
+    <div className="flex items-center gap-1 rounded-lg border border-border bg-bg px-1 py-1">
+      <button
+        type="button"
+        onClick={handlePrev}
+        disabled={!canPrev}
+        className="rounded p-2 text-muted hover:bg-border hover:text-text disabled:opacity-40 disabled:hover:bg-transparent"
+        aria-label="Poprzedni miesiąc"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
       <button
         type="button"
         onClick={handleOpen}
-        className="flex items-center gap-2 rounded-lg border border-border bg-bg px-4 py-2 text-sm hover:bg-bg/80 focus:outline-none focus:ring-2 focus:ring-accent"
-        aria-expanded={open}
+        className="min-w-[140px] rounded px-3 py-1.5 text-center text-sm font-medium hover:bg-border focus:outline-none focus:ring-2 focus:ring-accent"
       >
-        <span className="text-muted">Filtruj wg miesiąca:</span>
-        <span className="font-medium">{label}</span>
-        <svg
-          className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        {label}
+      </button>
+      <button
+        type="button"
+        onClick={handleNext}
+        disabled={!canNext}
+        className="rounded p-2 text-muted hover:bg-border hover:text-text disabled:opacity-40 disabled:hover:bg-transparent"
+        aria-label="Następny miesiąc"
+      >
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>
 
-      {/* Backdrop */}
       {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/40"
-          onClick={() => setOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      {/* Wysuwane menu */}
-      <div
-        className={`fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border bg-card shadow-xl transition-transform duration-200 ease-out sm:max-w-xs ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-        role="dialog"
-        aria-label="Wybierz miesiąc i rok"
-      >
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div
+            className="fixed right-0 top-0 z-50 h-full w-full max-w-sm border-l border-border bg-card shadow-xl sm:max-w-xs"
+            role="dialog"
+            aria-label="Wybierz miesiąc i rok"
+          >
         <div className="flex h-full flex-col p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Filtruj wg miesiąca</h2>
@@ -173,8 +203,10 @@ export function MonthYearFilter({ month, year, onChange }: MonthYearFilterProps)
               Wyczyść filtr
             </button>
           </div>
+          </div>
         </div>
-      </div>
-    </>
+        </>
+      )}
+    </div>
   );
 }

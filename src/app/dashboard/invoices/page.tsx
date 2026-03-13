@@ -22,6 +22,7 @@ type Invoice = {
   ksefStatus: string | null;
   source: string;
   payment?: { paidAt: string } | null;
+  correctionOfId?: string | null;
 };
 
 type Product = {
