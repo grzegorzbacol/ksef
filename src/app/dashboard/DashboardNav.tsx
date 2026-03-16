@@ -17,7 +17,6 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  Car,
 } from "lucide-react";
 
 type NavItem = {
@@ -70,11 +69,6 @@ const navSections: NavSection[] = [
       { href: "/dashboard/statistics", label: "Statystyki", icon: BarChart3 },
       { href: "/dashboard/rozrachunki", label: "Rozrachunki", icon: Wallet },
     ],
-  },
-  {
-    label: "Tesla Scanner",
-    icon: Car,
-    items: [{ href: "/dashboard/tesla-scanner", label: "Tesla Scanner", icon: Car }],
   },
   {
     label: "Ustawienia",
