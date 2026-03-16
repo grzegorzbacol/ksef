@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isDateInClosedPeriod } from "@/lib/closed-periods";
 import { z } from "zod";
 
 const itemSchema = z.object({
@@ -215,6 +216,14 @@ export async function POST(req: NextRequest) {
   }
 
   const issueDate = new Date(baseData.issueDate);
+  if (await isDateInClosedPeriod(issueDate)) {
+    const m = issueDate.getMonth() + 1;
+    const y = issueDate.getFullYear();
+    return NextResponse.json(
+      { error: `Miesiąc ${String(m).padStart(2, "0")}.${y} jest zamknięty. Nie można dodawać nowych faktur w tym miesiącu.` },
+      { status: 400 },
+    );
+  }
   const invoiceType = data.type === "cost" ? "cost" : "sales";
 
   const invoice = await prisma.$transaction(async (tx) => {

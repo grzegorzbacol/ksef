@@ -181,3 +181,13 @@ model DeletedMailInvoiceMessageId {
   createdAt      DateTime @default(now())
 }
 
+model ClosedPeriod {
+  id        String   @id @default(cuid())
+  year      Int
+  month     Int
+  createdAt DateTime @default(now())
+
+  @@unique([year, month])
+}
+
+

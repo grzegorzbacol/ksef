@@ -97,10 +97,10 @@ export default function TeslaScannerPage() {
           {!result.ok && (
             <div className="mt-4 pt-3 border-t border-border text-xs text-muted space-y-2">
               <p>
-                <strong>HTTP 403:</strong> Tesla blokuje requesty z serwerów. Obejścia: (1) Ustaw{" "}
-                <code>TESLA_PROXY_URL</code> – adres proxy HTTP (np. residential z Bright Data, Oxylabs).
-                Format: <code>http://user:pass@host:port</code>. (2) Uruchom skrypt lokalnie:{" "}
-                <code>npm run tesla-scan</code>
+                <strong>HTTP 403:</strong> Tesla używa Akamai Bot Manager. Najprostsze obejście:{" "}
+                <code>TESLA_SCRAPINGBEE_KEY</code> – klucz z{" "}
+                <a href="https://www.scrapingbee.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">scrapingbee.com</a>{" "}
+                (darmowy trial 1000 requestów). Alternatywa: uruchom skrypt lokalnie z sieci domowej.
               </p>
               <p>
                 <strong>Telegram:</strong> Upewnij się, że zmienne są w Coolify → Environment. "Bad
@@ -134,7 +134,12 @@ export default function TeslaScannerPage() {
             <code className="rounded bg-bg px-1 py-0.5">TESLA_TELEGRAM_CHAT_ID</code> – ID chatu (np. od @userinfobot)
           </li>
           <li>
-            <code className="rounded bg-bg px-1 py-0.5">TESLA_PROXY_URL</code> – opcjonalnie: proxy HTTP przy 403 (np.{" "}
+            <code className="rounded bg-bg px-1 py-0.5">TESLA_SCRAPINGBEE_KEY</code> – przy 403: klucz z{" "}
+            <a href="https://www.scrapingbee.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">ScrapingBee</a>{" "}
+            (1000 darmowych requestów) – omija Akamai
+          </li>
+          <li>
+            <code className="rounded bg-bg px-1 py-0.5">TESLA_PROXY_URL</code> – opcjonalnie: proxy HTTP (np.{" "}
             <code>http://user:pass@host:port</code>)
           </li>
         </ul>

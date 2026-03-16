@@ -91,6 +91,7 @@ export default function InvoicesPage() {
   const [syncKsefLoading, setSyncKsefLoading] = useState(false);
   const [sendingKsefId, setSendingKsefId] = useState<string | null>(null);
   const [importJpkLoading, setImportJpkLoading] = useState(false);
+  const [closedPeriods, setClosedPeriods] = useState<{ year: number; month: number }[]>([]);
 
   const now = new Date();
   const [month, setMonth] = useState<number | null>(now.getMonth() + 1);
@@ -127,6 +128,52 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadInvoices();
   }, [month, year]);
+
+  useEffect(() => {
+    fetch("/api/settings/closed-periods")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setClosedPeriods(data.map((p) => ({ year: p.year, month: p.month })));
+        } else {
+          setClosedPeriods([]);
+        }
+      })
+      .catch(() => setClosedPeriods([]));
+  }, []);
+
+  const isCurrentMonthClosed =
+    month != null &&
+    year != null &&
+    closedPeriods.some((p) => p.year === year && p.month === month);
+
+  async function closeCurrentMonth() {
+    if (month == null || year == null) return;
+    if (
+      !confirm(
+        `Zamknąć miesiąc ${String(month).padStart(2, "0")}.${year}? Po zamknięciu nie będzie można dodawać, edytować ani usuwać faktur z tego miesiąca.`,
+      )
+    ) {
+      return;
+    }
+    const res = await fetch("/api/settings/closed-periods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ month, year }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || "Nie udało się zamknąć miesiąca.");
+      return;
+    }
+    setClosedPeriods((prev) => {
+      if (prev.some((p) => p.year === year && p.month === month)) return prev;
+      return [...prev, { year, month }];
+    });
+    alert(
+      `Miesiąc ${String(month).padStart(2, "0")}.${year} został zamknięty. Zmiany w fakturach z tego miesiąca są zablokowane.`,
+    );
+  }
 
   async function syncKsefStatus() {
     setSyncKsefLoading(true);
@@ -355,9 +402,10 @@ export default function InvoicesPage() {
             onClick={() => setShowForm((v) => !v)}
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
             style={{ backgroundColor: "var(--accent)" }}
+            disabled={isCurrentMonthClosed}
           >
             <Plus className="w-4 h-4" />
-            {showForm ? "Anuluj" : "Wystaw fakturę"}
+            {showForm ? "Anuluj" : isCurrentMonthClosed ? "Miesiąc zamknięty" : "Wystaw fakturę"}
           </button>
           <button
             type="button"
@@ -394,6 +442,19 @@ export default function InvoicesPage() {
             <Trash2 className="w-4 h-4" />
             Usuń zaznaczone
           </button>
+          {month != null && year != null && (
+            <button
+              type="button"
+              onClick={closeCurrentMonth}
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50 disabled:opacity-50"
+              style={{ borderColor: "var(--content-border)", color: "var(--content-text)" }}
+              disabled={isCurrentMonthClosed}
+            >
+              {isCurrentMonthClosed
+                ? `Miesiąc ${String(month).padStart(2, "0")}.${year} zamknięty`
+                : `Zamknij miesiąc ${String(month).padStart(2, "0")}.${year}`}
+            </button>
+          )}
         </div>
       </div>
 

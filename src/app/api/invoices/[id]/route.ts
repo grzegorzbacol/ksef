@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { isDateInClosedPeriod } from "@/lib/closed-periods";
 
 export async function GET(
   _req: NextRequest,
@@ -34,6 +35,15 @@ export async function PATCH(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
+
+  const existing = await prisma.invoice.findUnique({
+    where: { id },
+    select: { issueDate: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Nie znaleziono faktury" }, { status: 404 });
+  }
+  const originalIssueDate = existing.issueDate;
   const body = await req.json().catch(() => ({}));
   const update: {
     issueDate?: Date;
@@ -102,6 +112,16 @@ export async function PATCH(
   if (body.expenseCategoryId !== undefined) {
     update.expenseCategoryId = body.expenseCategoryId && String(body.expenseCategoryId).trim() ? String(body.expenseCategoryId).trim() : null;
   }
+  const newIssueDate = update.issueDate ?? originalIssueDate;
+  if (await isDateInClosedPeriod(originalIssueDate) || (newIssueDate && (await isDateInClosedPeriod(newIssueDate)))) {
+    const m = originalIssueDate.getMonth() + 1;
+    const y = originalIssueDate.getFullYear();
+    return NextResponse.json(
+      { error: `Miesiąc ${String(m).padStart(2, "0")}.${y} jest zamknięty. Nie można wprowadzać zmian dla faktur z tego miesiąca.` },
+      { status: 400 },
+    );
+  }
+
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Brak pól do aktualizacji" }, { status: 400 });
   }
@@ -131,8 +151,22 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
-  const invoice = await prisma.invoice.findUnique({ where: { id }, select: { source: true, emailMessageId: true } });
-  if (invoice?.source === "mail" && invoice?.emailMessageId?.trim()) {
+  const invoice = await prisma.invoice.findUnique({
+    where: { id },
+    select: { source: true, emailMessageId: true, issueDate: true },
+  });
+  if (!invoice) {
+    return NextResponse.json({ error: "Nie znaleziono faktury" }, { status: 404 });
+  }
+  if (await isDateInClosedPeriod(invoice.issueDate)) {
+    const m = invoice.issueDate.getMonth() + 1;
+    const y = invoice.issueDate.getFullYear();
+    return NextResponse.json(
+      { error: `Miesiąc ${String(m).padStart(2, "0")}.${y} jest zamknięty. Nie można usuwać faktur z tego miesiąca.` },
+      { status: 400 },
+    );
+  }
+  if (invoice.source === "mail" && invoice.emailMessageId?.trim()) {
     await prisma.deletedMailInvoiceMessageId.upsert({
       where: { emailMessageId: invoice.emailMessageId.trim() },
       create: { emailMessageId: invoice.emailMessageId.trim() },

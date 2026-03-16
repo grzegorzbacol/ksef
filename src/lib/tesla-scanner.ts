@@ -12,6 +12,8 @@ const LOG_DIR = path.join(process.cwd(), "logs");
 const LOG_FILE = path.join(LOG_DIR, "tesla.log");
 
 const TESLA_API_URL = "https://www.tesla.com/inventory/api/v1/inventory-results";
+const TESLA_PAGE_URL =
+  "https://www.tesla.com/pl_PL/inventory/new/my?CATEGORY=PRAWD&arrangeby=plh&zip=00-510&range=0";
 
 const API_HEADERS = {
   "User-Agent": "Mozilla/5.0",
@@ -65,10 +67,42 @@ function log(message: string): void {
   }
 }
 
+async function fetchViaScrapingBee(): Promise<string> {
+  const key = process.env.TESLA_SCRAPINGBEE_KEY?.trim();
+  if (!key) return "";
+  try {
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${key}&url=${encodeURIComponent(TESLA_PAGE_URL)}&render_js=true&wait=3000`;
+    const res = await axios.get(url, {
+      timeout: 30000,
+      responseType: "text",
+    });
+    return res.status === 200 ? (res.data as string) : "";
+  } catch {
+    return "";
+  }
+}
+
+function extractJsonFromHtml(html: string): string | null {
+  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!match) return null;
+  try {
+    const data = JSON.parse(match[1]) as Record<string, unknown>;
+    const props = data?.props as Record<string, unknown> | undefined;
+    const pageProps = props?.["pageProps"] as Record<string, unknown> | undefined;
+    const state = pageProps?.initialState as Record<string, unknown> | undefined;
+    const inv = state?.inventory as Record<string, unknown> | undefined;
+    const invData = inv?.inventory as { results?: unknown[] } | undefined;
+    const results = invData?.results ?? [];
+    if (results.length === 0) return null;
+    return JSON.stringify({ results });
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Pobiera dane z oficjalnego API inventory Tesli (POST).
- * Zwraca JSON. Retry 3x, timeout 10s.
- * @throws Error przy nieudanym pobraniu
+ * Pobiera dane inventory Tesli. Najpierw POST do API, przy 403 – fallback ScrapingBee (TESLA_SCRAPINGBEE_KEY).
+ * Retry 3x, timeout 10s.
  */
 export async function fetchTeslaInventory(): Promise<string> {
   let lastError: Error | null = null;
@@ -82,18 +116,33 @@ export async function fetchTeslaInventory(): Promise<string> {
         validateStatus: () => true,
       });
 
-      if (res.status !== 200) {
-        const msg = `HTTP ${res.status} (próba ${attempt}/${MAX_RETRIES})`;
-        log(`Błąd API Tesli: ${msg}`);
-        lastError = new Error(msg);
-        if (attempt < MAX_RETRIES && (res.status === 403 || res.status >= 500)) {
-          await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-          continue;
+      if (res.status === 200) return res.data as string;
+
+      const msg = `HTTP ${res.status} (próba ${attempt}/${MAX_RETRIES})`;
+      log(`Błąd API Tesli: ${msg}`);
+      lastError = new Error(msg);
+
+      if (res.status === 403 && attempt === MAX_RETRIES) {
+        log("Próba fallback ScrapingBee...");
+        try {
+          const html = await fetchViaScrapingBee();
+          if (html) {
+            const cars = extractCarsFromHtml(html);
+            if (cars.length > 0) {
+              log("ScrapingBee OK – zwracam dane z HTML");
+              return JSON.stringify({ results: cars.map((c) => ({ VIN: c.id, Model: c.model, InventoryPrice: c.price, Url: c.link })) });
+            }
+          }
+        } catch (e) {
+          log("ScrapingBee nie powiódł się: " + (e instanceof Error ? e.message : String(e)));
         }
-        throw lastError;
       }
 
-      return res.data as string;
+      if (attempt < MAX_RETRIES && (res.status === 403 || res.status >= 500)) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      }
+      throw lastError;
     } catch (e) {
       const is403 = e instanceof AxiosError && e.response?.status === 403;
       const isNetwork = e instanceof AxiosError && !e.response;
@@ -110,6 +159,19 @@ export async function fetchTeslaInventory(): Promise<string> {
       if (shouldRetry) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       } else {
+        if (attempt === MAX_RETRIES && (is403 || isNetwork)) {
+          log("Próba fallback ScrapingBee...");
+          try {
+            const html = await fetchViaScrapingBee();
+            const json = html ? extractJsonFromHtml(html) : null;
+            if (json) {
+              log("ScrapingBee OK");
+              return json;
+            }
+          } catch {
+            // ignore
+          }
+        }
         throw lastError;
       }
     }
