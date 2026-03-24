@@ -28,6 +28,7 @@ export async function GET() {
       apiUrl: prod.apiUrl,
       token: maskToken(prod.token),
       refreshToken: maskToken(prod.refreshToken),
+      mcuToken: maskToken(prod.mcuToken),
       queryPath: prod.queryPath,
       sendPath: prod.sendPath,
       nip: prod.nip,
@@ -37,6 +38,7 @@ export async function GET() {
       apiUrl: test.apiUrl,
       token: maskToken(test.token),
       refreshToken: maskToken(test.refreshToken),
+      mcuToken: maskToken(test.mcuToken),
       queryPath: test.queryPath,
       sendPath: test.sendPath,
       nip: test.nip,
@@ -71,6 +73,7 @@ export async function PUT(req: NextRequest) {
         "apiUrl",
         "token",
         "refreshToken",
+        "mcuToken",
         "queryPath",
         "sendPath",
         "nip",
@@ -79,7 +82,7 @@ export async function PUT(req: NextRequest) {
       for (const k of keys) {
         const v = data[k];
         if (v !== undefined) {
-          if ((k === "token" || k === "refreshToken") && (v === "" || v === "********")) continue;
+          if ((k === "token" || k === "refreshToken" || k === "mcuToken") && (v === "" || v === "********")) continue;
           toSet[k] = String(v ?? "");
         }
       }

@@ -25,6 +25,8 @@ export type KsefSettingsData = {
   apiUrl: string;
   token: string;
   refreshToken: string;
+  /** Token z MCU (portalu KSeF) – długoterminowy, używany do automatycznego odnawiania sesji. */
+  mcuToken: string;
   queryPath: string;
   sendPath: string;
   nip: string;
@@ -35,6 +37,7 @@ const KSEF_KEYS = [
   "api_url",
   "token",
   "refresh_token",
+  "mcu_token",
   "query_path",
   "send_path",
   "nip",
@@ -60,6 +63,7 @@ export async function getKsefSettings(env?: KsefEnv): Promise<KsefSettingsData> 
       getSetting("ksef_api_url"),
       getSetting("ksef_token"),
       getSetting("ksef_refresh_token"),
+      getSetting("ksef_mcu_token"),
       getSetting("ksef_query_path"),
       getSetting("ksef_send_path"),
       getSetting("ksef_nip"),
@@ -73,10 +77,11 @@ export async function getKsefSettings(env?: KsefEnv): Promise<KsefSettingsData> 
     apiUrl: vals[0] ?? "",
     token: vals[1] ?? "",
     refreshToken: vals[2] ?? "",
-    queryPath: vals[3] ?? "",
-    sendPath: vals[4] ?? "",
-    nip: vals[5] ?? "",
-    invoicePdfPath: vals[6] ?? "",
+    mcuToken: vals[3] ?? "",
+    queryPath: vals[4] ?? "",
+    sendPath: vals[5] ?? "",
+    nip: vals[6] ?? "",
+    invoicePdfPath: vals[7] ?? "",
   };
 }
 
@@ -96,6 +101,7 @@ export async function setKsefSettings(env: KsefEnv, data: Partial<KsefSettingsDa
     "apiUrl",
     "token",
     "refreshToken",
+    "mcuToken",
     "queryPath",
     "sendPath",
     "nip",
@@ -105,6 +111,7 @@ export async function setKsefSettings(env: KsefEnv, data: Partial<KsefSettingsDa
     apiUrl: "api_url",
     token: "token",
     refreshToken: "refresh_token",
+    mcuToken: "mcu_token",
     queryPath: "query_path",
     sendPath: "send_path",
     nip: "nip",
@@ -113,7 +120,7 @@ export async function setKsefSettings(env: KsefEnv, data: Partial<KsefSettingsDa
   for (const k of keys) {
     if (data[k as keyof KsefSettingsData] !== undefined) {
       const val = data[k as keyof KsefSettingsData];
-      if ((k === "token" || k === "refreshToken") && (val === "" || val === "********")) continue;
+      if ((k === "token" || k === "refreshToken" || k === "mcuToken") && (val === "" || val === "********")) continue;
       await setSetting(ksefKey(env, keyMap[k]!), String(val ?? ""));
     }
   }

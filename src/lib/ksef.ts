@@ -5,6 +5,7 @@
  */
 
 import { getKsefSettings, setKsefSettings, getKsefActiveEnv, getCompanySettings, type KsefEnv } from "./settings";
+import { loginWithMcuToken } from "./ksef-auth";
 
 const DEFAULT_API_URL = "https://api.ksef.mf.gov.pl";
 
@@ -205,39 +206,71 @@ export async function isKsefConfigured(env?: KsefEnv): Promise<boolean> {
 /**
  * Odświeża token dostępu KSEF za pomocą refresh tokena (KSEF 2.0: POST /v2/auth/token/refresh).
  * Zapisuje nowy access token (i ewentualnie nowy refresh token) w ustawieniach dla danego env.
- * Zwraca nowy access token lub null przy braku refresh tokena / błędzie.
+ * Gdy refresh token też wygasł – automatycznie loguje się ponownie za pomocą zapisanego tokena MCU.
+ * Zwraca nowy access token lub null przy braku możliwości odświeżenia.
  */
 export async function refreshKsefAccessToken(env?: KsefEnv): Promise<string | null> {
   const targetEnv = env ?? (await getKsefActiveEnv());
   const s = await getKsefSettings(targetEnv);
   const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+
+  // Próba 1: refresh token
   const refreshToken = (s.refreshToken || "").trim();
-  if (!refreshToken) return null;
-  const refreshForHeader = tokenSafeForHeader(refreshToken);
-  if (!refreshForHeader) return null;
-  try {
-    const url = `${apiUrl}/v2/auth/token/refresh`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${refreshForHeader}`,
-      },
-    });
-    if (!res.ok) return null;
-    const text = await res.text();
-    const data = JSON.parse(text) as {
-      accessToken?: { token?: string; validUntil?: string };
-      refreshToken?: { token?: string; validUntil?: string };
-    };
-    const newAccess = data.accessToken?.token;
-    const newRefresh = data.refreshToken?.token;
-    if (!newAccess) return null;
-    await setKsefSettings(targetEnv, { token: newAccess, ...(newRefresh ? { refreshToken: newRefresh } : {}) });
-    return newAccess;
-  } catch {
-    return null;
+  if (refreshToken) {
+    const refreshForHeader = tokenSafeForHeader(refreshToken);
+    if (refreshForHeader) {
+      try {
+        const url = `${apiUrl}/v2/auth/token/refresh`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${refreshForHeader}`,
+          },
+        });
+        if (res.ok) {
+          const text = await res.text();
+          const data = JSON.parse(text) as {
+            accessToken?: { token?: string; validUntil?: string };
+            refreshToken?: { token?: string; validUntil?: string };
+          };
+          const newAccess = data.accessToken?.token;
+          const newRefresh = data.refreshToken?.token;
+          if (newAccess) {
+            await setKsefSettings(targetEnv, { token: newAccess, ...(newRefresh ? { refreshToken: newRefresh } : {}) });
+            return newAccess;
+          }
+        }
+      } catch {
+        // refresh nie zadziałał – próbujemy MCU poniżej
+      }
+    }
   }
+
+  // Próba 2: automatyczne ponowne logowanie za pomocą tokena MCU
+  return reloginWithMcuToken(targetEnv);
+}
+
+/**
+ * Loguje się ponownie do KSeF za pomocą zapisanego tokena MCU (challenge → encrypt → redeem).
+ * Zapisuje nowe tokeny (access + refresh) w ustawieniach.
+ */
+async function reloginWithMcuToken(env: KsefEnv): Promise<string | null> {
+  const s = await getKsefSettings(env);
+  const apiUrl = (s.apiUrl || process.env.KSEF_API_URL || DEFAULT_API_URL).replace(/\/$/, "");
+  const mcuToken = (s.mcuToken || "").trim();
+  const nip = (s.nip || "").trim();
+
+  if (!mcuToken || !nip) return null;
+
+  const result = await loginWithMcuToken(apiUrl, mcuToken, nip);
+  if (!result.ok || !result.accessToken) return null;
+
+  await setKsefSettings(env, {
+    token: result.accessToken,
+    ...(result.refreshToken ? { refreshToken: result.refreshToken } : {}),
+  });
+  return result.accessToken;
 }
 
 /**
