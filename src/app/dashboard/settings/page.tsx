@@ -7,6 +7,7 @@ type KsefSettings = {
   apiUrl: string;
   token: string;
   refreshToken: string;
+  mcuToken: string;
   queryPath: string;
   sendPath: string;
   nip: string;
@@ -52,6 +53,7 @@ const emptyKsef: KsefSettings = {
   apiUrl: "",
   token: "",
   refreshToken: "",
+  mcuToken: "",
   queryPath: "",
   sendPath: "",
   nip: "",
@@ -1214,14 +1216,15 @@ export default function SettingsPage() {
                       setLoginLoadingFor(env);
                       try {
                         const nip10 = ksef.nip.replace(/\D/g, "");
+                        const mcuTokenToSave = ksef.token.trim();
                         const res = await fetch("/api/ksef/login-token", {
                           method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: ksef.token, nip: nip10 }),
+                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: mcuTokenToSave, nip: nip10 }),
                         });
                         const data = await res.json().catch(() => ({}));
                         if (data.ok === true && data.accessToken) {
-                          const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
-                          setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          const updated = { ...ksef, token: data.accessToken, mcuToken: mcuTokenToSave, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
+                          setKsef((s) => ({ ...s, token: data.accessToken, mcuToken: mcuTokenToSave, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
                           if (env === "test") setKsefActiveEnv("test");
                           const saveRes = await fetch("/api/settings/ksef", {
                             method: "PUT", headers: { "Content-Type": "application/json" },
@@ -1274,14 +1277,15 @@ export default function SettingsPage() {
                       setRedeemResult(null); setTestResult(null); setLoginResult(null);
                       setRedeemingFor(env);
                       try {
+                        const mcuTokenToSave = ksef.token.trim();
                         const res = await fetch("/api/ksef/redeem-token", {
                           method: "POST", headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: ksef.token }),
+                          body: JSON.stringify({ apiUrl: ksef.apiUrl || defaultUrl, token: mcuTokenToSave }),
                         });
                         const data = await res.json().catch(() => ({}));
                         if (data.ok === true && data.accessToken) {
-                          const updated = { ...ksef, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
-                          setKsef((s) => ({ ...s, token: data.accessToken, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
+                          const updated = { ...ksef, token: data.accessToken, mcuToken: mcuTokenToSave, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) };
+                          setKsef((s) => ({ ...s, token: data.accessToken, mcuToken: mcuTokenToSave, ...(data.refreshToken ? { refreshToken: data.refreshToken } : {}) }));
                           if (env === "test") setKsefActiveEnv("test");
                           const saveRes = await fetch("/api/settings/ksef", {
                             method: "PUT", headers: { "Content-Type": "application/json" },
