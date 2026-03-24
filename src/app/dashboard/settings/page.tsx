@@ -163,6 +163,7 @@ export default function SettingsPage() {
           apiUrl: (d.apiUrl as string) ?? "",
           token: (d.token as string) === "********" ? "" : ((d.token as string) ?? ""),
           refreshToken: (d.refreshToken as string) === "********" ? "" : ((d.refreshToken as string) ?? ""),
+          mcuToken: (d.mcuToken as string) === "********" ? "" : ((d.mcuToken as string) ?? ""),
           queryPath: (d.queryPath as string) ?? "",
           sendPath: (d.sendPath as string) ?? "",
           nip: (d.nip as string) ?? "",
