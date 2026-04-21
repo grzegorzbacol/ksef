@@ -371,6 +371,10 @@ function formatDatePl(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
+function formatMoney(value: number): string {
+  return value.toFixed(2).replace(".", ",");
+}
+
 function splitLines(doc: jsPDF, text: string, x: number, y: number, maxWidth: number, fontSize: number): number {
   const font = doc.getFont();
   const lines = doc.splitTextToSize(text, maxWidth);
@@ -384,237 +388,245 @@ function splitLines(doc: jsPDF, text: string, x: number, y: number, maxWidth: nu
 
 export async function generatePdfFromFaData(data: FaInvoiceData): Promise<ArrayBuffer> {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 18;
+  const margin = 14;
   const pageW = 210;
-  const col1 = margin;
-  const col2 = 105;
+  const pageH = 297;
+  const contentW = pageW - margin * 2;
   let y = margin;
   const lineH = 5;
-  const sectionGap = 6;
   const labelSize = 8;
   const valueSize = 9;
-  const titleSize = 14;
+  const titleSize = 17;
+  const muted = [95, 95, 95] as const;
+  const primary = [24, 40, 72] as const;
 
   const base64 = await getUnicodeFontBase64();
   doc.addFileToVFS("DejaVuSans.ttf", base64);
   doc.addFont("DejaVuSans.ttf", "DejaVu", "normal");
   doc.setFont("DejaVu", "normal");
 
-  function label(t: string): void {
-    doc.setFontSize(labelSize);
-    doc.setFont("DejaVu", "normal");
-    doc.setTextColor(60, 60, 60);
-    doc.text(t, col1, y);
-    y += lineH * 0.9;
-  }
-  function value(t: string, opts?: { col?: number; wrap?: number }): void {
-    doc.setFontSize(valueSize);
-    doc.setFont("DejaVu", "normal");
-    doc.setTextColor(0, 0, 0);
-    const x = opts?.col ?? col1;
-    const wrap = opts?.wrap ?? (pageW - margin - x);
-    if (opts?.wrap) {
-      y = splitLines(doc, t, x, y, wrap, valueSize);
-    } else {
-      doc.text(t, x, y);
-      y += lineH;
+  function ensurePageSpace(space: number): void {
+    if (y + space > pageH - margin) {
+      doc.addPage();
+      y = margin;
     }
   }
-  function sectionTitle(t: string): void {
-    y += sectionGap;
+
+  function sectionTitle(title: string): void {
+    ensurePageSpace(12);
     doc.setFontSize(10);
-    doc.setFont("DejaVu", "normal");
+    doc.setTextColor(...primary);
+    doc.text(title.toUpperCase(), margin, y);
+    y += 2;
+    doc.setDrawColor(210, 218, 232);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y + 1, pageW - margin, y + 1);
+    y += 7;
+  }
+
+  function writeBlockLabelValue(
+    label: string,
+    val: string,
+    x: number,
+    maxWidth: number,
+    opts?: { valueOffset?: number }
+  ): number {
+    const valueOffset = opts?.valueOffset ?? 24;
+    const labelX = x;
+    const valueX = x + valueOffset;
+    doc.setFontSize(labelSize);
+    doc.setTextColor(...muted);
+    doc.text(label, labelX, y);
+    doc.setFontSize(valueSize);
     doc.setTextColor(0, 0, 0);
-    doc.text(t, col1, y);
-    y += lineH + 2;
+    const lines = doc.splitTextToSize(val || "—", Math.max(10, maxWidth - valueOffset));
+    doc.text(lines, valueX, y);
+    return Math.max(lineH, lines.length * 3.8);
+  }
+
+  function drawPartyCard(title: string, lines: Array<{ label: string; value?: string }>, x: number, width: number): number {
+    const top = y;
+    doc.setFillColor(247, 249, 253);
+    doc.setDrawColor(223, 229, 239);
+    doc.roundedRect(x, top, width, 40, 1.5, 1.5, "FD");
+    let cardY = top + 6;
+    doc.setFontSize(9);
+    doc.setTextColor(...primary);
+    doc.text(title, x + 3, cardY);
+    cardY += 5;
+    const oldY = y;
+    y = cardY;
+    lines.forEach((entry) => {
+      const h = writeBlockLabelValue(entry.label, entry.value || "—", x + 3, width - 6);
+      y += h;
+    });
+    const used = y - top;
+    y = oldY;
+    return Math.max(40, used + 4);
   }
 
   doc.setFontSize(titleSize);
-  doc.setFont("DejaVu", "normal");
-  doc.text("Faktura " + data.number, col1, y);
-  y += lineH + 6;
+  doc.setTextColor(...primary);
+  doc.text("FAKTURA VAT", margin, y);
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Nr: ${data.number}`, margin, y + 6);
+  doc.setFontSize(9);
+  doc.setTextColor(...muted);
+  doc.text(`Data wystawienia: ${data.issueDate ? formatDatePl(data.issueDate) : "—"}`, pageW - margin, y, { align: "right" });
+  doc.text(`Data sprzedaży: ${data.saleDate ? formatDatePl(data.saleDate) : "—"}`, pageW - margin, y + 5, { align: "right" });
+  y += 14;
 
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(col1, y, pageW - margin, y);
-  y += sectionGap;
+  sectionTitle("Strony transakcji");
+  const colGap = 4;
+  const cardW = (contentW - colGap) / 2;
+  const leftH = drawPartyCard(
+    "Sprzedawca",
+    [
+      { label: "Nazwa:", value: data.sellerName },
+      { label: "NIP:", value: data.sellerNip },
+      { label: "Adres:", value: data.sellerAddress || data.sellerCorrespondenceAddress || "—" },
+      { label: "Kontakt:", value: data.sellerContact || "—" },
+    ],
+    margin,
+    cardW
+  );
+  const rightH = drawPartyCard(
+    "Nabywca",
+    [
+      { label: "Nazwa:", value: data.buyerName },
+      { label: "NIP:", value: data.buyerNip },
+      { label: "Adres:", value: data.buyerAddress || data.buyerCorrespondenceAddress || "—" },
+      { label: "Kontakt:", value: data.buyerContact || "—" },
+    ],
+    margin + cardW + colGap,
+    cardW
+  );
+  y += Math.max(leftH, rightH) + 3;
 
-  sectionTitle("Sprzedawca");
-  label("Nazwa:");
-  value(data.sellerName, { wrap: 85 });
-  label("NIP:");
-  value(data.sellerNip);
-  if (data.sellerAddress) {
-    label("Adres:");
-    value(data.sellerAddress, { wrap: 85 });
-  }
-  if (data.sellerCorrespondenceAddress) {
-    label("Adres do korespondencji:");
-    value(data.sellerCorrespondenceAddress, { wrap: 85 });
-  }
-  if (data.sellerContact) {
-    label("Dane kontaktowe:");
-    value(data.sellerContact, { wrap: 85 });
-  }
-
-  y += 2;
-  sectionTitle("Nabywca");
-  label("NIP:");
-  value(data.buyerNip);
-  label("Nazwa:");
-  value(data.buyerName, { wrap: 85 });
-  if (data.buyerAddress) {
-    label("Adres:");
-    value(data.buyerAddress, { wrap: 85 });
-  }
-  if (data.buyerCorrespondenceAddress) {
-    label("Adres do korespondencji:");
-    value(data.buyerCorrespondenceAddress, { wrap: 85 });
-  }
-  if (data.buyerContact) {
-    label("Dane kontaktowe:");
-    value(data.buyerContact, { wrap: 85 });
-  }
-  if (data.customerNumber) {
-    label("Numer klienta:");
-    value(data.customerNumber);
-  }
-
-  y += 2;
-  sectionTitle("Szczegóły");
-  label("Data wystawienia:");
-  value(data.issueDate ? formatDatePl(data.issueDate) : "—");
-  if (data.saleDate) {
-    label("Data sprzedaży:");
-    value(formatDatePl(data.saleDate));
-  }
-  if (data.dateFrom || data.dateTo) {
-    label("Data dostawy:");
-    value([data.dateFrom ? formatDatePl(data.dateFrom) : "", data.dateTo ? formatDatePl(data.dateTo) : ""].filter(Boolean).join(" – ") || "—");
-  }
-
-  y += 2;
-  sectionTitle("Pozycje");
-  value("Faktura wystawiona w cenach netto w walucie " + data.currency + ".", { wrap: 170 });
-  y += 3;
-
-  const tableCols = [12, 72, 18, 14, 12, 14, 22, 18];
-  const headers = ["Lp.", "Nazwa towaru lub usługi", "Cena jedn. netto", "Ilość", "Miara", "Stawka", "Wartość netto", "Wartość VAT"];
+  sectionTitle("Pozycje faktury");
   doc.setFontSize(8);
-  doc.setFont("DejaVu", "normal");
-  let x = col1;
-  headers.forEach((h, i) => {
-    doc.text(h, x, y);
-    x += tableCols[i];
-  });
-  y += lineH + 1;
-  doc.setFont("DejaVu", "normal");
+  doc.setTextColor(...muted);
+  doc.text(`Waluta dokumentu: ${data.currency}`, margin, y);
+  y += 5;
+
+  const tableCols = [10, 68, 17, 14, 12, 14, 20, 20];
+  const headers = ["Lp.", "Nazwa towaru lub usługi", "Cena netto", "Ilość", "Jm", "VAT", "Wartość netto", "Wartość VAT"];
+  const drawTableHeader = () => {
+    doc.setFillColor(239, 244, 253);
+    doc.setDrawColor(213, 222, 239);
+    doc.rect(margin, y - 4, contentW, 7, "FD");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...primary);
+    let x = margin + 1;
+    headers.forEach((h, i) => {
+      doc.text(h, x, y);
+      x += tableCols[i];
+    });
+    y += 5;
+  };
+  drawTableHeader();
 
   data.items.forEach((it, idx) => {
-    if (y > 265) {
+    const nameLines = doc.splitTextToSize(it.name || "—", tableCols[1] - 2);
+    const rowH = Math.max(6, nameLines.length * 3.5 + 1.5);
+    if (y + rowH > pageH - margin - 22) {
       doc.addPage();
       y = margin;
-      doc.setFont("DejaVu", "normal");
-      doc.setFontSize(valueSize);
+      drawTableHeader();
     }
-    x = col1;
+    doc.setDrawColor(233, 233, 233);
+    doc.rect(margin, y - 3.5, contentW, rowH, "S");
+    let x = margin + 1;
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
     doc.text(String(idx + 1), x, y);
     x += tableCols[0];
-    const nameLines = doc.splitTextToSize(it.name || "—", tableCols[1] - 2);
-    doc.text(nameLines[0], x, y);
-    if (nameLines.length > 1) doc.text(nameLines.slice(1).join(" "), x, y + 3.5);
+    doc.text(nameLines, x, y);
     x += tableCols[1];
-    doc.text(it.unitPriceNet.toFixed(2), x, y);
+    doc.text(formatMoney(it.unitPriceNet), x + tableCols[2] - 2, y, { align: "right" });
     x += tableCols[2];
-    doc.text(it.quantity, x, y);
+    doc.text(it.quantity, x + tableCols[3] - 2, y, { align: "right" });
     x += tableCols[3];
-    doc.text(it.unit, x, y);
+    doc.text(it.unit, x + tableCols[4] - 2, y, { align: "right" });
     x += tableCols[4];
-    doc.text(it.taxRate, x, y);
+    doc.text(it.taxRate, x + tableCols[5] - 2, y, { align: "right" });
     x += tableCols[5];
-    doc.text(it.net.toFixed(2), x, y);
+    doc.text(formatMoney(it.net), x + tableCols[6] - 2, y, { align: "right" });
     x += tableCols[6];
-    doc.text(it.vat.toFixed(2), x, y);
-    y += nameLines.length > 1 ? lineH + 4 : lineH + 1;
+    doc.text(formatMoney(it.vat), x + tableCols[7] - 2, y, { align: "right" });
+    y += rowH;
   });
 
-  y += 4;
-  doc.setFont("DejaVu", "normal");
-  doc.setFontSize(valueSize);
-  doc.text("Kwota należności ogółem: " + data.grossAmount.toFixed(2) + " " + data.currency, col1, y);
-  y += lineH + 4;
+  y += 5;
+  ensurePageSpace(30);
+  const summaryW = 82;
+  const summaryX = pageW - margin - summaryW;
+  doc.setFillColor(247, 249, 253);
+  doc.setDrawColor(223, 229, 239);
+  doc.roundedRect(summaryX, y - 2, summaryW, 22, 1.5, 1.5, "FD");
+  doc.setTextColor(...muted);
+  doc.setFontSize(8);
+  doc.text("Razem netto:", summaryX + 3, y + 3);
+  doc.text("Razem VAT:", summaryX + 3, y + 9);
+  doc.text("Do zapłaty:", summaryX + 3, y + 16);
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${formatMoney(data.netAmount)} ${data.currency}`, summaryX + summaryW - 3, y + 3, { align: "right" });
+  doc.text(`${formatMoney(data.vatAmount)} ${data.currency}`, summaryX + summaryW - 3, y + 9, { align: "right" });
+  doc.setTextColor(...primary);
+  doc.setFontSize(10);
+  doc.text(`${formatMoney(data.grossAmount)} ${data.currency}`, summaryX + summaryW - 3, y + 16, { align: "right" });
+  y += 24;
 
   if (data.taxSummary && data.taxSummary.length > 0) {
     sectionTitle("Podsumowanie stawek podatku");
-    const sumCols = [25, 35, 35, 35];
-    doc.setFont("DejaVu", "normal");
+    const sumCols = [30, 35, 35, 35];
     doc.setFontSize(8);
-    doc.text("Stawka", col1, y);
-    doc.text("Kwota netto", col1 + sumCols[0], y);
-    doc.text("Kwota podatku", col1 + sumCols[0] + sumCols[1], y);
-    doc.text("Kwota brutto", col1 + sumCols[0] + sumCols[1] + sumCols[2], y);
+    doc.setTextColor(...muted);
+    doc.text("Stawka", margin, y);
+    doc.text("Kwota netto", margin + sumCols[0], y);
+    doc.text("Kwota podatku", margin + sumCols[0] + sumCols[1], y);
+    doc.text("Kwota brutto", margin + sumCols[0] + sumCols[1] + sumCols[2], y);
     y += lineH;
-    doc.setFont("DejaVu", "normal");
+    doc.setTextColor(0, 0, 0);
     data.taxSummary.forEach((row) => {
-      doc.text(row.rate, col1, y);
-      doc.text(row.net.toFixed(2), col1 + sumCols[0], y);
-      doc.text(row.vat.toFixed(2), col1 + sumCols[0] + sumCols[1], y);
-      doc.text(row.gross.toFixed(2), col1 + sumCols[0] + sumCols[1] + sumCols[2], y);
+      doc.text(row.rate, margin, y);
+      doc.text(formatMoney(row.net), margin + sumCols[0] + sumCols[1] - 3, y, { align: "right" });
+      doc.text(formatMoney(row.vat), margin + sumCols[0] + sumCols[1] + sumCols[2] - 3, y, { align: "right" });
+      doc.text(formatMoney(row.gross), margin + sumCols[0] + sumCols[1] + sumCols[2] + sumCols[3] - 3, y, { align: "right" });
       y += lineH;
     });
-    y += 2;
+    y += 3;
   }
 
-  if (data.paymentForm || data.paymentDueDate || data.bankAccount) {
+  const paymentEntries = [
+    data.paymentInfo ? `Informacja: ${data.paymentInfo}` : "",
+    data.paymentForm ? `Forma: ${data.paymentForm}` : "",
+    data.paymentDueDate ? `Termin: ${formatDatePl(data.paymentDueDate)}` : "",
+    data.bankAccount ? `Rachunek: ${data.bankAccount}` : "",
+    data.swift ? `SWIFT: ${data.swift}` : "",
+    data.bankName ? `Bank: ${data.bankName}` : "",
+  ].filter(Boolean);
+  if (paymentEntries.length > 0) {
     sectionTitle("Płatność");
-    if (data.paymentInfo) {
-      label("Informacja o płatności:");
-      value(data.paymentInfo);
-    }
-    if (data.paymentForm) {
-      label("Forma płatności:");
-      value(data.paymentForm);
-    }
-    if (data.paymentDueDate) {
-      label("Termin płatności:");
-      value(formatDatePl(data.paymentDueDate));
-    }
-    if (data.bankAccount) {
-      label("Numer rachunku bankowego:");
-      value(data.bankAccount);
-    }
-    if (data.swift) {
-      label("Kod SWIFT:");
-      value(data.swift);
-    }
-    if (data.bankName) {
-      label("Nazwa banku:");
-      value(data.bankName);
-    }
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    y = splitLines(doc, paymentEntries.join("\n"), margin, y, contentW, 9) + 1;
   }
 
-  if (data.contractNumber) {
-    sectionTitle("Warunki transakcji");
-    label("Numer umowy:");
-    value(data.contractNumber);
-  }
-
-  if (data.krs || data.regon) {
-    sectionTitle("Rejestry");
-    if (data.sellerName) value("Pełna nazwa: " + data.sellerName);
-    if (data.krs) value("KRS: " + data.krs);
-    if (data.regon) value("REGON: " + data.regon);
-  }
-
-  if (data.ksefNumber || data.ksefVerificationUrl) {
-    sectionTitle("KSeF");
-    if (data.ksefNumber) value("Numer KSeF: " + data.ksefNumber);
-    if (data.ksefVerificationUrl) value("Link weryfikacyjny: " + data.ksefVerificationUrl);
-  }
-
-  if (data.footerNote) {
-    sectionTitle("Stopka faktury");
-    value(data.footerNote, { wrap: 170 });
+  const infoLines = [
+    data.contractNumber ? `Numer umowy: ${data.contractNumber}` : "",
+    data.krs ? `KRS: ${data.krs}` : "",
+    data.regon ? `REGON: ${data.regon}` : "",
+    data.ksefNumber ? `Numer KSeF: ${data.ksefNumber}` : "",
+    data.ksefVerificationUrl ? `Link weryfikacyjny: ${data.ksefVerificationUrl}` : "",
+    data.footerNote ? `Uwagi: ${data.footerNote}` : "",
+  ].filter(Boolean);
+  if (infoLines.length > 0) {
+    sectionTitle("Dodatkowe informacje");
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    y = splitLines(doc, infoLines.join("\n"), margin, y, contentW, 9);
   }
 
   return doc.output("arraybuffer") as ArrayBuffer;
