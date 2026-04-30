@@ -55,8 +55,13 @@ type InvoiceWithItems = {
   }>;
 };
 
+type BuildFa2XmlOptions = {
+  /** Pozwala wygenerować XML podglądowy bez blokady NrRB (np. "Pobierz XML"). */
+  skipBankAccountRequirement?: boolean;
+};
+
 /** Generuje minimalny FA(3) XML zgodny ze schematem (obowiązuje od 1.02.2026). Wymaga paymentDueDate. */
-export function buildFa2Xml(inv: InvoiceWithItems): string {
+export function buildFa2Xml(inv: InvoiceWithItems, options?: BuildFa2XmlOptions): string {
   const paymentDue = inv.paymentDueDate
     ? typeof inv.paymentDueDate === "string"
       ? inv.paymentDueDate.slice(0, 10)
@@ -80,7 +85,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   const sellerBankAccount = String(inv.sellerBankAccount ?? "").replace(/\s/g, "");
   const isPlnVatWithNipsOverLimit =
     curr.toUpperCase() === "PLN" && gross >= 15000 && nipS.length === 10 && nipB.length === 10;
-  if (isPlnVatWithNipsOverLimit && !sellerBankAccount) {
+  if (!options?.skipBankAccountRequirement && isPlnVatWithNipsOverLimit && !sellerBankAccount) {
     throw new Error(
       "Dla faktury VAT w PLN z kwotą brutto co najmniej 15 000 zł i NIP nabywcy wymagany jest numer rachunku bankowego (NrRB). Uzupełnij go w Ustawieniach firmy."
     );

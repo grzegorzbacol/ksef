@@ -37,8 +37,9 @@ export async function GET(
       sellerAddress: company.address || null,
       sellerPostalCode: company.postalCode || null,
       sellerCity: company.city || null,
+      sellerBankAccount: company.bankAccount || null,
     };
-    const xml = buildFa2Xml(inv);
+    const xml = buildFa2Xml(inv, { skipBankAccountRequirement: true });
     return new NextResponse(xml, {
       headers: {
         "Content-Type": "application/xml; charset=utf-8",
