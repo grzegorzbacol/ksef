@@ -132,6 +132,7 @@ export type CompanySettings = {
   address: string;
   postalCode: string;
   city: string;
+  bankAccount: string;
   /** Stawka PIT – skala (0.12 lub 0.32) */
   pitRate: number;
   /** Stawka składki zdrowotnej (domyślnie 0.09) */
@@ -146,6 +147,7 @@ const COMPANY_KEYS = [
   "company_address",
   "company_postal_code",
   "company_city",
+  "company_bank_account",
   "company_pit_rate",
   "company_health_rate",
   "company_is_vat_payer",
@@ -163,12 +165,13 @@ function parseCompanyBool(val: string | null, defaultVal: boolean): boolean {
 }
 
 export async function getCompanySettings(): Promise<CompanySettings> {
-  const [name, nip, address, postalCode, city, pitRate, healthRate, isVatPayer] = await Promise.all([
+  const [name, nip, address, postalCode, city, bankAccount, pitRate, healthRate, isVatPayer] = await Promise.all([
     getSetting("company_name"),
     getSetting("company_nip"),
     getSetting("company_address"),
     getSetting("company_postal_code"),
     getSetting("company_city"),
+    getSetting("company_bank_account"),
     getSetting("company_pit_rate"),
     getSetting("company_health_rate"),
     getSetting("company_is_vat_payer"),
@@ -179,6 +182,7 @@ export async function getCompanySettings(): Promise<CompanySettings> {
     address: address?.trim() || "",
     postalCode: postalCode?.trim() || "",
     city: city?.trim() || "",
+    bankAccount: bankAccount?.trim() || "",
     pitRate: parseCompanyNum(pitRate ?? null, 0.12),
     healthRate: parseCompanyNum(healthRate ?? null, 0.09),
     isVatPayer: parseCompanyBool(isVatPayer ?? null, true),
@@ -192,6 +196,7 @@ export async function setCompanySettings(data: CompanySettings): Promise<void> {
     data.address ?? "",
     data.postalCode ?? "",
     data.city ?? "",
+    data.bankAccount ?? "",
     String(data.pitRate ?? 0.12),
     String(data.healthRate ?? 0.09),
     data.isVatPayer !== false ? "true" : "false",

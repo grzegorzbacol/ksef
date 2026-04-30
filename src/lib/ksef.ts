@@ -442,6 +442,7 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
       paymentDueDate?: Date | string | null;
       sellerName: string; sellerNip: string; buyerName: string; buyerNip: string;
       netAmount: number; vatAmount: number; grossAmount: number; currency: string;
+      sellerBankAccount?: string | null;
       items?: Array<{ name: string; quantity: number; unit: string; unitPriceNet: number; amountNet: number; amountVat: number; vatRate: number }>;
     };
     if (!invData.paymentDueDate) {
@@ -466,6 +467,7 @@ export async function sendInvoiceToKsef(invoice: unknown, env?: KsefEnv): Promis
         sellerAddress: company.address || null,
         sellerPostalCode: company.postalCode || null,
         sellerCity: company.city || null,
+        sellerBankAccount: company.bankAccount || null,
       };
       let result = await sendInvoiceToKsefV2(apiUrl, tokenForHeader, inv);
       if (!result.success && result.error?.includes("401") && (await refreshKsefAccessToken(targetEnv))) {

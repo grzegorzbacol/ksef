@@ -42,6 +42,8 @@ type InvoiceWithItems = {
   buyerCity?: string | null;
   /** Termin płatności – wymagany przy wysyłce do KSeF */
   paymentDueDate: Date | string | null;
+  /** Numer rachunku bankowego sprzedawcy do sekcji Platnosc/NrRB */
+  sellerBankAccount?: string | null;
   items?: Array<{
     name: string;
     quantity: number;
@@ -74,6 +76,15 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
   if (nipS.length !== 10) throw new Error("NIP sprzedawcy musi mieć 10 cyfr.");
   if (nipB.length !== 10) throw new Error("NIP nabywcy jest wymagany i musi mieć 10 cyfr. Uzupełnij dane nabywcy w fakturze.");
   const curr = (inv.currency ?? "PLN").trim() || "PLN";
+  const gross = Number(inv.grossAmount) || 0;
+  const sellerBankAccount = String(inv.sellerBankAccount ?? "").replace(/\s/g, "");
+  const isPlnVatWithNipsOverLimit =
+    curr.toUpperCase() === "PLN" && gross >= 15000 && nipS.length === 10 && nipB.length === 10;
+  if (isPlnVatWithNipsOverLimit && !sellerBankAccount) {
+    throw new Error(
+      "Dla faktury VAT w PLN z kwotą brutto co najmniej 15 000 zł i NIP nabywcy wymagany jest numer rachunku bankowego (NrRB). Uzupełnij go w Ustawieniach firmy."
+    );
+  }
 
   const fullAddr = (
     addr: string | null | undefined,
@@ -147,7 +158,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
     <P_6>${saleDate}</P_6>
     <P_13_1>${(Number(inv.netAmount) || 0).toFixed(2)}</P_13_1>
     <P_14_1>${(Number(inv.vatAmount) || 0).toFixed(2)}</P_14_1>
-    <P_15>${(Number(inv.grossAmount) || 0).toFixed(2)}</P_15>
+    <P_15>${gross.toFixed(2)}</P_15>
     <Adnotacje>
       <P_16>2</P_16>
       <P_17>2</P_17>
@@ -170,6 +181,7 @@ export function buildFa2Xml(inv: InvoiceWithItems): string {
       <TerminPlatnosci>
         <Termin>${paymentDue}</Termin>
       </TerminPlatnosci>
+      ${sellerBankAccount ? `<RachunekBankowy><NrRB>${escXml(sellerBankAccount)}</NrRB></RachunekBankowy>` : ""}
     </Platnosc>
   </Fa>
 </Faktura>`;

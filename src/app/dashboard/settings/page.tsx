@@ -20,6 +20,7 @@ type CompanySettings = {
   address: string;
   postalCode: string;
   city: string;
+  bankAccount: string;
   pitRate: number;
   healthRate: number;
   isVatPayer: boolean;
@@ -66,6 +67,7 @@ const emptyCompany: CompanySettings = {
   address: "",
   postalCode: "",
   city: "",
+  bankAccount: "",
   pitRate: 0.12,
   healthRate: 0.09,
   isVatPayer: true,
@@ -178,6 +180,7 @@ export default function SettingsPage() {
           address: companyData.address ?? "",
           postalCode: companyData.postalCode ?? "",
           city: companyData.city ?? "",
+          bankAccount: companyData.bankAccount ?? "",
           pitRate: companyData.pitRate != null ? Number(companyData.pitRate) : 0.12,
           healthRate: companyData.healthRate != null ? Number(companyData.healthRate) : 0.09,
           isVatPayer: companyData.isVatPayer !== false && String(companyData.isVatPayer) !== "false",
@@ -488,6 +491,19 @@ export default function SettingsPage() {
                 className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm text-content-text-secondary mb-1">Numer rachunku bankowego</label>
+            <input
+              type="text"
+              value={company.bankAccount}
+              onChange={(e) => setCompany((s) => ({ ...s, bankAccount: e.target.value }))}
+              placeholder="np. PL61109010140000071219812874 lub 26109010140000071219812874"
+              className="w-full rounded-lg border border-content-border bg-white px-3 py-2 text-content-text"
+            />
+            <p className="mt-1 text-xs text-content-text-secondary">
+              Używany do pola NrRB przy wysyłce do KSeF (wymagany m.in. dla faktur VAT w PLN od 15 000 PLN brutto).
+            </p>
           </div>
           <div className="border-t border-content-border pt-4 mt-4">
             <h3 className="font-medium mb-2 text-content-text">Korzyści podatkowe (faktury zakupu)</h3>

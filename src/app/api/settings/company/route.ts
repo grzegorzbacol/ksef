@@ -24,6 +24,7 @@ export async function PUT(req: NextRequest) {
     address: String(body.address ?? "").trim(),
     postalCode: String(body.postalCode ?? "").trim(),
     city: String(body.city ?? "").trim(),
+    bankAccount: String(body.bankAccount ?? "").trim(),
     pitRate: pitRate === 0.32 ? 0.32 : 0.12,
     healthRate: Number.isNaN(healthRate) ? 0.09 : Math.max(0, Math.min(1, healthRate)),
     isVatPayer,
