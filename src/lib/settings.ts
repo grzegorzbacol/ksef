@@ -1,13 +1,8 @@
 import { prisma } from "./prisma";
 
-const CACHE: Record<string, string> = {};
-
 export async function getSetting(key: string): Promise<string | null> {
-  if (CACHE[key] !== undefined) return CACHE[key] || null;
   const row = await prisma.setting.findUnique({ where: { key } });
-  const val = row?.value ?? null;
-  CACHE[key] = val ?? "";
-  return val;
+  return row?.value ?? null;
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
@@ -16,7 +11,6 @@ export async function setSetting(key: string, value: string): Promise<void> {
     create: { key, value },
     update: { value },
   });
-  CACHE[key] = value;
 }
 
 export type KsefEnv = "test" | "prod";
