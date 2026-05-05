@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
   let baseData: {
     issueDate: string;
     saleDate?: string;
+    paymentDueDate?: string | null;
     sellerName: string;
     sellerNip: string;
     buyerName: string;
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest) {
     baseData = {
       issueDate: data.issueDate,
       saleDate: data.saleDate,
+      paymentDueDate: data.paymentDueDate ?? (original.paymentDueDate ? original.paymentDueDate.toISOString().slice(0, 10) : null),
       sellerName: original.sellerName,
       sellerNip: original.sellerNip,
       buyerName: original.buyerName,
@@ -188,6 +190,7 @@ export async function POST(req: NextRequest) {
     baseData = {
       issueDate: data.issueDate,
       saleDate: data.saleDate,
+      paymentDueDate: data.paymentDueDate ?? null,
       sellerName: data.sellerName!,
       sellerNip: data.sellerNip!,
       buyerName: data.buyerName!,
@@ -280,7 +283,7 @@ export async function POST(req: NextRequest) {
         number,
         issueDate,
         saleDate: baseData.saleDate ? new Date(baseData.saleDate) : null,
-        paymentDueDate: data.paymentDueDate ? new Date(data.paymentDueDate) : null,
+        paymentDueDate: baseData.paymentDueDate ? new Date(baseData.paymentDueDate) : null,
         sellerName: baseData.sellerName,
         sellerNip: baseData.sellerNip,
         buyerName: baseData.buyerName,

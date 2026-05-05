@@ -322,6 +322,7 @@ export default function InvoiceDetailPage() {
   const [creatingCorrection, setCreatingCorrection] = useState(false);
   const [showCorrectionModal, setShowCorrectionModal] = useState(false);
   const [correctionIssueDate, setCorrectionIssueDate] = useState("");
+  const [correctionPaymentDueDate, setCorrectionPaymentDueDate] = useState("");
   const [correctionSelectedItemIds, setCorrectionSelectedItemIds] = useState<Set<string>>(new Set());
 
   function loadInvoice() {
@@ -404,12 +405,16 @@ export default function InvoiceDetailPage() {
 
   useEffect(() => {
     if (showCorrectionModal) {
-      setCorrectionIssueDate(new Date().toISOString().slice(0, 10));
+      const today = new Date().toISOString().slice(0, 10);
+      setCorrectionIssueDate(today);
+      setCorrectionPaymentDueDate(
+        invoice?.paymentDueDate ? new Date(invoice.paymentDueDate).toISOString().slice(0, 10) : today
+      );
       setCorrectionSelectedItemIds(
         new Set((invoice?.items ?? []).map((it) => it.id))
       );
     }
-  }, [showCorrectionModal, invoice?.items]);
+  }, [showCorrectionModal, invoice?.items, invoice?.paymentDueDate]);
 
   if (loading) return <p className="text-muted">Ładowanie…</p>;
   if (!invoice) return <p className="text-muted">Nie znaleziono faktury.</p>;
@@ -1417,6 +1422,15 @@ export default function InvoiceDetailPage() {
                           className="rounded border border-border bg-bg px-3 py-2 w-full"
                         />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-muted mb-1">Termin płatności</label>
+                        <input
+                          type="date"
+                          value={correctionPaymentDueDate}
+                          onChange={(e) => setCorrectionPaymentDueDate(e.target.value)}
+                          className="rounded border border-border bg-bg px-3 py-2 w-full"
+                        />
+                      </div>
                       {invoice?.items && invoice.items.length > 0 && (
                         <div>
                           <div className="flex items-center justify-between mb-2">
@@ -1499,6 +1513,7 @@ export default function InvoiceDetailPage() {
                             const payload: Record<string, unknown> = {
                               correctionOfId: id,
                               issueDate: correctionIssueDate,
+                              paymentDueDate: correctionPaymentDueDate || null,
                               type: "sales",
                             };
                             if (
